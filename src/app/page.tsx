@@ -1,103 +1,149 @@
-import Image from "next/image";
+"use client";
+
+import PollForm from "./components/PollForm";
+import PollCard from "./components/PollCard";
+import { Poll } from "./types/poll";
+import { v4 as uuidv4 } from "uuid";
+import useLocalStorage from "./hooks/useLocalStorage";
+import { useState, useMemo } from "react";
+import { useAuth } from "./context/AuthContext";
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [polls, setPolls] = useLocalStorage<Poll[]>("polls", []);
+  const [deleteFeedbackMessage, setDeleteFeedbackMessage] = useState<string | null>(null);
+  const [deleteFeedbackType, setDeleteFeedbackType] = useState<"success" | "error" | null>(null);
+  const [activeFilter, setActiveFilter] = useState<"recent" | "trending" | "mine">("recent");
+  const { user } = useAuth(); // Get the current user from AuthContext
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const addPoll = (title: string, options: string[]) => {
+    const newPoll: Poll = {
+      id: uuidv4(),
+      title,
+      options: options.map((opt) => ({
+        id: uuidv4(),
+        text: opt,
+        votes: 0,
+      })),
+      creator: {
+        name: user ? user.email : "Usuário Anônimo", // Use user email if logged in
+        avatarUrl: "https://www.gravatar.com/avatar/?d=mp",
+      },
+      createdAt: Date.now(),
+      creatorId: user ? user.uid : "anonymous", // Use user uid if logged in
+    };
+    setPolls([...polls, newPoll]);
+  };
+
+  const handlePollCreated = () => {
+    setActiveFilter("mine");
+  };
+
+  const handleVote = (pollId: string, optionId: string) => {
+    setPolls((prevPolls) =>
+      prevPolls.map((poll) =>
+        poll.id === pollId
+          ? {
+              ...poll,
+              options: poll.options.map((option) =>
+                option.id === optionId
+                  ? { ...option, votes: option.votes + 1 }
+                  : option
+              ),
+            }
+          : poll
+      )
+    );
+  };
+
+  const handleDeletePoll = (pollId: string) => {
+    try {
+      setPolls((prevPolls) => prevPolls.filter((poll) => poll.id !== pollId));
+      setDeleteFeedbackMessage("Enquete excluída com sucesso!");
+      setDeleteFeedbackType("success");
+      setTimeout(() => setDeleteFeedbackMessage(null), 3000);
+    } catch (error) {
+      setDeleteFeedbackMessage("Erro ao excluir enquete.");
+      setDeleteFeedbackType("error");
+      setTimeout(() => setDeleteFeedbackMessage(null), 3000);
+    }
+  };
+
+  const filteredPolls = useMemo(() => {
+    let sortedPolls = [...polls];
+
+    if (activeFilter === "recent") {
+      sortedPolls.sort((a, b) => b.createdAt - a.createdAt);
+    } else if (activeFilter === "trending") {
+      sortedPolls.sort((a, b) => {
+        const votesA = a.options.reduce((sum, option) => sum + option.votes, 0);
+        const votesB = b.options.reduce((sum, option) => sum + option.votes, 0);
+        return votesB - votesA;
+      });
+    } else if (activeFilter === "mine") {
+      // Filter by logged-in user's ID, or show no polls if not logged in
+      sortedPolls = sortedPolls.filter(poll => user && poll.creatorId === user.uid);
+    }
+    return sortedPolls;
+  }, [polls, activeFilter, user]);
+
+  return (
+    <main className="min-h-screen w-full flex flex-col items-center px-4 py-24 bg-white dark:bg-zinc-900">
+      <div className="max-w-3xl w-full text-center mb-12">
+        <h1 className="text-5xl md:text-6xl font-extrabold text-zinc-900 dark:text-white leading-tight animate-fade-in">
+          Bem-vindo ao Poll App!
+        </h1>
+
+        {deleteFeedbackMessage && (
+        
+        <div className={`p-3 rounded-md text-white mt-4 ${
+            deleteFeedbackType === "success" ? "bg-green-500" : "bg-red-500"
+          }`}>
+            {deleteFeedbackMessage}
+          </div>
+        )}
+
+        <div className="text-center mt-4">
+        <a
+          href="/enquetes"
+          className="inline-block px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+        >
+          Ver todas as enquetes
+        </a>
+      </div>
+
+        <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
+          Crie enquetes e envie para outras pessoas.
+        </p>
+      </div>
+
+      <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl flex flex-col items-center gap-8 px-4">
+        <PollForm onAddPoll={addPoll} onPollCreated={handlePollCreated} />
+
+        <div className="flex space-x-4 mb-8">
+          <button
+            className={`px-4 py-2 rounded-full text-sm font-medium ${activeFilter === "recent" ? "bg-indigo-600 text-white" : "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200"}`}
+            onClick={() => setActiveFilter("recent")}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            Recentes
+          </button>
+          <button
+            className={`px-4 py-2 rounded-full text-sm font-medium ${activeFilter === "trending" ? "bg-indigo-600 text-white" : "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200"}`}
+            onClick={() => setActiveFilter("trending")}
           >
-            Read our docs
-          </a>
+            Em alta
+          </button>
+          <button
+            className={`px-4 py-2 rounded-full text-sm font-medium ${activeFilter === "mine" ? "bg-indigo-600 text-white" : "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200"}`}
+            onClick={() => setActiveFilter("mine")}
+          >
+            Minhas
+          </button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+
+        {filteredPolls.map((poll) => (
+          <PollCard key={poll.id} poll={poll} onVote={handleVote} onDelete={handleDeletePoll} />
+        ))}
+      </div>
+    </main>
   );
 }
