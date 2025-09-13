@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { auth } from "@/lib/firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 interface LoginProps {
   onLoginSuccess?: () => void;
@@ -17,15 +19,14 @@ export default function Login({ onLoginSuccess, onSwitchToSignup }: LoginProps) 
     e.preventDefault();
     setError(null);
     setLoading(true);
-    // Implement Firebase login logic here later
-    console.log("Login attempt with:", { email, password });
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    if (email === "test@example.com" && password === "password") {
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
       onLoginSuccess?.();
-    } else {
-      setError("Email ou senha incorretos.");
+    } catch (firebaseError: any) {
+      setError(firebaseError.message);
     }
+
     setLoading(false);
   };
 

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { auth } from "@/lib/firebase";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 
 interface SignupProps {
   onSignupSuccess?: () => void;
@@ -25,16 +27,13 @@ export default function Signup({ onSignupSuccess, onSwitchToLogin }: SignupProps
       return;
     }
 
-    // Implement Firebase signup logic here later
-    console.log("Signup attempt with:", { email, password });
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    if (email === "new@example.com" && password === "newpassword") {
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
       onSignupSuccess?.();
-    } else {
-      setError("Erro ao cadastrar. Tente novamente.");
+    } catch (firebaseError: any) {
+      setError(firebaseError.message);
     }
+
     setLoading(false);
   };
 

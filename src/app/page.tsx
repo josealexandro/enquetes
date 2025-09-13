@@ -4,41 +4,86 @@ import PollForm from "./components/PollForm";
 import PollCard from "./components/PollCard";
 import { Poll } from "./types/poll";
 import { v4 as uuidv4 } from "uuid";
-import useLocalStorage from "./hooks/useLocalStorage";
-import { useState, useMemo } from "react";
+// import useLocalStorage from "./hooks/useLocalStorage"; // Remover useLocalStorage
+import { useState, useMemo, useEffect } from "react"; // Adicionar useEffect
 import { useAuth } from "./context/AuthContext";
+import { motion } from "framer-motion";
+import { LayoutGroup } from "framer-motion";
+import { db } from "@/lib/firebase"; // Importar a instância do Firestore
+import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, arrayUnion, arrayRemove } from "firebase/firestore"; // Importar funções do Firestore
 
 export default function Home() {
-  const [polls, setPolls] = useLocalStorage<Poll[]>("polls", []);
+  const [polls, setPolls] = useState<Poll[]>([]); // Mudar para useState
+  const [loadingPolls, setLoadingPolls] = useState(true); // Novo estado para carregamento
   const [deleteFeedbackMessage, setDeleteFeedbackMessage] = useState<string | null>(null);
   const [deleteFeedbackType, setDeleteFeedbackType] = useState<"success" | "error" | null>(null);
   const [activeFilter, setActiveFilter] = useState<"recent" | "trending" | "mine">("recent");
-  const { user } = useAuth(); // Get the current user from AuthContext
+  const { user } = useAuth();
+  const [isClient, setIsClient] = useState(false); // Novo estado para montagem no cliente
 
-  const addPoll = (title: string, options: string[]) => {
-    const newPoll: Poll = {
-      id: uuidv4(),
+  // useEffect para carregar enquetes do Firestore em tempo real
+  useEffect(() => {
+    setIsClient(true); // Marcar como montado no cliente
+    setLoadingPolls(true);
+    const pollsCollection = collection(db, "polls");
+    const q = query(pollsCollection, orderBy("createdAt", "desc")); // Ordenar por data de criação
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedPolls = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Poll[];
+      setPolls(fetchedPolls);
+      setLoadingPolls(false);
+    }, (error) => {
+      console.error("Erro ao carregar enquetes:", error);
+      setLoadingPolls(false);
+    });
+
+    return () => unsubscribe(); // Limpar o listener quando o componente for desmontado
+  }, []);
+
+  const addPoll = async (title: string, options: string[]) => {
+    if (!user) {
+      alert("Você precisa estar logado para criar uma enquete.");
+      return;
+    }
+
+    const newPoll: Omit<Poll, "id"> = {
       title,
       options: options.map((opt) => ({
-        id: uuidv4(),
+        id: uuidv4(), // Usar uuid para IDs de opções
         text: opt,
         votes: 0,
       })),
       creator: {
-        name: user ? user.email : "Usuário Anônimo", // Use user email if logged in
-        avatarUrl: "https://www.gravatar.com/avatar/?d=mp",
+        name: user.email || "Usuário Logado",
+        avatarUrl: "https://www.gravatar.com/avatar/?d=mp", // Pode ser personalizado com o avatar do usuário
       },
-      createdAt: Date.now(),
-      creatorId: user ? user.uid : "anonymous", // Use user uid if logged in
+      createdAt: Date.now(), // Timestamp em milissegundos
+      creatorId: user.uid,
     };
-    setPolls([...polls, newPoll]);
+
+    try {
+      await addDoc(collection(db, "polls"), newPoll);
+      // setPolls((prev) => [...prev, { id: docRef.id, ...newPoll }]); // onSnapshot vai atualizar o estado
+    } catch (error) {
+      console.error("Erro ao adicionar enquete:", error);
+      alert("Erro ao criar enquete. Tente novamente.");
+    }
   };
 
   const handlePollCreated = () => {
     setActiveFilter("mine");
   };
 
-  const handleVote = (pollId: string, optionId: string) => {
+  const handleVote = async (pollId: string, optionId: string) => {
+    if (!user) {
+      alert("Você precisa estar logado para votar.");
+      return;
+    }
+
+    // Otimista: Atualiza a UI imediatamente
     setPolls((prevPolls) =>
       prevPolls.map((poll) =>
         poll.id === pollId
@@ -53,15 +98,58 @@ export default function Home() {
           : poll
       )
     );
+
+    try {
+      const pollRef = doc(db, "polls", pollId);
+      // Para evitar sobrescrever votos de outros usuários, busco o poll mais recente
+      // Isso pode ser otimizado com transações ou um modelo de dados diferente no Firestore para votos
+      const currentPoll = polls.find(p => p.id === pollId);
+      if (currentPoll) {
+        const updatedOptions = currentPoll.options.map(option =>
+          option.id === optionId ? { ...option, votes: option.votes + 1 } : option
+        );
+        await updateDoc(pollRef, { options: updatedOptions });
+      }
+    } catch (error) {
+      console.error("Erro ao votar:", error);
+      alert("Erro ao registrar voto. Tente novamente.");
+      // Reverter a UI se o voto falhar
+      setPolls((prevPolls) =>
+        prevPolls.map((poll) =>
+          poll.id === pollId
+            ? {
+                ...poll,
+                options: poll.options.map((option) =>
+                  option.id === optionId
+                    ? { ...option, votes: option.votes - 1 }
+                    : option
+                ),
+              }
+            : poll
+        )
+      );
+    }
   };
 
-  const handleDeletePoll = (pollId: string) => {
+  const handleDeletePoll = async (pollId: string) => {
+    if (!user) {
+      alert("Você precisa estar logado para excluir enquetes.");
+      return;
+    }
+
+    const pollToDelete = polls.find(p => p.id === pollId);
+    if (!pollToDelete || pollToDelete.creatorId !== user.uid) {
+      alert("Você não tem permissão para excluir esta enquete.");
+      return;
+    }
+
     try {
-      setPolls((prevPolls) => prevPolls.filter((poll) => poll.id !== pollId));
+      await deleteDoc(doc(db, "polls", pollId));
       setDeleteFeedbackMessage("Enquete excluída com sucesso!");
       setDeleteFeedbackType("success");
       setTimeout(() => setDeleteFeedbackMessage(null), 3000);
     } catch (error) {
+      console.error("Erro ao excluir enquete:", error);
       setDeleteFeedbackMessage("Erro ao excluir enquete.");
       setDeleteFeedbackType("error");
       setTimeout(() => setDeleteFeedbackMessage(null), 3000);
@@ -85,6 +173,21 @@ export default function Home() {
     }
     return sortedPolls;
   }, [polls, activeFilter, user]);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 },
+  };
 
   return (
     <main className="min-h-screen w-full flex flex-col items-center px-4 py-24 bg-white dark:bg-zinc-900">
@@ -117,32 +220,61 @@ export default function Home() {
       </div>
 
       <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl flex flex-col items-center gap-8 px-4">
-        <PollForm onAddPoll={addPoll} onPollCreated={handlePollCreated} />
+        {!isClient ? (
+          <p className="text-zinc-600 dark:text-zinc-400">Carregando conteúdo...</p>
+        ) : (
+          <>
+            <PollForm onAddPoll={addPoll} onPollCreated={handlePollCreated} />
 
-        <div className="flex space-x-4 mb-8">
-          <button
-            className={`px-4 py-2 rounded-full text-sm font-medium ${activeFilter === "recent" ? "bg-indigo-600 text-white" : "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200"}`}
-            onClick={() => setActiveFilter("recent")}
-          >
-            Recentes
-          </button>
-          <button
-            className={`px-4 py-2 rounded-full text-sm font-medium ${activeFilter === "trending" ? "bg-indigo-600 text-white" : "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200"}`}
-            onClick={() => setActiveFilter("trending")}
-          >
-            Em alta
-          </button>
-          <button
-            className={`px-4 py-2 rounded-full text-sm font-medium ${activeFilter === "mine" ? "bg-indigo-600 text-white" : "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200"}`}
-            onClick={() => setActiveFilter("mine")}
-          >
-            Minhas
-          </button>
-        </div>
+            <div className="flex space-x-4 mb-8">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors duration-300 ${activeFilter === "recent" ? "bg-indigo-600 text-white" : "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200"}`}
+                onClick={() => setActiveFilter("recent")}
+              >
+                Recentes
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors duration-300 ${activeFilter === "trending" ? "bg-indigo-600 text-white" : "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200"}`}
+                onClick={() => setActiveFilter("trending")}
+              >
+                Em alta
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors duration-300 ${activeFilter === "mine" ? "bg-indigo-600 text-white" : "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200"}`}
+                onClick={() => setActiveFilter("mine")}
+              >
+                Minhas
+              </motion.button>
+            </div>
 
-        {filteredPolls.map((poll) => (
-          <PollCard key={poll.id} poll={poll} onVote={handleVote} onDelete={handleDeletePoll} />
-        ))}
+            {loadingPolls ? (
+              <p className="text-zinc-600 dark:text-zinc-400">Carregando enquetes...</p>
+            ) : filteredPolls.length === 0 ? (
+              <p className="text-zinc-600 dark:text-zinc-400">Nenhuma enquete encontrada para este filtro.</p>
+            ) : (
+              <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="w-full flex flex-col items-center gap-8"
+              >
+                <LayoutGroup>
+                  {filteredPolls.map((poll) => (
+                    <motion.div key={poll.id} variants={itemVariants} className="w-full">
+                      <PollCard poll={poll} onVote={handleVote} onDelete={handleDeletePoll} />
+                    </motion.div>
+                  ))}
+                </LayoutGroup>
+              </motion.div>
+            )}
+          </>
+        )}
       </div>
     </main>
   );

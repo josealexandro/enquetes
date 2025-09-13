@@ -1,9 +1,17 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { auth } from "@/lib/firebase"; // Importar a instância de autenticação do Firebase
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  User
+} from "firebase/auth";
 
 interface AuthContextType {
-  user: { uid: string; email: string } | null;
+  user: User | null; // O tipo de usuário agora é o User do Firebase
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
@@ -17,53 +25,52 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<{ uid: string; email: string } | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate checking for a logged-in user (e.g., from localStorage or a token)
-    const storedUser = localStorage.getItem("currentUser");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const login = async (email: string, password: string) => {
     setLoading(true);
-    // Simulate Firebase login
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    if (email === "test@example.com" && password === "password") {
-      const mockUser = { uid: "mock-uid-123", email };
-      setUser(mockUser);
-      localStorage.setItem("currentUser", JSON.stringify(mockUser));
-    } else {
-      throw new Error("Email ou senha incorretos.");
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (error: any) {
+      console.error("Erro ao fazer login:", error.message);
+      throw new Error("Email ou senha incorretos."); // Mensagem amigável ao usuário
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const signup = async (email: string, password: string) => {
     setLoading(true);
-    // Simulate Firebase signup
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    if (email === "new@example.com" && password === "newpassword") {
-      const mockUser = { uid: "mock-uid-new", email };
-      setUser(mockUser);
-      localStorage.setItem("currentUser", JSON.stringify(mockUser));
-    } else {
-      throw new Error("Erro ao cadastrar. Tente novamente.");
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+    } catch (error: any) {
+      console.error("Erro ao cadastrar:", error.message);
+      throw new Error("Erro ao cadastrar. Tente novamente."); // Mensagem amigável ao usuário
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const logout = async () => {
     setLoading(true);
-    // Simulate Firebase logout
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setUser(null);
-    localStorage.removeItem("currentUser");
-    setLoading(false);
+    try {
+      await signOut(auth);
+    } catch (error: any) {
+      console.error("Erro ao fazer logout:", error.message);
+      throw new Error("Erro ao fazer logout. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -76,7 +83,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error("useAuth deve ser usado dentro de um AuthProvider");
   }
   return context;
 }

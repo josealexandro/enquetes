@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { v4 as uuidv4 } from "uuid"; // Instale com: npm install uuid
+import { motion } from "framer-motion";
 
 interface PollFormProps {
   onAddPoll?: (title: string, options: string[]) => void;
@@ -28,28 +29,7 @@ export default function PollForm({ onAddPoll, onPollCreated }: PollFormProps) {
     setOptions(options.filter((_, i) => i !== index));
   };
 
-  const savePollToLocalStorage = (title: string, options: string[]) => {
-    const existingPolls = JSON.parse(localStorage.getItem("polls") || "[]");
-
-    const newPoll = {
-      id: uuidv4(),
-      title,
-      options: options.map((opt) => ({
-        id: uuidv4(),
-        text: opt,
-        votes: 0,
-      })),
-      creator: {
-        name: "Usuário Anônimo",
-        avatarUrl: "https://www.gravatar.com/avatar/?d=mp",
-      },
-    };
-
-    const updatedPolls = [...existingPolls, newPoll];
-    localStorage.setItem("polls", JSON.stringify(updatedPolls));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => { // Tornar handleSubmit assíncrono
     e.preventDefault();
 
     const trimmedTitle = title.trim();
@@ -75,17 +55,20 @@ export default function PollForm({ onAddPoll, onPollCreated }: PollFormProps) {
     }
 
     try {
-      onAddPoll?.(trimmedTitle, filteredOptions);
+      if (onAddPoll) {
+        await onAddPoll(trimmedTitle, filteredOptions); // Chamar onAddPoll e aguardar
+      }
       setFeedbackMessage("Enquete criada com sucesso!");
       setFeedbackType("success");
       setTitle("");
       setOptions(["", ""]);
       setTimeout(() => {
         setFeedbackMessage(null);
-        onPollCreated?.(); // Call the callback after poll creation
+        onPollCreated?.();
       }, 3000);
     } catch (error) {
-      setFeedbackMessage("Erro ao criar enquete.");
+      console.error("Erro ao criar enquete:", error);
+      setFeedbackMessage("Erro ao criar enquete."); // Usar mensagem mais genérica, já que o erro pode vir do Firestore
       setFeedbackType("error");
       setTimeout(() => setFeedbackMessage(null), 3000);
     }
@@ -128,31 +111,37 @@ export default function PollForm({ onAddPoll, onPollCreated }: PollFormProps) {
             required
           />
           {options.length > 2 && (
-            <button
+            <motion.button
               type="button"
               onClick={() => removeOption(idx)}
               className="px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700 transition"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
             >
               ✕
-            </button>
+            </motion.button>
           )}
         </div>
       ))}
 
-      <button
+      <motion.button
         type="button"
         onClick={addOption}
         className="w-full px-4 py-2 rounded bg-gradient-to-r from-cyan-500 to-purple-600 text-white font-poppins font-bold shadow-md hover:scale-105 transition-transform duration-300"
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
       >
         Adicionar Opção
-      </button>
+      </motion.button>
 
-      <button
+      <motion.button
         type="submit"
         className="w-full px-4 py-2 rounded bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-poppins font-bold shadow-md hover:scale-105 transition-transform duration-300"
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
       >
         Criar Enquete
-      </button>
+      </motion.button>
     </form>
   );
 }

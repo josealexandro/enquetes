@@ -8,11 +8,14 @@ import { faSun, faMoon } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from "../context/AuthContext";
 import Login from "./Auth/Login";
 import Signup from "./Auth/Signup";
+import { motion } from "framer-motion";
+import { faBars, faTimes } from '@fortawesome/free-solid-svg-icons'; // Import hamburger and close icons
 
 export default function Header() {
   const [darkMode, setDarkMode] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
   const { user, logout, loading } = useAuth();
 
   useEffect(() => {
@@ -43,13 +46,13 @@ export default function Header() {
   const handleLoginSuccess = () => {
     setShowLoginModal(false);
     setShowSignupModal(false);
-    // You might want to redirect or show a success message here
+    setIsMobileMenuOpen(false); // Close mobile menu on login
   };
 
   const handleSignupSuccess = () => {
     setShowSignupModal(false);
     setShowLoginModal(false);
-    // You might want to automatically log in the user or redirect to login
+    setIsMobileMenuOpen(false); // Close mobile menu on signup
   };
 
   if (loading) {
@@ -60,49 +63,82 @@ export default function Header() {
     <header className="w-full bg-zinc-800 text-white py-4 px-6 fixed top-0 z-50 shadow-md transition-colors duration-300">
       <nav className="max-w-7xl mx-auto flex justify-between items-center">
         <Link href="/" className="hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300">
-          <Image src="/logoHome.png" alt="Poll App Logo" width={120} height={40} />
+          <Image src="/logoHome.png" alt="Logo do Aplicativo de Enquetes" width={120} height={40} objectFit="contain" />
         </Link>
-        <div className="flex items-center space-x-6">
-          <Link href="/" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300">Home</Link>
-          <Link href="/enquetes" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300">Enquetes</Link>
+
+        {/* Mobile menu button */}
+        <div className="flex items-center md:hidden">
+          <motion.button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="text-white p-2 rounded-full hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors duration-300"
+            aria-label="Abrir/Fechar Menu Mobile"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <FontAwesomeIcon icon={isMobileMenuOpen ? faTimes : faBars} size="lg" />
+          </motion.button>
+        </div>
+
+        {/* Desktop menu items and mobile menu content */}
+        <div className={`md:flex items-center space-x-6 ${isMobileMenuOpen ? "flex flex-col absolute top-full left-0 w-full bg-zinc-800 p-4 shadow-md items-center space-y-4" : "hidden"}`}>
+          <Link href="/" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
+          <Link href="/enquetes" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300" onClick={() => setIsMobileMenuOpen(false)}>Enquetes</Link>
           {!user ? (
             <>
-              <button
-                onClick={() => setShowLoginModal(true)}
+              <motion.button
+                onClick={() => { setShowLoginModal(true); setIsMobileMenuOpen(false); }}
                 className="px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition-colors duration-300"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
                 Login
-              </button>
-              <button
-                onClick={() => setShowSignupModal(true)}
+              </motion.button>
+              <motion.button
+                onClick={() => { setShowSignupModal(true); setIsMobileMenuOpen(false); }}
                 className="px-4 py-2 rounded-full bg-gray-200 text-zinc-800 hover:bg-gray-300 transition-colors duration-300"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
                 Cadastre-se
-              </button>
+              </motion.button>
             </>
           ) : (
             <>
               <span className="text-white">Olá, {user.email}!</span>
-              <button
-                onClick={logout}
+              <motion.button
+                onClick={() => { logout(); setIsMobileMenuOpen(false); }}
                 className="px-4 py-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors duration-300"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
                 Sair
-              </button>
+              </motion.button>
             </>
           )}
-          <button
+          <motion.button
             onClick={toggleDarkMode}
             className="text-white p-2 rounded-full hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors duration-300"
-            aria-label="Toggle Dark Mode"
+            aria-label="Alternar Modo Escuro"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
             <FontAwesomeIcon icon={darkMode ? faSun : faMoon} size="lg" />
-          </button>
+          </motion.button>
         </div>
       </nav>
       {(showLoginModal || showSignupModal) && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]">
-          <div className="relative">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]"
+        >
+          <motion.div
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -50, opacity: 0 }}
+            className="relative"
+          >
             {showLoginModal && (
               <Login
                 onLoginSuccess={handleLoginSuccess}
@@ -121,14 +157,16 @@ export default function Header() {
                 }}
               />
             )}
-            <button
+            <motion.button
               onClick={() => { setShowLoginModal(false); setShowSignupModal(false); }}
               className="absolute top-2 right-2 text-white text-xl p-2 hover:text-gray-300"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
             >
               &times;
-            </button>
-          </div>
-        </div>
+            </motion.button>
+          </motion.div>
+        </motion.div>
       )}
     </header>
   );

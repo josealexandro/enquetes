@@ -6,6 +6,12 @@ import { v4 as uuidv4 } from "uuid";
 import CommentComponent from "./Comment";
 import CommentForm from "./CommentForm";
 import Image from "next/image";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faShareNodes } from '@fortawesome/free-solid-svg-icons';
+import { motion } from "framer-motion";
+import { db } from "@/lib/firebase"; // Importar a instância do Firestore
+import { collection, query, orderBy, onSnapshot, addDoc } from "firebase/firestore"; // Importar funções do Firestore
+import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 
 interface PollCardProps {
   poll: Poll;
@@ -16,9 +22,68 @@ interface PollCardProps {
 export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
   const [votedOptionId, setVotedOptionId] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [isClient, setIsClient] = useState(false); // Adicionar estado isClient
-  const totalVotes = poll.options.reduce((sum, opt) => sum + opt.votes, 0);
+  const [isClient, setIsClient] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [currentTotalVotes, setCurrentTotalVotes] = useState(poll.options.reduce((sum, opt) => sum + opt.votes, 0));
+  const { user } = useAuth(); // Obter o usuário logado
 
+  // Update currentTotalVotes if the poll's total votes change externally (e.g., via real-time DB)
+  useEffect(() => {
+    setCurrentTotalVotes(poll.options.reduce((sum, opt) => sum + opt.votes, 0));
+  }, [poll.options]);
+
+  // useEffect para carregar comentários do Firestore em tempo real
+  useEffect(() => {
+    const commentsCollectionRef = collection(db, "polls", poll.id, "comments");
+    const q = query(commentsCollectionRef, orderBy("timestamp", "asc"));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedComments = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Comment[];
+      setComments(fetchedComments);
+    }, (error) => {
+      console.error("Erro ao carregar comentários:", error);
+    });
+
+    setIsClient(true); // Manter isso para outras funcionalidades que dependem do cliente
+    return () => unsubscribe();
+  }, [poll.id]);
+
+  const pollShareLink = `${window.location.origin}/poll/${poll.id}`;
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(pollShareLink);
+    alert("Link copiado para a área de transferência!");
+    setShowShareMenu(false);
+  };
+
+  const shareOnWhatsApp = () => {
+    window.open(`https://wa.me/?text=${encodeURIComponent(poll.title + "\n" + pollShareLink)}`, "_blank");
+    setShowShareMenu(false);
+  };
+
+  const shareGeneric = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: poll.title,
+        text: "Vote nesta enquete!",
+        url: pollShareLink,
+      }).then(() => {
+        console.log("Compartilhado com sucesso!");
+        setShowShareMenu(false);
+      }).catch((error) => {
+        console.error("Erro ao compartilhar:", error);
+      });
+    } else {
+      alert("Seu navegador não suporta a API de Compartilhamento. Por favor, copie o link.");
+      copyToClipboard();
+    }
+  };
+
+  // Remover loadComments e saveCommentsToLocalStorage
+  /*
   const loadComments = (pollId: string) => {
     const storedComments = localStorage.getItem("comments");
     if (storedComments) {
@@ -33,30 +98,40 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
     const newComments = [...otherPollComments, ...updatedComments];
     localStorage.setItem("comments", JSON.stringify(newComments));
   };
-
-  useEffect(() => {
-    loadComments(poll.id);
-    setIsClient(true); // Definir como true após a montagem do cliente
-  }, [poll.id]);
+  */
 
   const handleVoteClick = (optionId: string) => {
-    if (votedOptionId) return; // impede múltiplos votos
+    if (votedOptionId) return;
     onVote(poll.id, optionId);
     setVotedOptionId(optionId);
+    // Manually update total votes for immediate feedback (before state sync)
+    setCurrentTotalVotes(prev => prev + 1);
   };
 
-  const handleAddComment = (author: string, text: string, parentId?: string) => {
-    const newComment: Comment = {
-      id: uuidv4(),
+  const handleAddComment = async (author: string, text: string, parentId?: string) => {
+    if (!user) {
+      alert("Você precisa estar logado para comentar.");
+      return;
+    }
+
+    const newComment = {
       pollId: poll.id,
       parentId,
       author,
+      authorId: user.uid,
+      authorEmail: user.email,
       text,
       timestamp: Date.now(),
     };
-    const updatedComments = [...comments, newComment]; // Remover a ordenação aqui
-    setComments(updatedComments);
-    saveCommentsToLocalStorage(updatedComments);
+
+    try {
+      const commentsCollectionRef = collection(db, "polls", poll.id, "comments");
+      await addDoc(commentsCollectionRef, newComment);
+      // onSnapshot já vai atualizar o estado de comments, não precisamos fazer setComments aqui
+    } catch (error) {
+      console.error("Erro ao adicionar comentário:", error);
+      alert("Erro ao adicionar comentário. Tente novamente.");
+    }
   };
 
   const renderCommentsHierarchically = (currentParentId: string | undefined, depth: number) => {
@@ -71,7 +146,6 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
           onAddReply={(replyParentId, author, text) => handleAddComment(author, text, replyParentId)}
           className={depth > 0 ? "ml-6" : ""}
         />
-        {/* Recursivamente renderiza as respostas */}
         {renderCommentsHierarchically(comment.id, depth + 1)}
       </div>
     ));
@@ -79,21 +153,57 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
 
   return (
     <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 mb-6 border border-transparent hover:border-indigo-500 transform hover:-translate-y-1">
-      <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4">
-        {poll.title}
-      </h2>
+      <div className="flex justify-between items-start mb-4">
+        <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white max-w-[calc(100%-80px)] sm:max-w-[calc(100%-120px)] break-words">
+          {poll.title}
+        </h2>
+        <div className="flex flex-shrink-0 items-center space-x-2 relative">
+          <div className="relative">
+            <button
+              onClick={() => setShowShareMenu(!showShareMenu)}
+              className="text-zinc-300 hover:text-indigo-400 p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors duration-200"
+              aria-label="Opções de Compartilhamento"
+            >
+              <FontAwesomeIcon icon={faShareNodes} size="lg" />
+            </button>
+            {showShareMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-zinc-700 rounded-md shadow-lg py-1 z-10">
+                <button
+                  onClick={copyToClipboard}
+                  className="block w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-600"
+                >
+                  Copiar Link
+                </button>
+                <button
+                  onClick={shareOnWhatsApp}
+                  className="block w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-600"
+                >
+                  Compartilhar no WhatsApp
+                </button>
+                <button
+                  onClick={shareGeneric}
+                  className="block w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-600"
+                >
+                  Compartilhar
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => onDelete(poll.id)}
+            className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors duration-200"
+            aria-label="Excluir Enquete"
+          >
+            Excluir
+          </button>
+        </div>
+      </div>
       <div className="flex items-center text-sm text-zinc-600 dark:text-zinc-400 mb-4">
         <img src={poll.creator.avatarUrl} alt={poll.creator.name} className="w-8 h-8 rounded-full mr-2" />
         <span>Criado por {poll.creator.name}</span>
       </div>
-      <button
-        onClick={() => onDelete(poll.id)}
-        className="absolute top-4 right-4 text-red-500 hover:text-red-700"
-      >
-        Excluir
-      </button>
 
-      {isClient && ( // Renderizar conteúdo dependente do cliente apenas se isClient for true
+      {isClient && (
         <>
           {votedOptionId && (
             <p className="text-green-600 text-sm mb-4">Obrigado por votar!</p>
@@ -101,15 +211,17 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
 
           <ul className="space-y-4">
             {poll.options.map((option) => {
-              const percent = totalVotes ? Math.round((option.votes / totalVotes) * 100) : 0;
+              const percent = currentTotalVotes ? Math.round((option.votes / currentTotalVotes) * 100) : 0;
 
               return (
                 <li key={option.id}>
                   <div className="flex justify-between items-center mb-1">
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.02, x: 5 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => handleVoteClick(option.id)}
                       disabled={!!votedOptionId}
-                      className={`text-left font-medium ${
+                      className={`text-left font-medium transition-colors duration-200 ${
                         votedOptionId === option.id
                           ? "text-blue-600 dark:text-blue-400"
                           : votedOptionId
@@ -118,8 +230,8 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
                       }`}
                     >
                       {option.text}
-                    </button>
-                    <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                    </motion.button>
+                    <span key={option.votes} className="text-sm text-zinc-600 dark:text-zinc-400 animate-pulse-once">
                       {option.votes} votos ({percent}%)
                     </span>
                   </div>
@@ -141,7 +253,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
               {comments.length === 0 ? (
                 <div className="text-center text-zinc-600 dark:text-zinc-400">Nenhum comentário ainda. Seja o primeiro a comentar!</div>
               ) : (
-                renderCommentsHierarchically(undefined, 0) // Passar undefined para o primeiro nível
+                renderCommentsHierarchically(undefined, 0)
               )}
             </div>
           </div>
