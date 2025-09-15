@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { auth } from "@/lib/firebase";
-import { createUserWithEmailAndPassword, FirebaseError } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 
 interface SignupProps {
   onSignupSuccess?: () => void;
@@ -30,8 +30,12 @@ export default function Signup({ onSignupSuccess, onSwitchToLogin }: SignupProps
     try {
       await createUserWithEmailAndPassword(auth, email, password);
       onSignupSuccess?.();
-    } catch (firebaseError: FirebaseError) {
-      setError(firebaseError.message);
+    } catch (error: any) {
+      if (error && typeof error === "object" && "message" in error) {
+        setError((error as any).message);
+      } else {
+        setError("Ocorreu um erro desconhecido.");
+      }
     }
 
     setLoading(false);

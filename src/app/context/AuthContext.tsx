@@ -8,7 +8,6 @@ import {
   signOut,
   onAuthStateChanged,
   User,
-  FirebaseError // Adicionar FirebaseError aqui
 } from "firebase/auth";
 
 interface AuthContextType {
@@ -42,9 +41,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (error: FirebaseError) { // Alterado de 'any' para 'FirebaseError'
-      console.error("Erro ao fazer login:", error.message);
-      throw new Error("Email ou senha incorretos."); // Mensagem amigável ao usuário
+    } catch (error: any) {
+      console.error("Erro ao fazer login:", (error as any).message);
+      throw new Error((error as any).message || "Email ou senha incorretos."); // Mensagem amigável ao usuário
     } finally {
       setLoading(false);
     }
@@ -54,9 +53,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true);
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-    } catch (error: FirebaseError) { // Alterado de 'any' para 'FirebaseError'
-      console.error("Erro ao cadastrar:", error.message);
-      throw new Error("Erro ao cadastrar. Tente novamente."); // Mensagem amigável ao usuário
+    } catch (error: any) {
+      console.error("Erro ao cadastrar:", (error as any).message);
+      throw new Error((error as any).message || "Erro ao cadastrar. Tente novamente."); // Mensagem amigável ao usuário
     } finally {
       setLoading(false);
     }
@@ -66,9 +65,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true);
     try {
       await signOut(auth);
-    } catch (error: FirebaseError) { // Alterado de 'any' para 'FirebaseError'
-      console.error("Erro ao fazer logout:", error.message);
-      throw new Error("Erro ao fazer logout. Tente novamente.");
+    } catch (error: any) {
+      console.error("Erro ao fazer logout:", (error as any).message);
+      throw new Error((error as any).message || "Erro ao fazer logout. Tente novamente.");
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { auth } from "@/lib/firebase";
-import { signInWithEmailAndPassword, FirebaseError } from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 interface LoginProps {
   onLoginSuccess?: () => void;
@@ -23,8 +23,12 @@ export default function Login({ onLoginSuccess, onSwitchToSignup }: LoginProps) 
     try {
       await signInWithEmailAndPassword(auth, email, password);
       onLoginSuccess?.();
-    } catch (firebaseError: FirebaseError) {
-      setError(firebaseError.message);
+    } catch (error: any) {
+      if (error && typeof error === "object" && "message" in error) {
+        setError((error as any).message);
+      } else {
+        setError("Ocorreu um erro desconhecido.");
+      }
     }
 
     setLoading(false);
