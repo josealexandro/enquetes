@@ -5,13 +5,13 @@ import { getFirestore } from "firebase/firestore";
 
 
 const firebaseConfig = {
-    apiKey: "AIzaSyB8MhmgReuul8G-afA4prOG01pTaLnkIlA",
-    authDomain: "poll-app1366.firebaseapp.com",
-    projectId: "poll-app1366",
-    storageBucket: "poll-app1366.firebasestorage.app",
-    messagingSenderId: "806315458366",
-    appId: "1:806315458366:web:b51cfe7717ceb586e1366f",
-    measurementId: "G-FS45HXP73K"
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
   };
   
 

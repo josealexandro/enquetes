@@ -7,7 +7,8 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  User
+  User,
+  FirebaseError // Adicionar FirebaseError aqui
 } from "firebase/auth";
 
 interface AuthContextType {
@@ -41,7 +42,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
+    } catch (error: FirebaseError) { // Alterado de 'any' para 'FirebaseError'
       console.error("Erro ao fazer login:", error.message);
       throw new Error("Email ou senha incorretos."); // Mensagem amigável ao usuário
     } finally {
@@ -53,7 +54,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true);
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
+    } catch (error: FirebaseError) { // Alterado de 'any' para 'FirebaseError'
       console.error("Erro ao cadastrar:", error.message);
       throw new Error("Erro ao cadastrar. Tente novamente."); // Mensagem amigável ao usuário
     } finally {
@@ -65,7 +66,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true);
     try {
       await signOut(auth);
-    } catch (error: any) {
+    } catch (error: FirebaseError) { // Alterado de 'any' para 'FirebaseError'
       console.error("Erro ao fazer logout:", error.message);
       throw new Error("Erro ao fazer logout. Tente novamente.");
     } finally {

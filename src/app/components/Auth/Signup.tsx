@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { auth } from "@/lib/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, FirebaseError } from "firebase/auth";
 
 interface SignupProps {
   onSignupSuccess?: () => void;
@@ -30,7 +30,7 @@ export default function Signup({ onSignupSuccess, onSwitchToLogin }: SignupProps
     try {
       await createUserWithEmailAndPassword(auth, email, password);
       onSignupSuccess?.();
-    } catch (firebaseError: any) {
+    } catch (firebaseError: FirebaseError) {
       setError(firebaseError.message);
     }
 
