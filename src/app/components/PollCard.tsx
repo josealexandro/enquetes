@@ -107,7 +107,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
     setCurrentTotalVotes(prev => prev + 1);
   };
 
-  const handleAddComment = async (author: string, text: string, parentId?: string) => {
+  const handleAddComment = async (text: string, parentId?: string) => {
     if (!user) {
       alert("Você precisa estar logado para comentar.");
       return;
@@ -116,7 +116,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
     const newComment = {
       pollId: poll.id,
       parentId,
-      author,
+      author: user.email || "Usuário Logado", // Usar o email do usuário logado como autor
       authorId: user.uid,
       authorEmail: user.email,
       text,
@@ -142,7 +142,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
       <div key={comment.id} className="w-full">
         <CommentComponent
           comment={comment}
-          onAddReply={(replyParentId, text) => handleAddComment(user?.email || "Usuário Logado", text, replyParentId)}
+          onAddReply={(replyParentId, text) => handleAddComment(text, replyParentId)}
           className={depth > 0 ? "ml-6" : ""}
         />
         {renderCommentsHierarchically(comment.id, depth + 1)}
