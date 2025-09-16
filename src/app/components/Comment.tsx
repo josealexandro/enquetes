@@ -6,18 +6,15 @@ import CommentForm from "./CommentForm";
 
 interface CommentProps {
   comment: Comment;
-  onAddReply: (parentId: string, text: string) => void; // Ajustado para não esperar 'author'
+  onAddReply: (parentId: string, text: string) => Promise<void>; // Agora retorna Promise<void>
   className?: string;
 }
 
 export default function CommentComponent({ comment, onAddReply, className }: CommentProps) {
   const [showReplyForm, setShowReplyForm] = useState(false);
 
-  // handleReplySubmit agora corresponde à assinatura de onAddComment do CommentForm
-  const handleReplySubmit = (text: string) => {
-    // Chamamos onAddReply com o parentId do comentário atual e o texto da resposta
-    // O author será providenciado pelo PollCard, que detém o estado do usuário logado
-    onAddReply(comment.id, text);
+  const handleReplySubmit = async (text: string, parentId?: string) => {
+    await onAddReply(comment.id, text);
     setShowReplyForm(false);
   };
 
