@@ -21,6 +21,14 @@ export default function EnquetesPage() {
     setPolls(updatedPolls);
   };
 
+  const handleDeletePoll = (pollId: string) => {
+    // Aqui, em um app real, você adicionaria lógica de confirmação e talvez de autenticação/autorização
+    if (window.confirm("Tem certeza de que deseja excluir esta enquete?")) {
+      const updatedPolls = polls.filter((poll) => poll.id !== pollId);
+      setPolls(updatedPolls);
+    }
+  };
+
   return (
     <main className="min-h-screen w-full px-4 py-24 bg-white dark:bg-zinc-900">
       <div className="max-w-4xl mx-auto">
@@ -35,7 +43,7 @@ export default function EnquetesPage() {
         ) : (
           <div className="space-y-8">
             {polls.map((poll) => (
-              <PollCard key={poll.id} poll={poll} onVote={handleVote} />
+              <PollCard key={poll.id} poll={poll} onVote={handleVote} onDelete={handleDeletePoll} />
             ))}
           </div>
         )}

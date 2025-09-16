@@ -13,7 +13,7 @@ interface CommentProps {
 export default function CommentComponent({ comment, onAddReply, className }: CommentProps) {
   const [showReplyForm, setShowReplyForm] = useState(false);
 
-  const handleReplySubmit = async (text: string, parentId?: string) => {
+  const handleReplySubmit = async (text: string) => {
     await onAddReply(comment.id, text);
     setShowReplyForm(false);
   };
