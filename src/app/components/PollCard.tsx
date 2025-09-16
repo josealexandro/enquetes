@@ -142,7 +142,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
       <div key={comment.id} className="w-full">
         <CommentComponent
           comment={comment}
-          onAddReply={(replyParentId, author, text) => handleAddComment(author, text, replyParentId)}
+          onAddReply={(replyParentId, text) => handleAddComment(user?.email || "Usuário Logado", text, replyParentId)}
           className={depth > 0 ? "ml-6" : ""}
         />
         {renderCommentsHierarchically(comment.id, depth + 1)}
