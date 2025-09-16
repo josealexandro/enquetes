@@ -5,7 +5,7 @@ import React, { useState, useEffect } from "react";
 interface CommentFormProps {
   pollId: string;
   parentId?: string; // Optional: for replies
-  onAddComment: (text: string, parentId?: string) => void; // onAddComment agora só espera text e parentId
+  onAddComment: (text: string, parentId?: string) => Promise<void>; // Agora aceita Promise<void>
   initialText?: string; // New: for pre-filling reply text
 }
 
@@ -18,13 +18,13 @@ export default function CommentForm({ parentId, onAddComment, initialText }: Com
     setCommentText(initialText || "");
   }, [initialText]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => { // Tornar handleSubmit assíncrono
     e.preventDefault();
     if (commentText.trim() === "") { // Apenas validar o texto do comentário
       alert("Por favor, digite seu comentário."); // Mensagem atualizada
       return;
     }
-    onAddComment(commentText.trim(), parentId); // Chamar com text e parentId
+    await onAddComment(commentText.trim(), parentId); // Agora aguarda a função assíncrona
     setCommentText("");
     // Optionally, clear author if you want users to re-enter for each comment
     // setAuthor('');

@@ -14,7 +14,7 @@ export default function CommentComponent({ comment, onAddReply, className }: Com
   const [showReplyForm, setShowReplyForm] = useState(false);
 
   // handleReplySubmit agora corresponde à assinatura de onAddComment do CommentForm
-  const handleReplySubmit = (text: string, parentId?: string) => {
+  const handleReplySubmit = (text: string) => {
     // Chamamos onAddReply com o parentId do comentário atual e o texto da resposta
     // O author será providenciado pelo PollCard, que detém o estado do usuário logado
     onAddReply(comment.id, text);
