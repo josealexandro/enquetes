@@ -9,7 +9,6 @@ import {
   onAuthStateChanged,
   User,
 } from "firebase/auth";
-import { FirebaseError } from "firebase/app";
 
 interface AuthContextType {
   user: User | null; // O tipo de usuário agora é o User do Firebase
@@ -42,9 +41,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (error: FirebaseError) {
-      console.error("Erro ao fazer login:", error.message);
-      throw new Error(error.message || "Email ou senha incorretos."); // Mensagem amigável ao usuário
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
+      console.error("Erro ao fazer login:", errorMessage);
+      throw new Error(errorMessage || "Email ou senha incorretos."); // Mensagem amigável ao usuário
     } finally {
       setLoading(false);
     }
@@ -54,9 +54,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true);
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-    } catch (error: FirebaseError) {
-      console.error("Erro ao cadastrar:", error.message);
-      throw new Error(error.message || "Erro ao cadastrar. Tente novamente."); // Mensagem amigável ao usuário
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
+      console.error("Erro ao cadastrar:", errorMessage);
+      throw new Error(errorMessage || "Erro ao cadastrar. Tente novamente."); // Mensagem amigável ao usuário
     } finally {
       setLoading(false);
     }
@@ -66,9 +67,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true);
     try {
       await signOut(auth);
-    } catch (error: FirebaseError) {
-      console.error("Erro ao fazer logout:", error.message);
-      throw new Error(error.message || "Erro ao fazer logout. Tente novamente.");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
+      console.error("Erro ao fazer logout:", errorMessage);
+      throw new Error(errorMessage || "Erro ao fazer logout. Tente novamente.");
     } finally {
       setLoading(false);
     }
