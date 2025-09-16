@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { v4 as uuidv4 } from "uuid"; // Instale com: npm install uuid
 import { motion } from "framer-motion";
 
 interface PollFormProps {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 function useLocalStorage<T>(key: string, initialValue: T) {
   // Obter o valor inicial do localStorage ou usar o valor padrão

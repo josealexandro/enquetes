@@ -9,7 +9,7 @@ interface CommentFormProps {
   initialText?: string; // New: for pre-filling reply text
 }
 
-export default function CommentForm({ pollId, parentId, onAddComment, initialText }: CommentFormProps) {
+export default function CommentForm({ parentId, onAddComment, initialText }: CommentFormProps) {
   // const [author, setAuthor] = useState(""); // Remover estado local do autor
   const [commentText, setCommentText] = useState(initialText || "");
 

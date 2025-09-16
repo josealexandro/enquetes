@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Poll, Comment } from "../types/poll";
-import { v4 as uuidv4 } from "uuid";
+import Image from "next/image";
 import CommentComponent from "./Comment";
 import CommentForm from "./CommentForm";
-import Image from "next/image";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShareNodes } from '@fortawesome/free-solid-svg-icons';
 import { motion } from "framer-motion";
@@ -199,7 +198,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
         </div>
       </div>
       <div className="flex items-center text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-        <img src={poll.creator.avatarUrl} alt={poll.creator.name} className="w-8 h-8 rounded-full mr-2" />
+        <Image src={poll.creator.avatarUrl} alt={poll.creator.name} width={32} height={32} className="w-8 h-8 rounded-full mr-2" />
         <span>Criado por {poll.creator.name}</span>
       </div>
 

@@ -10,7 +10,7 @@ import { useAuth } from "./context/AuthContext";
 import { motion } from "framer-motion";
 import { LayoutGroup } from "framer-motion";
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, arrayUnion, arrayRemove } from "firebase/firestore"; // Importar funções do Firestore
+import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore"; // Importar funções do Firestore
 
 export default function Home() {
   const [polls, setPolls] = useState<Poll[]>([]); // Mudar para useState
