@@ -113,15 +113,18 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
       return;
     }
 
-    const newComment = {
+    const newComment: Comment = {
       pollId: poll.id,
-      parentId,
       author: user.email || "Usuário Logado", // Usar o email do usuário logado como autor
       authorId: user.uid,
       authorEmail: user.email,
       text,
       timestamp: Date.now(),
     };
+
+    if (parentId) {
+      newComment.parentId = parentId;
+    }
 
     try {
       const commentsCollectionRef = collection(db, "polls", poll.id, "comments");
