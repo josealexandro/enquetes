@@ -113,22 +113,22 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
       return;
     }
 
-    const newComment: Comment = {
+    const baseComment = {
       pollId: poll.id,
-      author: user.email || "Usuário Logado", // Usar o email do usuário logado como autor
+      author: user.email || "Usuário Logado",
       authorId: user.uid,
       authorEmail: user.email,
       text,
       timestamp: Date.now(),
     };
 
-    if (parentId) {
-      newComment.parentId = parentId;
-    }
+    const newComment = parentId
+      ? { ...baseComment, parentId }
+      : baseComment;
 
     try {
       const commentsCollectionRef = collection(db, "polls", poll.id, "comments");
-      await addDoc(commentsCollectionRef, newComment);
+      await addDoc(commentsCollectionRef, newComment as Comment);
       // onSnapshot já vai atualizar o estado de comments, não precisamos fazer setComments aqui
     } catch (error) {
       console.error("Erro ao adicionar comentário:", error);
