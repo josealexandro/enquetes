@@ -128,7 +128,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
 
     try {
       const commentsCollectionRef = collection(db, "polls", poll.id, "comments");
-      await addDoc(commentsCollectionRef, newComment as Comment);
+      await addDoc(commentsCollectionRef, newComment);
       // onSnapshot já vai atualizar o estado de comments, não precisamos fazer setComments aqui
     } catch (error) {
       console.error("Erro ao adicionar comentário:", error);
