@@ -20,8 +20,9 @@ export interface Poll {
   creator: {
     name: string;
     avatarUrl: string;
+    id: string; // Adicionar o ID do criador aqui
   };
   createdAt: number; // Timestamp for sorting by recency
-  creatorId?: string; // Optional: for filtering "My Polls" if user authentication is implemented
+  // creatorId?: string; // Remover esta linha, pois o ID agora está dentro de 'creator'
 }
 

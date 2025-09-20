@@ -29,10 +29,19 @@ export default function Home() {
     const q = query(pollsCollection, orderBy("createdAt", "desc")); // Ordenar por data de criação
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedPolls = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Poll[];
+      const fetchedPolls = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        // Assegurar que poll.creator.id seja sempre definido para compatibilidade
+        const creatorId = data.creator?.id || data.creatorId; // Prioriza o novo campo, mas usa o antigo se o novo não existir
+        return {
+          id: doc.id,
+          ...data,
+          creator: {
+            ...data.creator,
+            id: creatorId, // Garantir que o ID do criador esteja dentro do objeto creator
+          },
+        } as Poll;
+      });
       setPolls(fetchedPolls);
       setLoadingPolls(false);
     }, (error) => {
@@ -59,9 +68,10 @@ export default function Home() {
       creator: {
         name: user.email || "Usuário Logado",
         avatarUrl: "https://www.gravatar.com/avatar/?d=mp", // Pode ser personalizado com o avatar do usuário
+        id: user.uid, // Adicionar o ID do criador aqui
       },
       createdAt: Date.now(), // Timestamp em milissegundos
-      creatorId: user.uid,
+      // creatorId: user.uid, // Remover esta linha
     };
 
     try {
