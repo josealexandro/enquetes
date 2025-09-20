@@ -148,7 +148,7 @@ export default function Home() {
     }
 
     const pollToDelete = polls.find(p => p.id === pollId);
-    if (!pollToDelete || pollToDelete.creatorId !== user.uid) {
+    if (!pollToDelete || pollToDelete.creator.id !== user.uid) { // Correção aqui
       alert("Você não tem permissão para excluir esta enquete.");
       return;
     }
