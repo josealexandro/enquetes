@@ -191,13 +191,15 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
               </div>
             )}
           </div>
-          <button
-            onClick={() => onDelete(poll.id)}
-            className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors duration-200"
-            aria-label="Excluir Enquete"
-          >
-            Excluir
-          </button>
+          {user?.uid === poll.creator.id && (
+            <button
+              onClick={() => onDelete(poll.id)}
+              className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors duration-200"
+              aria-label="Excluir Enquete"
+            >
+              Excluir
+            </button>
+          )}
         </div>
       </div>
       <div className="flex items-center text-sm text-zinc-600 dark:text-zinc-400 mb-4">
