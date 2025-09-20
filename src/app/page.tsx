@@ -18,7 +18,7 @@ export default function Home() {
   const [deleteFeedbackMessage, setDeleteFeedbackMessage] = useState<string | null>(null);
   const [deleteFeedbackType, setDeleteFeedbackType] = useState<"success" | "error" | null>(null);
   const [activeFilter, setActiveFilter] = useState<"recent" | "trending" | "mine">("recent");
-  const { user } = useAuth();
+  const { user, isMasterUser } = useAuth(); // Obter o usuário logado e o status de mestre
   const [isClient, setIsClient] = useState(false); // Novo estado para montagem no cliente
 
   // useEffect para carregar enquetes do Firestore em tempo real
@@ -148,7 +148,8 @@ export default function Home() {
     }
 
     const pollToDelete = polls.find(p => p.id === pollId);
-    if (!pollToDelete || pollToDelete.creator.id !== user.uid) { // Correção aqui
+    // Permitir exclusão se for o criador OU um usuário mestre
+    if (!pollToDelete || (pollToDelete.creator.id !== user.uid && !isMasterUser)) {
       alert("Você não tem permissão para excluir esta enquete.");
       return;
     }

@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { auth } from "@/lib/firebase"; // Importar a instância de autenticação do Firebase
+import { db } from "@/lib/firebase"; // Importar a instância do Firestore para buscar roles
+import { doc, getDoc } from "firebase/firestore"; // Importar doc e getDoc do Firestore
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -13,6 +15,7 @@ import {
 interface AuthContextType {
   user: User | null; // O tipo de usuário agora é o User do Firebase
   loading: boolean;
+  isMasterUser: boolean; // Novo campo para indicar se o usuário é mestre
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -27,10 +30,19 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isMasterUser, setIsMasterUser] = useState(false); // Novo estado
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
+      if (firebaseUser) {
+        // Verificar se o usuário é mestre
+        const masterUserRef = doc(db, "masterUsers", firebaseUser.uid);
+        const masterUserDoc = await getDoc(masterUserRef);
+        setIsMasterUser(masterUserDoc.exists());
+      } else {
+        setIsMasterUser(false);
+      }
       setLoading(false);
     });
 
@@ -77,7 +89,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, isMasterUser, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -9,7 +9,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShareNodes } from '@fortawesome/free-solid-svg-icons';
 import { motion } from "framer-motion";
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, orderBy, onSnapshot, addDoc } from "firebase/firestore"; // Importar funções do Firestore
+import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc } from "firebase/firestore"; // Importar funções do Firestore
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 
 interface PollCardProps {
@@ -24,7 +24,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
   const [isClient, setIsClient] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [currentTotalVotes, setCurrentTotalVotes] = useState(poll.options.reduce((sum, opt) => sum + opt.votes, 0));
-  const { user } = useAuth(); // Obter o usuário logado
+  const { user, isMasterUser } = useAuth(); // Obter o usuário logado e o status de mestre
 
   // Update currentTotalVotes if the poll's total votes change externally (e.g., via real-time DB)
   useEffect(() => {
@@ -136,6 +136,23 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
     }
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    if (!user) {
+      alert("Você precisa estar logado para excluir comentários.");
+      return;
+    }
+
+    try {
+      const commentRef = doc(db, "polls", poll.id, "comments", commentId);
+      await deleteDoc(commentRef);
+      // onSnapshot já vai atualizar o estado de comments, não precisamos fazer setComments aqui
+      console.log("Comentário excluído com sucesso!");
+    } catch (error) {
+      console.error("Erro ao excluir comentário:", error);
+      alert("Erro ao excluir comentário. Tente novamente.");
+    }
+  };
+
   const renderCommentsHierarchically = (currentParentId: string | undefined, depth: number) => {
     const filteredComments = comments
       .filter((comment) => comment.parentId === currentParentId)
@@ -146,6 +163,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
         <CommentComponent
           comment={comment}
           onAddReply={(replyParentId, text) => handleAddComment(text, replyParentId)}
+          onDeleteComment={handleDeleteComment} // Passar a função de exclusão
           className={depth > 0 ? "ml-6" : ""}
         />
         {renderCommentsHierarchically(comment.id, depth + 1)}
@@ -191,7 +209,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
               </div>
             )}
           </div>
-          {user?.uid === poll.creator.id && (
+          {(user?.uid === poll.creator.id || isMasterUser) && (
             <button
               onClick={() => onDelete(poll.id)}
               className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors duration-200"

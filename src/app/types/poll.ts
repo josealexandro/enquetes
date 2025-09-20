@@ -9,6 +9,7 @@ export interface Comment {
   pollId: string;
   parentId?: string; // Optional: for replies to a comment
   author: string;
+  authorId: string; // Adicionar o ID do autor aqui
   text: string;
   timestamp: number; // Using timestamp for easy sorting
 }
