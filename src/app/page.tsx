@@ -180,7 +180,7 @@ export default function Home() {
       });
     } else if (activeFilter === "mine") {
       // Filter by logged-in user's ID, or show no polls if not logged in
-      sortedPolls = sortedPolls.filter(poll => user && poll.creatorId === user.uid);
+      sortedPolls = sortedPolls.filter(poll => user && poll.creator.id === user.uid);
     }
     return sortedPolls;
   }, [polls, activeFilter, user]);
