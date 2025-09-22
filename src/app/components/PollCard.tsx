@@ -352,11 +352,11 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
 
               return (
                 <li key={option.id}>
-                  <div className="flex justify-between items-center mb-1">
+                  <div className="flex justify-between items-center mb-1" onClick={(e) => e.stopPropagation()}> {/* Impede a propagação do clique */} 
                     <motion.button
                       whileHover={{ scale: 1.02, x: 5 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => handleVoteClick(option.id)}
+                      onClick={(e) => { handleVoteClick(option.id); }}
                       disabled={!!votedOptionId}
                       className={`text-left font-medium transition-colors duration-200 ${
                         votedOptionId === option.id
@@ -383,28 +383,9 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
             })}
           </ul>
 
-          <div className="comments-section pt-6 border-t border-zinc-200 dark:border-zinc-700 mt-6"> {/* Removido max-h e overflow daqui */}
-            <h4 className="text-xl font-poppins font-semibold mb-4 text-zinc-900 dark:text-white">Comentários ({comments.length})</h4>
-            <div className="mt-4">
-              <CommentForm pollId={poll.id} onAddComment={handleAddComment} />
-            </div>
-            <div className="mt-6 overflow-hidden max-h-[50px] overflow-y-auto"> {/* Reduzido max-h pela metade */}
-              {comments.length === 0 ? (
-                <div className="text-center text-zinc-600 dark:text-zinc-400">Nenhum comentário ainda. Seja o primeiro a comentar!</div>
-              ) : (
-                <>
-                  {renderComments(topLevelComments.slice(0, 3), 0)} {/* Limitar a 3 comentários */}
-                  {topLevelComments.length > 3 && (
-                    <button
-                      onClick={() => { /* Implementar abertura do modal */ }}
-                      className="mt-4 text-blue-500 hover:underline text-sm w-full text-center"
-                    >
-                      Ver mais {comments.length - 3} comentários
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
+          <div onClick={(e) => e.stopPropagation()}> {/* Nova div para agrupar comentários e formulário, impedindo a propagação */} 
+            <CommentForm pollId={poll.id} onAddComment={handleAddComment} />
+            {renderComments(topLevelComments, 0)}
           </div>
         </>
       )}
