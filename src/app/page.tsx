@@ -52,7 +52,7 @@ export default function Home() {
     return () => unsubscribe(); // Limpar o listener quando o componente for desmontado
   }, []);
 
-  const addPoll = async (title: string, options: string[]) => {
+  const addPoll = async (title: string, options: string[], category: string) => {
     if (!user) {
       alert("Você precisa estar logado para criar uma enquete.");
       return;
@@ -71,6 +71,11 @@ export default function Home() {
         id: user.uid, // Adicionar o ID do criador aqui
       },
       createdAt: Date.now(), // Timestamp em milissegundos
+      category, // Adicionar a categoria aqui
+      likes: 0, // Inicializar curtidas como 0
+      likedBy: [], // Inicializar likedBy como um array vazio
+      dislikes: 0, // Inicializar descurtidas como 0
+      dislikedBy: [], // Inicializar dislikedBy como um array vazio
       // creatorId: user.uid, // Remover esta linha
     };
 

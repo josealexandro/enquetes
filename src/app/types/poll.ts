@@ -24,6 +24,11 @@ export interface Poll {
     id: string; // Adicionar o ID do criador aqui
   };
   createdAt: number; // Timestamp for sorting by recency
+  category: string;
+  likes: number; // Novo campo para o número de curtidas
+  likedBy: string[]; // Novo campo para armazenar os IDs dos usuários que curtiram
+  dislikes: number; // Novo campo para o número de descurtidas
+  dislikedBy: string[]; // Novo campo para armazenar os IDs dos usuários que descurtiram
   // creatorId?: string; // Remover esta linha, pois o ID agora está dentro de 'creator'
 }
 
