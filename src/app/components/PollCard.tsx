@@ -9,7 +9,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShareNodes, faHeart, faHeartCrack } from '@fortawesome/free-solid-svg-icons';
 import { motion } from "framer-motion";
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore"; // Importar funções do Firestore e arrayUnion/arrayRemove
+import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc, arrayUnion, arrayRemove, FieldValue, increment } from "firebase/firestore"; // Importar funções do Firestore e arrayUnion/arrayRemove
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 
 interface PollCardProps {
@@ -105,18 +105,18 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
       if (hasLiked) {
         // Se já curtiu, descurtir
         await updateDoc(pollRef, {
-          likes: arrayRemove(user.uid),
+          likes: increment(-1),
           likedBy: arrayRemove(user.uid),
         });
       } else {
         // Se não curtiu, curtir
-        let updateData: any = {
-          likes: arrayUnion(user.uid),
+        const updateData: { [key: string]: any } = {
+          likes: increment(1),
           likedBy: arrayUnion(user.uid),
         };
         if (hasDisliked) {
           // Se descurtiu, remover descurtida ao curtir
-          updateData.dislikes = arrayRemove(user.uid);
+          updateData.dislikes = increment(-1);
           updateData.dislikedBy = arrayRemove(user.uid);
         }
         await updateDoc(pollRef, updateData);
@@ -141,18 +141,18 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
       if (hasDisliked) {
         // Se já descurtiu, remover descurtida
         await updateDoc(pollRef, {
-          dislikes: arrayRemove(user.uid),
+          dislikes: increment(-1),
           dislikedBy: arrayRemove(user.uid),
         });
       } else {
         // Se não descurtiu, descurtir
-        let updateData: any = {
-          dislikes: arrayUnion(user.uid),
+        const updateData: { [key: string]: any } = {
+          dislikes: increment(1),
           dislikedBy: arrayUnion(user.uid),
         };
         if (hasLiked) {
           // Se curtiu, remover curtida ao descurtir
-          updateData.likes = arrayRemove(user.uid);
+          updateData.likes = increment(-1);
           updateData.likedBy = arrayRemove(user.uid);
         }
         await updateDoc(pollRef, updateData);
