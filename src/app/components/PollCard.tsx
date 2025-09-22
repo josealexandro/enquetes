@@ -23,6 +23,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false); // Novo estado para controlar a expansão
   const [currentTotalVotes, setCurrentTotalVotes] = useState(poll.options.reduce((sum, opt) => sum + opt.votes, 0));
   const { user, isMasterUser } = useAuth(); // Obter o usuário logado e o status de mestre
 
@@ -257,7 +258,10 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
   const topLevelComments = comments.filter(comment => !comment.parentId).sort((a, b) => a.timestamp - b.timestamp);
 
   return (
-    <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 mb-6 border border-transparent hover:border-indigo-500 transform hover:-translate-y-1 min-h-[150px]"> {/* Ajustado min-h para ser metade do anterior */}
+    <div
+      className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 mb-6 border border-transparent hover:border-indigo-500 transform hover:-translate-y-1 min-h-[150px] cursor-pointer"
+      onClick={() => setIsExpanded(!isExpanded)} // Adicionado o manipulador de clique
+    >
       <div className="flex items-center text-sm text-zinc-600 dark:text-zinc-400 mb-4">
         <Image src={poll.creator.avatarUrl} alt={poll.creator.name} width={32} height={32} className="w-8 h-8 rounded-full mr-2" />
         <span>{poll.creator.name}</span>
@@ -267,7 +271,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
         {poll.title}
       </h2>
 
-      <div className="flex items-center space-x-2 mb-4">
+      <div className="flex items-center space-x-2 mb-4" onClick={(e) => e.stopPropagation()}> {/* Impede a propagação do clique */} 
         <div className="relative">
           <button
             onClick={() => setShowShareMenu(!showShareMenu)}
@@ -336,7 +340,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
         )}
       </div>
 
-      {isClient && (
+      {isExpanded && isClient && (
         <>
           {votedOptionId && (
             <p className="text-green-600 text-sm mb-4">Obrigado por votar!</p>
