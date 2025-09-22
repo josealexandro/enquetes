@@ -4,15 +4,18 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 
 interface PollFormProps {
-  onAddPoll?: (title: string, options: string[]) => void;
+  onAddPoll?: (title: string, options: string[], category: string) => void;
   onPollCreated?: () => void; // New prop for callback
 }
 
 export default function PollForm({ onAddPoll, onPollCreated }: PollFormProps) {
   const [title, setTitle] = useState("");
   const [options, setOptions] = useState(["", ""]);
+  const [category, setCategory] = useState("Geral"); // Novo estado para a categoria, com valor padrão
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "error" | null>(null);
+
+  const categories = ["Geral", "Política", "Games", "Gastronomia", "Filme", "Esportes", "Tecnologia", "Educação"];
 
   const handleOptionChange = (index: number, value: string) => {
     const updated = [...options];
@@ -53,14 +56,21 @@ export default function PollForm({ onAddPoll, onPollCreated }: PollFormProps) {
       return;
     }
 
+    if (!category) {
+      setFeedbackMessage("Por favor, selecione uma categoria para a enquete.");
+      setFeedbackType("error");
+      return;
+    }
+
     try {
       if (onAddPoll) {
-        await onAddPoll(trimmedTitle, filteredOptions); // Chamar onAddPoll e aguardar
+        await onAddPoll(trimmedTitle, filteredOptions, category); // Chamar onAddPoll e aguardar com a categoria
       }
       setFeedbackMessage("Enquete criada com sucesso!");
       setFeedbackType("success");
       setTitle("");
       setOptions(["", ""]);
+      setCategory("Geral"); // Resetar categoria para o padrão
       setTimeout(() => {
         setFeedbackMessage(null);
         onPollCreated?.();
@@ -98,6 +108,20 @@ export default function PollForm({ onAddPoll, onPollCreated }: PollFormProps) {
         className="w-full px-4 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder-zinc-500 dark:placeholder-zinc-400"
         required
       />
+
+      <select
+        value={category}
+        onChange={(e) => setCategory(e.target.value)}
+        className="w-full px-4 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white"
+        required
+      >
+        <option value="">Selecione uma categoria</option>
+        {categories.map((cat) => (
+          <option key={cat} value={cat}>
+            {cat}
+          </option>
+        ))}
+      </select>
 
       {options.map((opt, idx) => (
         <div key={idx} className="flex gap-2">

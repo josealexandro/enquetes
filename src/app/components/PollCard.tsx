@@ -110,7 +110,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
         });
       } else {
         // Se não curtiu, curtir
-        const updateData: { [key: string]: any } = {
+        const updateData: { likes: number | FieldValue; likedBy: string[] | FieldValue; dislikes?: number | FieldValue; dislikedBy?: string[] | FieldValue; } = {
           likes: increment(1),
           likedBy: arrayUnion(user.uid),
         };
@@ -146,7 +146,7 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
         });
       } else {
         // Se não descurtiu, descurtir
-        const updateData: { [key: string]: any } = {
+        const updateData: { dislikes: number | FieldValue; dislikedBy: string[] | FieldValue; likes?: number | FieldValue; likedBy?: string[] | FieldValue; } = {
           dislikes: increment(1),
           dislikedBy: arrayUnion(user.uid),
         };

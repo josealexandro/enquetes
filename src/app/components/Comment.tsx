@@ -9,11 +9,14 @@ interface CommentProps {
   comment: Comment;
   onAddReply: (parentId: string, text: string) => Promise<void>;
   onDeleteComment: (commentId: string) => void; // Nova prop para excluir comentário
+  replies?: Comment[]; // Adicionar prop para respostas diretas
+  totalRepliesCount?: number; // Contagem total de respostas (incluindo aninhadas)
   className?: string;
 }
 
-export default function CommentComponent({ comment, onAddReply, onDeleteComment, className }: CommentProps) {
+export default function CommentComponent({ comment, onAddReply, onDeleteComment, replies = [], totalRepliesCount = 0, className }: CommentProps) {
   const [showReplyForm, setShowReplyForm] = useState(false);
+  const [showReplies, setShowReplies] = useState(false); // Novo estado para controlar a visibilidade das respostas
   const { user, isMasterUser } = useAuth(); // Obter o usuário logado e o status de mestre
 
   const handleReplySubmit = async (text: string) => {
@@ -42,6 +45,14 @@ export default function CommentComponent({ comment, onAddReply, onDeleteComment,
             Excluir
           </button>
         )}
+        {totalRepliesCount > 0 && (
+          <button
+            onClick={() => setShowReplies(!showReplies)}
+            className="text-zinc-500 hover:underline text-sm ml-auto"
+          >
+            {showReplies ? `Ocultar ${totalRepliesCount} respostas` : `Ver ${totalRepliesCount} respostas`}
+          </button>
+        )}
       </div>
 
       {showReplyForm && (
@@ -52,6 +63,20 @@ export default function CommentComponent({ comment, onAddReply, onDeleteComment,
             onAddComment={handleReplySubmit}
             initialText={`@${comment.author} `}
           />
+        </div>
+      )}
+
+      {showReplies && replies.length > 0 && (
+        <div className="ml-6 mt-4 space-y-4">
+          {replies.map((reply) => (
+            <CommentComponent
+              key={reply.id}
+              comment={reply}
+              onAddReply={onAddReply}
+              onDeleteComment={onDeleteComment}
+              className="ml-6"
+            />
+          ))}
         </div>
       )}
     </div>
