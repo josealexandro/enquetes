@@ -5,6 +5,29 @@ import { Comment } from "../types/poll";
 import CommentForm from "./CommentForm";
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 
+// Função auxiliar para formatar o tempo como "há X tempo"
+const formatTimeAgo = (timestamp: number) => {
+  const now = Date.now();
+  const seconds = Math.floor((now - timestamp) / 1000);
+
+  if (seconds < 60) return `${seconds} segundos atrás`;
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minutos atrás`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} horas atrás`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} dias atrás`;
+
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} meses atrás`;
+
+  const years = Math.floor(months / 12);
+  return `${years} anos atrás`;
+};
+
 interface CommentProps {
   comment: Comment;
   onAddReply: (parentId: string, text: string) => Promise<void>;
@@ -28,7 +51,7 @@ export default function CommentComponent({ comment, onAddReply, onDeleteComment,
 
   return (
     <div className={`bg-zinc-100 dark:bg-zinc-900 p-4 rounded-lg shadow-sm mb-4 max-w-full ${className}`}>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">By: {comment.author} at {new Date(comment.timestamp).toLocaleString()}</p>
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">By: {comment.author} {formatTimeAgo(comment.timestamp)}</p>
       <p className="text-zinc-800 dark:text-zinc-200 mt-2 break-words">{comment.text}</p>
       <div className="flex items-center space-x-4 mt-2">
         <button
