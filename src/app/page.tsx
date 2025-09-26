@@ -5,7 +5,7 @@ import PollCard from "./components/PollCard";
 import { Poll } from "./types/poll";
 import { v4 as uuidv4 } from "uuid";
 // import useLocalStorage from "./hooks/useLocalStorage"; // Remover useLocalStorage
-import { useState, useMemo, useEffect } from "react"; // Adicionar useEffect
+import { useState, useMemo, useEffect, useRef } from "react"; // Adicionar useEffect
 import { useAuth } from "./context/AuthContext";
 import { motion } from "framer-motion";
 import { LayoutGroup } from "framer-motion";
@@ -17,29 +17,39 @@ export default function Home() {
   const [loadingPolls, setLoadingPolls] = useState(true); // Novo estado para carregamento
   const [deleteFeedbackMessage, setDeleteFeedbackMessage] = useState<string | null>(null);
   const [deleteFeedbackType, setDeleteFeedbackType] = useState<"success" | "error" | null>(null);
-  const [activeFilter, setActiveFilter] = useState<"recent" | "trending" | "mine">("recent");
+  const [activeFilter, setActiveFilter] = useState<"recent" | "trending" | "mine" | "public" | "commercial">("recent");
   const { user, isMasterUser } = useAuth(); // Obter o usuário logado e o status de mestre
   const [isClient, setIsClient] = useState(false); // Novo estado para montagem no cliente
+
+  const [currentPublicPollIndex, setCurrentPublicPollIndex] = useState(0);
+  const [currentCommercialPollIndex, setCurrentCommercialPollIndex] = useState(0);
+
+  const publicCarouselRef = useRef<HTMLDivElement>(null);
+  const commercialCarouselRef = useRef<HTMLDivElement>(null);
+
+  const [isPublicCarouselPaused, setIsPublicCarouselPaused] = useState(false);
+  const [isCommercialCarouselPaused, setIsCommercialCarouselPaused] = useState(false);
 
   // useEffect para carregar enquetes do Firestore em tempo real
   useEffect(() => {
     setIsClient(true); // Marcar como montado no cliente
     setLoadingPolls(true);
     const pollsCollection = collection(db, "polls");
-    const q = query(pollsCollection, orderBy("createdAt", "desc")); // Ordenar por data de criação
+    // Removendo a ordenação inicial para lidar com ela no frontend, ou podemos buscar duas coleções separadas se a filtragem de segurança for necessária
+    const q = query(pollsCollection, orderBy("createdAt", "desc")); 
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedPolls = snapshot.docs.map((doc) => {
         const data = doc.data();
-        // Assegurar que poll.creator.id seja sempre definido para compatibilidade
-        const creatorId = data.creator?.id || data.creatorId; // Prioriza o novo campo, mas usa o antigo se o novo não existir
+        const creatorId = data.creator?.id || data.creatorId; 
         return {
           id: doc.id,
           ...data,
           creator: {
             ...data.creator,
-            id: creatorId, // Garantir que o ID do criador esteja dentro do objeto creator
+            id: creatorId, 
           },
+          isCommercial: data.isCommercial || false, // Garantir que isCommercial exista e seja booleano
         } as Poll;
       });
       setPolls(fetchedPolls);
@@ -51,6 +61,86 @@ export default function Home() {
 
     return () => unsubscribe(); // Limpar o listener quando o componente for desmontado
   }, []);
+
+  const publicPolls = useMemo(() => {
+    return polls.filter(poll => !poll.isCommercial);
+  }, [polls]);
+
+  const commercialPolls = useMemo(() => {
+    return polls.filter(poll => poll.isCommercial);
+  }, [polls]);
+
+  const filteredPublicPolls = useMemo(() => {
+    let sortedPolls = [...publicPolls];
+    if (activeFilter === "recent") {
+      sortedPolls.sort((a, b) => b.createdAt - a.createdAt);
+    } else if (activeFilter === "trending") {
+      sortedPolls.sort((a, b) => {
+        const votesA = a.options.reduce((sum, option) => sum + option.votes, 0);
+        const votesB = b.options.reduce((sum, option) => sum + option.votes, 0);
+        return votesB - votesA;
+      });
+    } else if (activeFilter === "mine") {
+      sortedPolls = sortedPolls.filter(poll => user && poll.creator.id === user.uid);
+    }
+    return sortedPolls;
+  }, [publicPolls, activeFilter, user]);
+
+  const filteredCommercialPolls = useMemo(() => {
+    let sortedPolls = [...commercialPolls];
+    if (activeFilter === "recent") {
+      sortedPolls.sort((a, b) => b.createdAt - a.createdAt);
+    } else if (activeFilter === "trending") {
+      sortedPolls.sort((a, b) => {
+        const votesA = a.options.reduce((sum, option) => sum + option.votes, 0);
+        const votesB = b.options.reduce((sum, option) => sum + option.votes, 0);
+        return votesB - votesA;
+      });
+    } else if (activeFilter === "mine") {
+      sortedPolls = sortedPolls.filter(poll => user && poll.creator.id === user.uid);
+    }
+    return sortedPolls;
+  }, [commercialPolls, activeFilter, user]);
+
+  // Efeito para rolagem automática das enquetes públicas
+  useEffect(() => {
+    if (!publicCarouselRef.current || filteredPublicPolls.length === 0 || isPublicCarouselPaused) return;
+
+    const interval = setInterval(() => {
+      setCurrentPublicPollIndex((prevIndex) => {
+        const nextIndex = (prevIndex + 1) % filteredPublicPolls.length;
+        const scrollAmount = nextIndex * (publicCarouselRef.current!.children[0] as HTMLElement).offsetWidth;
+        publicCarouselRef.current!.scrollTo({ left: scrollAmount, behavior: "smooth" });
+        return nextIndex;
+      });
+    }, 5000); // Rola a cada 5 segundos
+
+    return () => clearInterval(interval);
+  }, [filteredPublicPolls, isPublicCarouselPaused]);
+
+  // Efeito para rolagem automática das enquetes de comerciantes
+  useEffect(() => {
+    if (!commercialCarouselRef.current || filteredCommercialPolls.length === 0 || isCommercialCarouselPaused) return;
+
+    const interval = setInterval(() => {
+      setCurrentCommercialPollIndex((prevIndex) => {
+        const nextIndex = (prevIndex + 1) % filteredCommercialPolls.length;
+        const scrollAmount = nextIndex * (commercialCarouselRef.current!.children[0] as HTMLElement).offsetWidth;
+        commercialCarouselRef.current!.scrollTo({ left: scrollAmount, behavior: "smooth" });
+        return nextIndex;
+      });
+    }, 5000); // Rola a cada 5 segundos
+
+    return () => clearInterval(interval);
+  }, [filteredCommercialPolls, isCommercialCarouselPaused]);
+
+  const handlePublicCardClick = (isCardExpanded: boolean) => {
+    setIsPublicCarouselPaused(isCardExpanded);
+  };
+
+  const handleCommercialCardClick = (isCardExpanded: boolean) => {
+    setIsCommercialCarouselPaused(isCardExpanded);
+  };
 
   const addPoll = async (title: string, options: string[], category: string) => {
     if (!user) {
@@ -76,6 +166,7 @@ export default function Home() {
       likedBy: [], // Inicializar likedBy como um array vazio
       dislikes: 0, // Inicializar descurtidas como 0
       dislikedBy: [], // Inicializar dislikedBy como um array vazio
+      isCommercial: isMasterUser, // Adicionar o campo isCommercial com base no status do usuário
       // creatorId: user.uid, // Remover esta linha
     };
 
@@ -172,24 +263,6 @@ export default function Home() {
     }
   };
 
-  const filteredPolls = useMemo(() => {
-    let sortedPolls = [...polls];
-
-    if (activeFilter === "recent") {
-      sortedPolls.sort((a, b) => b.createdAt - a.createdAt);
-    } else if (activeFilter === "trending") {
-      sortedPolls.sort((a, b) => {
-        const votesA = a.options.reduce((sum, option) => sum + option.votes, 0);
-        const votesB = b.options.reduce((sum, option) => sum + option.votes, 0);
-        return votesB - votesA;
-      });
-    } else if (activeFilter === "mine") {
-      // Filter by logged-in user's ID, or show no polls if not logged in
-      sortedPolls = sortedPolls.filter(poll => user && poll.creator.id === user.uid);
-    }
-    return sortedPolls;
-  }, [polls, activeFilter, user]);
-
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -269,26 +342,101 @@ export default function Home() {
               </motion.button>
             </div>
 
-            {loadingPolls ? (
-              <p className="text-zinc-600 dark:text-zinc-400">Carregando enquetes...</p>
-            ) : filteredPolls.length === 0 ? (
-              <p className="text-zinc-600 dark:text-zinc-400">Nenhuma enquete encontrada para este filtro.</p>
-            ) : (
-              <motion.div
-                variants={containerVariants}
-                initial="hidden"
-                animate="show"
-                className="w-full flex flex-col items-center gap-8"
+            {/* Seção de Enquetes Públicas */}
+            <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Enquetes Públicas</h2>
+            <div className="relative w-full">
+              {loadingPolls ? (
+                <p className="text-zinc-600 dark:text-zinc-400">Carregando enquetes públicas...</p>
+              ) : filteredPublicPolls.length === 0 ? (
+                <p className="text-zinc-600 dark:text-zinc-400">Nenhuma enquete pública encontrada.</p>
+              ) : (
+                <div className="mx-12"> {/* Novo wrapper para o carrossel, criando espaço para as setas */}
+                  <motion.div
+                    ref={publicCarouselRef}
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="show"
+                    className="w-full flex overflow-x-auto snap-x snap-mandatory gap-8 pb-4 scrollbar-hide"
+                  >
+                    <LayoutGroup>
+                      {filteredPublicPolls.map((poll) => (
+                        <motion.div key={poll.id} variants={itemVariants} className="w-full flex-shrink-0 snap-center min-w-[300px] max-w-[300px]">
+                          <PollCard poll={poll} onVote={handleVote} onDelete={handleDeletePoll} onCardClick={handlePublicCardClick} />
+                        </motion.div>
+                      ))}
+                    </LayoutGroup>
+                  </motion.div>
+                </div>
+              )}
+              <button
+                className="absolute left-4 top-1/2 -translate-y-1/2 bg-zinc-800 bg-opacity-50 text-white p-2 rounded-full z-10"
+                onClick={() => {
+                  if (publicCarouselRef.current) {
+                    publicCarouselRef.current.scrollBy({ left: -300, behavior: "smooth" });
+                  }
+                }}
               >
-                <LayoutGroup>
-                  {filteredPolls.map((poll) => (
-                    <motion.div key={poll.id} variants={itemVariants} className="w-full">
-                      <PollCard poll={poll} onVote={handleVote} onDelete={handleDeletePoll} />
-                    </motion.div>
-                  ))}
-                </LayoutGroup>
-              </motion.div>
-            )}
+                &#9664;
+              </button>
+              <button
+                className="absolute right-4 top-1/2 -translate-y-1/2 bg-zinc-800 bg-opacity-50 text-white p-2 rounded-full z-10"
+                onClick={() => {
+                  if (publicCarouselRef.current) {
+                    publicCarouselRef.current.scrollBy({ left: 300, behavior: "smooth" });
+                  }
+                }}
+              >
+                &#9654;
+              </button>
+            </div>
+
+            {/* Seção de Enquetes de Comerciantes */}
+            <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Enquetes de Comerciantes</h2>
+            <div className="relative w-full">
+              {loadingPolls ? (
+                <p className="text-zinc-600 dark:text-zinc-400">Carregando enquetes de comerciantes...</p>
+              ) : filteredCommercialPolls.length === 0 ? (
+                <p className="text-zinc-600 dark:text-zinc-400">Nenhuma enquete de comerciante encontrada.</p>
+              ) : (
+                <div className="mx-12"> {/* Novo wrapper para o carrossel, criando espaço para as setas */}
+                  <motion.div
+                    ref={commercialCarouselRef}
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="show"
+                    className="w-full flex overflow-x-auto snap-x snap-mandatory gap-8 pb-4 scrollbar-hide"
+                  >
+                    <LayoutGroup>
+                      {filteredCommercialPolls.map((poll) => (
+                        <motion.div key={poll.id} variants={itemVariants} className="w-full flex-shrink-0 snap-center min-w-[300px] max-w-[300px]">
+                          <PollCard poll={poll} onVote={handleVote} onDelete={handleDeletePoll} onCardClick={handleCommercialCardClick} />
+                        </motion.div>
+                      ))}
+                    </LayoutGroup>
+                  </motion.div>
+                </div>
+              )}
+              <button
+                className="absolute left-4 top-1/2 -translate-y-1/2 bg-zinc-800 bg-opacity-50 text-white p-2 rounded-full z-10"
+                onClick={() => {
+                  if (commercialCarouselRef.current) {
+                    commercialCarouselRef.current.scrollBy({ left: -300, behavior: "smooth" });
+                  }
+                }}
+              >
+                &#9664;
+              </button>
+              <button
+                className="absolute right-4 top-1/2 -translate-y-1/2 bg-zinc-800 bg-opacity-50 text-white p-2 rounded-full z-10"
+                onClick={() => {
+                  if (commercialCarouselRef.current) {
+                    commercialCarouselRef.current.scrollBy({ left: 300, behavior: "smooth" });
+                  }
+                }}
+              >
+                &#9654;
+              </button>
+            </div>
           </>
         )}
       </div>

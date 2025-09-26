@@ -12,35 +12,42 @@ import { motion } from "framer-motion";
 import { faBars, faTimes } from '@fortawesome/free-solid-svg-icons'; // Import hamburger and close icons
 
 export default function Header() {
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('theme');
+      return savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    }
+    return false; // Default to light mode on server or if window is undefined
+  });
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
   const { user, logout, loading } = useAuth();
 
+  // Remove o useEffect redundante para inicialização do tema, já que o useState faz isso
+  // useEffect(() => {
+  //   const savedTheme = localStorage.getItem("theme");
+  //   if (savedTheme === "dark") {
+  //     setDarkMode(true);
+  //     document.documentElement.classList.add("dark");
+  //   } else {
+  //     setDarkMode(false);
+  //     document.documentElement.classList.remove("dark");
+  //   }
+  // }, []);
+
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "dark") {
-      setDarkMode(true);
+    if (darkMode) {
       document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
     } else {
-      setDarkMode(false);
       document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
     }
-  }, []);
+  }, [darkMode]); // Este useEffect agora reage apenas às mudanças no estado darkMode
 
   const toggleDarkMode = () => {
-    setDarkMode((prevMode) => {
-      const newMode = !prevMode;
-      if (newMode) {
-        document.documentElement.classList.add("dark");
-        localStorage.setItem("theme", "dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-        localStorage.setItem("theme", "light");
-      }
-      return newMode;
-    });
+    setDarkMode((prevMode) => !prevMode);
   };
 
   const handleLoginSuccess = () => {
@@ -131,7 +138,7 @@ export default function Header() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]"
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[1000]"
         >
           <motion.div
             initial={{ y: -50, opacity: 0 }}

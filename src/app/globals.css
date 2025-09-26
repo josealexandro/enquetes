@@ -4,15 +4,7 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Removendo as variáveis de cor para deixar o Tailwind gerenciar */
 }
 
 body {
@@ -20,13 +12,12 @@ body {
   margin: 0;
   padding-top: 64px;
   padding-bottom: 64px;
-  background: var(--background);
-  color: var(--foreground);
+  /* Removendo as propriedades background e color fixas para permitir que o Tailwind gerencie */
   font-family: var(--font-inter), sans-serif;
 }
 
-/* Add some basic styling for the app container */
-#root {
+/* Remover #root já que o layout é gerenciado pelo Next.js e Tailwind */
+/* #root {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -35,7 +26,7 @@ body {
   --primary: #00ffff;
   --secondary: #ff00cc;
   --accent: #39ff14;
-}
+} */
 
 input, button {
   font-size: 1rem;

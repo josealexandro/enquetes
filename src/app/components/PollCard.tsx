@@ -16,9 +16,10 @@ interface PollCardProps {
   poll: Poll;
   onVote: (pollId: string, optionId: string) => void;
   onDelete: (pollId: string) => void;
+  onCardClick?: (isCardExpanded: boolean) => void; // Novo prop para lidar com o clique no card, passando o estado de expansão
 }
 
-export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
+export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCardProps) {
   const [votedOptionId, setVotedOptionId] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [isClient, setIsClient] = useState(false);
@@ -260,7 +261,13 @@ export default function PollCard({ poll, onVote, onDelete }: PollCardProps) {
   return (
     <div
       className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 mb-6 border border-transparent hover:border-indigo-500 transform hover:-translate-y-1 min-h-[150px] cursor-pointer"
-      onClick={() => setIsExpanded(!isExpanded)} // Adicionado o manipulador de clique
+      onClick={() => {
+        const newExpandedState = !isExpanded; // Calcular o novo estado antes de definir
+        setIsExpanded(newExpandedState);
+        if (onCardClick) {
+          onCardClick(newExpandedState); // Passar o novo estado de expansão
+        }
+      }} // Adicionado o manipulador de clique
     >
       <div className="flex items-center text-sm text-zinc-600 dark:text-zinc-400 mb-4">
         <Image src={poll.creator.avatarUrl} alt={poll.creator.name} width={32} height={32} className="w-8 h-8 rounded-full mr-2" />
