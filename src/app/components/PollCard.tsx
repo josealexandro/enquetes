@@ -260,7 +260,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
 
   return (
     <div
-      className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 mb-6 border border-transparent hover:border-indigo-500 transform hover:-translate-y-1 min-h-[150px] cursor-pointer"
+      className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 mb-6 border border-transparent hover:border-indigo-500 transform hover:-translate-y-1 cursor-pointer w-[90%] mx-auto"
       onClick={() => {
         const newExpandedState = !isExpanded; // Calcular o novo estado antes de definir
         setIsExpanded(newExpandedState);
@@ -274,11 +274,11 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
         <span>{poll.creator.name}</span>
       </div>
 
-      <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white max-w-[calc(100%-40px)] sm:max-w-[calc(100%-60px)] break-words overflow-hidden mb-4"> {/* Ajustado max-w para dar mais espaço ao título */} 
+      <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white max-w-full break-words overflow-hidden mb-4 line-clamp-2"> {/* Ajustado max-w para dar mais espaço ao título e adicionado line-clamp-2 */}
         {poll.title}
       </h2>
 
-      <div className="flex items-center space-x-2 mb-4" onClick={(e) => e.stopPropagation()}> {/* Impede a propagação do clique */} 
+      <div className="flex items-center space-x-2 mb-4" onClick={(e) => e.stopPropagation()}> {/* Impede a propagação do clique e define uma altura fixa */}
         <div className="relative">
           <button
             onClick={() => setShowShareMenu(!showShareMenu)}

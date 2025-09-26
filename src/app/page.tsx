@@ -399,7 +399,7 @@ export default function Home() {
               ) : filteredPublicPolls.length === 0 ? (
                 <p className="text-zinc-600 dark:text-zinc-400">Nenhuma enquete pública encontrada.</p>
               ) : (
-                <div className="mx-12"> {/* Novo wrapper para o carrossel, criando espaço para as setas */}
+                <div className="sm:mx-12"> {/* Novo wrapper para o carrossel, criando espaço para as setas */}
                   <motion.div
                     ref={publicCarouselRef}
                     variants={containerVariants}
@@ -409,7 +409,7 @@ export default function Home() {
                   >
                     <LayoutGroup>
                       {filteredPublicPolls.map((poll) => (
-                        <motion.div key={poll.id} variants={itemVariants} className="w-full flex-shrink-0 snap-center min-w-[320px] max-w-[360px]">
+                        <motion.div key={poll.id} variants={itemVariants} className="w-[90%] mx-auto flex-shrink-0 snap-center md:w-full md:min-w-[320px] md:max-w-[360px]">
                           <PollCard poll={poll} onVote={handleVote} onDelete={handleDeletePoll} onCardClick={handlePublicCardClick} />
                         </motion.div>
                       ))}
@@ -447,7 +447,7 @@ export default function Home() {
               ) : filteredCommercialPolls.length === 0 ? (
                 <p className="text-zinc-600 dark:text-zinc-400">Nenhuma enquete de comerciante encontrada.</p>
               ) : (
-                <div className="mx-12"> {/* Novo wrapper para o carrossel, criando espaço para as setas */}
+                <div className="sm:mx-12"> {/* Novo wrapper para o carrossel, criando espaço para as setas */}
                   <motion.div
                     ref={commercialCarouselRef}
                     variants={containerVariants}
@@ -457,7 +457,7 @@ export default function Home() {
                   >
                     <LayoutGroup>
                       {filteredCommercialPolls.map((poll) => (
-                        <motion.div key={poll.id} variants={itemVariants} className="w-full flex-shrink-0 snap-center min-w-[320px] max-w-[360px]">
+                        <motion.div key={poll.id} variants={itemVariants} className="w-[90%] mx-auto flex-shrink-0 snap-center md:w-full md:min-w-[320px] md:max-w-[360px]">
                           <PollCard poll={poll} onVote={handleVote} onDelete={handleDeletePoll} onCardClick={handleCommercialCardClick} />
                         </motion.div>
                       ))}
