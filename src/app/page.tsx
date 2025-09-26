@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useState, useMemo, useEffect, useRef } from "react"; // Adicionar useEffect
 import { useAuth } from "./context/AuthContext";
 import { motion } from "framer-motion";
-import { LayoutGroup } from "framer-motion";
+import { LayoutGroup, AnimatePresence } from "framer-motion"; // Importar AnimatePresence
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore"; // Importar funções do Firestore
 
@@ -23,6 +23,9 @@ export default function Home() {
 
   const [currentPublicPollIndex, setCurrentPublicPollIndex] = useState(0);
   const [currentCommercialPollIndex, setCurrentCommercialPollIndex] = useState(0);
+
+  const [showPollForm, setShowPollForm] = useState(false); // Novo estado para controlar a visibilidade do formulário de enquete
+  const pollFormRef = useRef<HTMLDivElement>(null); // Ref para o contêiner do formulário de enquete
 
   const publicCarouselRef = useRef<HTMLDivElement>(null);
   const commercialCarouselRef = useRef<HTMLDivElement>(null);
@@ -133,6 +136,25 @@ export default function Home() {
 
     return () => clearInterval(interval);
   }, [filteredCommercialPolls, isCommercialCarouselPaused]);
+
+  // Efeito para detectar cliques fora do formulário de enquete
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (pollFormRef.current && !pollFormRef.current.contains(event.target as Node)) {
+        setShowPollForm(false); // Oculta o formulário se o clique foi fora
+      }
+    }
+
+    if (showPollForm) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showPollForm]);
 
   const handlePublicCardClick = (isCardExpanded: boolean) => {
     setIsPublicCarouselPaused(isCardExpanded);
@@ -313,7 +335,34 @@ export default function Home() {
           <p className="text-zinc-600 dark:text-zinc-400">Carregando conteúdo...</p>
         ) : (
           <>
-            <PollForm onAddPoll={addPoll} onPollCreated={handlePollCreated} />
+            {/* Botão para criar enquete */}
+            {!showPollForm && (
+              <motion.button
+                onClick={() => setShowPollForm(true)}
+                className="w-full px-8 py-4 rounded-full bg-indigo-600 text-white text-xl font-bold shadow-lg hover:bg-indigo-700 transition-colors duration-300 transform hover:scale-105 mb-8"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Crie sua enquete!
+              </motion.button>
+            )}
+
+            {/* Renderizar PollForm condicionalmente */}
+            {showPollForm && (
+              <AnimatePresence>
+                <motion.div
+                  key="poll-form"
+                  ref={pollFormRef} // Atribuir o ref ao contêiner do formulário
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="w-full"
+                >
+                  <PollForm onAddPoll={addPoll} onPollCreated={() => { handlePollCreated(); setShowPollForm(false); }} />
+                </motion.div>
+              </AnimatePresence>
+            )}
 
             <div className="flex space-x-4 mb-8">
               <motion.button
@@ -356,11 +405,11 @@ export default function Home() {
                     variants={containerVariants}
                     initial="hidden"
                     animate="show"
-                    className="w-full flex overflow-x-auto snap-x snap-mandatory gap-8 pb-4 scrollbar-hide"
+                    className="w-full flex overflow-x-auto snap-x snap-mandatory gap-8 scrollbar-hide"
                   >
                     <LayoutGroup>
                       {filteredPublicPolls.map((poll) => (
-                        <motion.div key={poll.id} variants={itemVariants} className="w-full flex-shrink-0 snap-center min-w-[300px] max-w-[300px]">
+                        <motion.div key={poll.id} variants={itemVariants} className="w-full flex-shrink-0 snap-center min-w-[320px] max-w-[360px]">
                           <PollCard poll={poll} onVote={handleVote} onDelete={handleDeletePoll} onCardClick={handlePublicCardClick} />
                         </motion.div>
                       ))}
@@ -391,7 +440,7 @@ export default function Home() {
             </div>
 
             {/* Seção de Enquetes de Comerciantes */}
-            <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Enquetes de Comerciantes</h2>
+            <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Enquetes Comerciais</h2>
             <div className="relative w-full">
               {loadingPolls ? (
                 <p className="text-zinc-600 dark:text-zinc-400">Carregando enquetes de comerciantes...</p>
@@ -404,11 +453,11 @@ export default function Home() {
                     variants={containerVariants}
                     initial="hidden"
                     animate="show"
-                    className="w-full flex overflow-x-auto snap-x snap-mandatory gap-8 pb-4 scrollbar-hide"
+                    className="w-full flex overflow-x-auto snap-x snap-mandatory gap-8 scrollbar-hide"
                   >
                     <LayoutGroup>
                       {filteredCommercialPolls.map((poll) => (
-                        <motion.div key={poll.id} variants={itemVariants} className="w-full flex-shrink-0 snap-center min-w-[300px] max-w-[300px]">
+                        <motion.div key={poll.id} variants={itemVariants} className="w-full flex-shrink-0 snap-center min-w-[320px] max-w-[360px]">
                           <PollCard poll={poll} onVote={handleVote} onDelete={handleDeletePoll} onCardClick={handleCommercialCardClick} />
                         </motion.div>
                       ))}
