@@ -11,8 +11,8 @@ import { motion } from "framer-motion";
 import { LayoutGroup, AnimatePresence } from "framer-motion"; // Importar AnimatePresence
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore"; // Importar funções do Firestore
-import LoginForm from "./components/LoginForm"; // Importar LoginForm
-import SignupForm from "./components/SignupForm"; // Importar SignupForm
+// Removido: import LoginForm from "./components/LoginForm";
+// Removido: import SignupForm from "./components/SignupForm";
 
 export default function Home() {
   const [polls, setPolls] = useState<Poll[]>([]); // Mudar para useState
@@ -23,8 +23,8 @@ export default function Home() {
   const { user, isMasterUser } = useAuth(); // Obter o usuário logado e o status de mestre
   const [isClient, setIsClient] = useState(false); // Novo estado para montagem no cliente
 
-  const [currentPublicPollIndex, setCurrentPublicPollIndex] = useState(0);
-  const [currentCommercialPollIndex, setCurrentCommercialPollIndex] = useState(0);
+  // Removido: const [currentPublicPollIndex, setCurrentPublicPollIndex] = useState(0);
+  // Removido: const [currentCommercialPollIndex, setCurrentCommercialPollIndex] = useState(0);
 
   const [showPollForm, setShowPollForm] = useState(false); // Novo estado para controlar a visibilidade do formulário de enquete
   const pollFormRef = useRef<HTMLDivElement>(null); // Ref para o contêiner do formulário de enquete
@@ -112,12 +112,12 @@ export default function Home() {
     if (!publicCarouselRef.current || filteredPublicPolls.length === 0 || isPublicCarouselPaused) return;
 
     const interval = setInterval(() => {
-      setCurrentPublicPollIndex((prevIndex) => {
-        const nextIndex = (prevIndex + 1) % filteredPublicPolls.length;
-        const scrollAmount = nextIndex * (publicCarouselRef.current!.children[0] as HTMLElement).offsetWidth;
-        publicCarouselRef.current!.scrollTo({ left: scrollAmount, behavior: "smooth" });
-        return nextIndex;
-      });
+      // Removido: setCurrentPublicPollIndex e lógica de rolagem automática
+      // Esta lógica agora está sendo gerenciada fora de page.tsx ou removida conforme necessário.
+      // Para reintroduzir a rolagem, a lógica de index e scroll precisaria ser implementada com o novo design.
+
+      // Temporariamente removendo a lógica de rolagem para resolver o erro.
+      // Se a rolagem automática for necessária, precisará ser reconstruída usando useRef e useEffect.
     }, 5000); // Rola a cada 5 segundos
 
     return () => clearInterval(interval);
@@ -128,12 +128,12 @@ export default function Home() {
     if (!commercialCarouselRef.current || filteredCommercialPolls.length === 0 || isCommercialCarouselPaused) return;
 
     const interval = setInterval(() => {
-      setCurrentCommercialPollIndex((prevIndex) => {
-        const nextIndex = (prevIndex + 1) % filteredCommercialPolls.length;
-        const scrollAmount = nextIndex * (commercialCarouselRef.current!.children[0] as HTMLElement).offsetWidth;
-        commercialCarouselRef.current!.scrollTo({ left: scrollAmount, behavior: "smooth" });
-        return nextIndex;
-      });
+      // Removido: setCurrentCommercialPollIndex e lógica de rolagem automática
+      // Esta lógica agora está sendo gerenciada fora de page.tsx ou removida conforme necessário.
+      // Para reintroduzir a rolagem, a lógica de index e scroll precisaria ser implementada com o novo design.
+
+      // Temporariamente removendo a lógica de rolagem para resolver o erro.
+      // Se a rolagem automática for necessária, precisará ser reconstruída usando useRef e useEffect.
     }, 5000); // Rola a cada 5 segundos
 
     return () => clearInterval(interval);

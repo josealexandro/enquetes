@@ -367,7 +367,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
 
               return (
                 <li key={option.id}>
-                  <div className="flex justify-between items-center mb-1" onClick={(e) => e.stopPropagation()}> {/* Impede a propagação do clique */} 
+                  <div className="flex justify-between items-center mb-1" onClick={(_e) => _e.stopPropagation()}> {/* Impede a propagação do clique */} 
                     <motion.button
                       whileHover={{ scale: 1.02, x: 5 }}
                       whileTap={{ scale: 0.98 }}

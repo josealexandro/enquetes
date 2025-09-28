@@ -1,7 +1,7 @@
 // src/app/context/AuthModalContext.tsx
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
 
 interface AuthModalContextType {
   openLoginModal: () => void;

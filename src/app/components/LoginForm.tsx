@@ -20,7 +20,7 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
     try {
       await login(email, password);
       onLoginSuccess?.();
-    } catch (err: any) {
+    } catch (err: Error) {
       setError(err.message || 'Erro ao fazer login. Tente novamente.');
     }
     setLoading(false);
