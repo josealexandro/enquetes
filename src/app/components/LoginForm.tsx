@@ -20,8 +20,12 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
     try {
       await login(email, password);
       onLoginSuccess?.();
-    } catch (err: Error) {
-      setError(err.message || 'Erro ao fazer login. Tente novamente.');
+    } catch (err: unknown) { // Alterado de 'Error' para 'unknown'
+      if (err instanceof Error) {
+        setError(err.message || 'Erro ao fazer login. Tente novamente.');
+      } else {
+        setError('Ocorreu um erro desconhecido.');
+      }
     }
     setLoading(false);
   };

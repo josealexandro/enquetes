@@ -371,7 +371,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
                     <motion.button
                       whileHover={{ scale: 1.02, x: 5 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={(e) => { handleVoteClick(option.id); }}
+                      onClick={() => { handleVoteClick(option.id); }}
                       disabled={!!votedOptionId}
                       className={`text-left font-medium transition-colors duration-200 ${
                         votedOptionId === option.id
@@ -398,7 +398,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
             })}
           </ul>
 
-          <div onClick={(e) => e.stopPropagation()}> {/* Nova div para agrupar comentários e formulário, impedindo a propagação */} 
+          <div onClick={(_e) => _e.stopPropagation()}> {/* Nova div para agrupar comentários e formulário, impedindo a propagação */} 
             <CommentForm pollId={poll.id} onAddComment={handleAddComment} />
             {renderComments(topLevelComments, 0)}
           </div>

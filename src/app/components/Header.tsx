@@ -8,7 +8,6 @@ import { faSun, faMoon } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from "../context/AuthContext";
 import Login from "./Auth/Login";
 import Signup from "./Auth/Signup";
-import { AuthModalProvider, useAuthModal } from "../context/AuthModalContext"; // Importar AuthModalProvider e useAuthModal
 import { motion } from "framer-motion";
 import { faBars, faTimes } from '@fortawesome/free-solid-svg-icons'; // Import hamburger and close icons
 
@@ -29,7 +28,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
   const { user, logout, loading } = useAuth();
-  const { openLoginModal, openSignupModal } = useAuthModal(); // Usar o contexto para abrir modais
+  // Removido: const { openLoginModal, openSignupModal } = useAuthModal();
 
   // Remove o useEffect redundante para inicialização do tema, já que o useState faz isso
   // useEffect(() => {
