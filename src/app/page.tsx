@@ -11,6 +11,8 @@ import { motion } from "framer-motion";
 import { LayoutGroup, AnimatePresence } from "framer-motion"; // Importar AnimatePresence
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore"; // Importar funções do Firestore
+import LoginForm from "./components/LoginForm"; // Importar LoginForm
+import SignupForm from "./components/SignupForm"; // Importar SignupForm
 
 export default function Home() {
   const [polls, setPolls] = useState<Poll[]>([]); // Mudar para useState
@@ -178,7 +180,7 @@ export default function Home() {
         votes: 0,
       })),
       creator: {
-        name: user.email || "Usuário Logado",
+        name: user.displayName || user.email || "Usuário Logado", // Usar displayName, fallback para email ou "Usuário Logado"
         avatarUrl: "https://www.gravatar.com/avatar/?d=mp", // Pode ser personalizado com o avatar do usuário
         id: user.uid, // Adicionar o ID do criador aqui
       },

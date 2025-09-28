@@ -11,6 +11,8 @@ import { motion } from "framer-motion";
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
 import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc, arrayUnion, arrayRemove, FieldValue, increment } from "firebase/firestore"; // Importar funções do Firestore e arrayUnion/arrayRemove
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
+import AuthPromptCard from "./Auth/AuthPromptCard"; // Importar AuthPromptCard
+import { useAuthModal } from "@/app/context/AuthModalContext"; // Importar useAuthModal
 
 interface PollCardProps {
   poll: Poll;
@@ -27,6 +29,8 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
   const [isExpanded, setIsExpanded] = useState(false); // Novo estado para controlar a expansão
   const [currentTotalVotes, setCurrentTotalVotes] = useState(poll.options.reduce((sum, opt) => sum + opt.votes, 0));
   const { user, isMasterUser } = useAuth(); // Obter o usuário logado e o status de mestre
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false); // Novo estado para controlar a visibilidade do AuthPromptCard
+  const { openLoginModal, openSignupModal } = useAuthModal(); // Usar o contexto para abrir modais
 
   // Efeito para carregar o estado do voto do localStorage
   useEffect(() => {
@@ -95,7 +99,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
 
   const handleLike = async () => {
     if (!user) {
-      alert("Você precisa estar logado para curtir uma enquete.");
+      setShowAuthPrompt(true); // Mostrar o card de prompt de autenticação
       return;
     }
 
@@ -131,7 +135,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
 
   const handleDislike = async () => {
     if (!user) {
-      alert("Você precisa estar logado para descurtir uma enquete.");
+      setShowAuthPrompt(true); // Mostrar o card de prompt de autenticação
       return;
     }
 
@@ -166,6 +170,10 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
   };
 
   const handleVoteClick = (optionId: string) => {
+    if (!user) { // Adicionar verificação de login aqui
+      setShowAuthPrompt(true); // Mostrar o card de prompt de autenticação
+      return;
+    }
     if (votedOptionId) return;
     onVote(poll.id, optionId);
     setVotedOptionId(optionId);
@@ -178,13 +186,13 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
 
   const handleAddComment = async (text: string, parentId?: string) => {
     if (!user) {
-      alert("Você precisa estar logado para comentar.");
+      setShowAuthPrompt(true); // Mostrar o card de prompt de autenticação
       return;
     }
 
     const baseComment = {
       pollId: poll.id,
-      author: user.email || "Usuário Logado",
+      author: user.displayName || user.email || "Usuário Logado", // Usar displayName, fallback para email ou "Usuário Logado"
       authorId: user.uid,
       authorEmail: user.email,
       text,
@@ -395,6 +403,20 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
             {renderComments(topLevelComments, 0)}
           </div>
         </>
+      )}
+      {showAuthPrompt && (
+        <AuthPromptCard
+          message="Você precisa estar logado para votar."
+          onClose={() => setShowAuthPrompt(false)}
+          onLoginClick={() => {
+            setShowAuthPrompt(false);
+            openLoginModal();
+          }}
+          onSignupClick={() => {
+            setShowAuthPrompt(false);
+            openSignupModal();
+          }}
+        />
       )}
     </div>
   );

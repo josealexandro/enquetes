@@ -3,21 +3,22 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { auth } from "@/lib/firebase"; // Importar a instância de autenticação do Firebase
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore para buscar roles
-import { doc, getDoc } from "firebase/firestore"; // Importar doc e getDoc do Firestore
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"; // Importar doc, getDoc, setDoc e serverTimestamp do Firestore
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   User,
+  updateProfile,
 } from "firebase/auth";
 
 interface AuthContextType {
-  user: User | null; // O tipo de usuário agora é o User do Firebase
+  user: (User & { displayName?: string | null }) | null; // O tipo de usuário agora é o User do Firebase
   loading: boolean;
   isMasterUser: boolean; // Novo campo para indicar se o usuário é mestre
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -34,13 +35,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
       if (firebaseUser) {
         // Verificar se o usuário é mestre
         const masterUserRef = doc(db, "masterUsers", firebaseUser.uid);
         const masterUserDoc = await getDoc(masterUserRef);
+
+        // Buscar displayName do Firestore
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        const userData = userDoc.exists() ? userDoc.data() : null;
+
+        setUser({
+          ...firebaseUser,
+          displayName: userData?.displayName || firebaseUser.displayName || null,
+        });
+
         setIsMasterUser(masterUserDoc.exists());
       } else {
+        setUser(null);
         setIsMasterUser(false);
       }
       setLoading(false);
@@ -62,10 +74,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const signup = async (email: string, password: string) => {
+  const signup = async (email: string, password: string, displayName: string) => {
     setLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+
+      // Salvar o displayName no Firestore
+      await setDoc(doc(db, "users", firebaseUser.uid), {
+        email: firebaseUser.email,
+        displayName: displayName,
+        createdAt: serverTimestamp(), // Adicionar timestamp de criação
+      });
+      // Atualizar o perfil do Firebase Auth também
+      await updateProfile(firebaseUser, { displayName: displayName });
+
+
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
       console.error("Erro ao cadastrar:", errorMessage);

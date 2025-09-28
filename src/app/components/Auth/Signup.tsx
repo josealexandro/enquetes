@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { auth } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
+import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 
 interface SignupProps {
   onSignupSuccess?: () => void;
@@ -13,8 +14,10 @@ export default function Signup({ onSignupSuccess, onSwitchToLogin }: SignupProps
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [displayName, setDisplayName] = useState(""); // Novo estado para o nome/apelido
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const { signup } = useAuth(); // Usar o hook useAuth
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +31,7 @@ export default function Signup({ onSignupSuccess, onSwitchToLogin }: SignupProps
     }
 
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      await signup(email, password, displayName); // Chamar a função signup do AuthContext
       onSignupSuccess?.();
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -48,6 +51,15 @@ export default function Signup({ onSignupSuccess, onSwitchToLogin }: SignupProps
       </h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && <p className="text-red-500 text-center">{error}</p>}
+        {/* Campo para Nome / Apelido */}
+        <input
+          type="text"
+          placeholder="Nome / Apelido"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          className="w-full px-4 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder-zinc-500 dark:placeholder-zinc-400"
+          required
+        />
         <input
           type="email"
           placeholder="Email"

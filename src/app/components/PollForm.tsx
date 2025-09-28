@@ -15,7 +15,7 @@ export default function PollForm({ onAddPoll, onPollCreated }: PollFormProps) {
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "error" | null>(null);
 
-  const categories = ["Geral", "Política", "Games", "Gastronomia", "Filme", "Esportes", "Tecnologia", "Educação"];
+  const categories = ["Geral", "Política", "Games", "Gastronomia", "Filme", "Esportes", "Tecnologia", "Educação", "Música"];
 
   const handleOptionChange = (index: number, value: string) => {
     const updated = [...options];
@@ -100,15 +100,6 @@ export default function PollForm({ onAddPoll, onPollCreated }: PollFormProps) {
         </div>
       )}
 
-      <input
-        type="text"
-        placeholder="Título da Enquete"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className="w-full px-4 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder-zinc-500 dark:placeholder-zinc-400"
-        required
-      />
-
       <select
         value={category}
         onChange={(e) => setCategory(e.target.value)}
@@ -122,6 +113,15 @@ export default function PollForm({ onAddPoll, onPollCreated }: PollFormProps) {
           </option>
         ))}
       </select>
+
+      <input
+        type="text"
+        placeholder="Título da Enquete"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        className="w-full px-4 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder-zinc-500 dark:placeholder-zinc-400"
+        required
+      />
 
       {options.map((opt, idx) => (
         <div key={idx} className="flex gap-2">

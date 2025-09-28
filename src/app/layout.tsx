@@ -1,3 +1,5 @@
+"use client";
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Poppins, Inter } from "next/font/google";
@@ -16,6 +18,8 @@ library.add(faFacebookF, faTwitter, faLinkedinIn, faGithub, faEnvelope, faSun, f
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import { AuthProvider } from "./context/AuthContext";
+import { AuthModalProvider } from "./context/AuthModalContext"; // Importar AuthModalProvider
+import { useState } from "react"; // Importar useState
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,25 +43,30 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-export const metadata: Metadata = {
-  title: "Poll App - Crie e Participe de Enquetes",
-  description: "Crie e participe de enquetes interativas de forma rápida e fácil.",
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showSignupModal, setShowSignupModal] = useState(false);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${poppins.variable} ${geistSans.variable} ${geistMono.variable} antialiased bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white`}>
         {/* O script de tema foi movido para Header.tsx para gerenciamento centralizado */}
         
         <AuthProvider>
-          <Header />
-          {children}
-          <Footer />
+          <AuthModalProvider onOpenLogin={() => setShowLoginModal(true)} onOpenSignup={() => setShowSignupModal(true)}>
+            <Header
+              showLoginModal={showLoginModal}
+              setShowLoginModal={setShowLoginModal}
+              showSignupModal={showSignupModal}
+              setShowSignupModal={setShowSignupModal}
+            />
+            {children}
+            <Footer />
+          </AuthModalProvider>
         </AuthProvider>
       </body>
     </html>
