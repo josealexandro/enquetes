@@ -28,7 +28,9 @@ export default function SignupForm({ onSignupSuccess }: SignupFormProps) {
       await signup(email, password, displayName);
       onSignupSuccess?.();
     } catch (err: unknown) {
-      setError(err.message || 'Erro ao cadastrar. Tente novamente.');
+      setError(
+        (err instanceof Error && err.message) || 'Erro ao cadastrar. Tente novamente.'
+      );
     }
     setLoading(false);
   };
