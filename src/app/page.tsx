@@ -303,8 +303,8 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen w-full flex flex-col items-center px-4 py-24 bg-white dark:bg-zinc-900">
-      <div className="max-w-3xl w-full text-center mb-12">
+    <main className="min-h-screen w-full flex flex-col items-center px-4 py-24 bg-white dark:bg-zinc-900 pt-20">
+      <div className="max-w-3xl w-full text-center mb-12 mt-10">
         <h1 className="text-5xl md:text-6xl font-extrabold text-zinc-900 dark:text-white leading-tight animate-fade-in">
           Bem-vindo ao Poll App!
         </h1>

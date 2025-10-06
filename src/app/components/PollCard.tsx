@@ -257,7 +257,9 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
             onDeleteComment={handleDeleteComment}
             replies={directReplies} // Passar as respostas diretas
             totalRepliesCount={totalCount} // Passar a contagem total de respostas
-            className={depth > 0 ? "ml-6" : ""}
+            depth={depth + 1} // Adicionado
+            getReplies={getReplies} // Adicionado
+            countReplies={countReplies} // Adicionado
           />
         </div>
       );

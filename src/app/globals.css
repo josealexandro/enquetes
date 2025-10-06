@@ -10,8 +10,6 @@
 body {
   /* Remove default margins and padding */
   margin: 0;
-  padding-top: 64px;
-  padding-bottom: 64px;
   /* Removendo as propriedades background e color fixas para permitir que o Tailwind gerencie */
   font-family: var(--font-inter), sans-serif;
 }

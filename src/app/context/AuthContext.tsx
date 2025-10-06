@@ -37,20 +37,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         // Verificar se o usuário é mestre
-        const masterUserRef = doc(db, "masterUsers", firebaseUser.uid);
-        const masterUserDoc = await getDoc(masterUserRef);
+        // const masterUserRef = doc(db, "masterUsers", firebaseUser.uid);
+        // const masterUserDoc = await getDoc(masterUserRef);
 
         // Buscar displayName do Firestore
-        const userDocRef = doc(db, "users", firebaseUser.uid);
-        const userDoc = await getDoc(userDocRef);
-        const userData = userDoc.exists() ? userDoc.data() : null;
+        // const userDocRef = doc(db, "users", firebaseUser.uid);
+        // const userDoc = await getDoc(userDocRef);
+        // const userData = userDoc.exists() ? userDoc.data() : null;
 
         setUser({
           ...firebaseUser,
-          displayName: userData?.displayName || firebaseUser.displayName || null,
+          displayName: firebaseUser.displayName || null, // Usar displayName direto do firebaseUser por enquanto
         });
 
-        setIsMasterUser(masterUserDoc.exists());
+        setIsMasterUser(false); // Definir como false temporariamente
       } else {
         setUser(null);
         setIsMasterUser(false);

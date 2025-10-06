@@ -19,28 +19,33 @@ interface HeaderProps {
 }
 
 export default function Header({ showLoginModal, setShowLoginModal, showSignupModal, setShowSignupModal }: HeaderProps) {
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('theme');
-      return savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    }
-    return false; // Default to light mode on server or if window is undefined
-  });
+  const [darkMode, setDarkMode] = useState(false); // Inicializa com valor padrão (modo claro)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
   const { user, logout, loading } = useAuth();
-  // Removido: const { openLoginModal, openSignupModal } = useAuthModal();
+  // REMOVIDO: const { openLoginModal, openSignupModal } = useAuthModal();
 
-  // Remove o useEffect redundante para inicialização do tema, já que o useState faz isso
-  // useEffect(() => {
-  //   const savedTheme = localStorage.getItem("theme");
-  //   if (savedTheme === "dark") {
-  //     setDarkMode(true);
-  //     document.documentElement.classList.add("dark");
-  //   } else {
-  //     setDarkMode(false);
-  //     document.documentElement.classList.remove("dark");
-  //   }
-  // }, []);
+  // useEffect para inicializar o tema APENAS no lado do cliente
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      
+      if (savedTheme) {
+        setDarkMode(savedTheme === 'dark');
+        if (savedTheme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } else if (prefersDark) {
+        setDarkMode(true);
+        document.documentElement.classList.add('dark');
+      } else {
+        setDarkMode(false);
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, []); // Executar apenas uma vez na montagem do cliente
 
   useEffect(() => {
     if (darkMode) {
@@ -68,12 +73,12 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
     setIsMobileMenuOpen(false); // Close mobile menu on signup
   };
 
-  if (loading) {
-    return null; // Or a loading spinner
-  }
+  // if (loading) {
+  //   return null; // Or a loading spinner
+  // }
 
   return (
-    <header className="w-full bg-zinc-800 text-white py-4 px-6 fixed top-0 z-50 shadow-md transition-colors duration-300">
+    <header className="w-full bg-zinc-800 text-white py-1 px-6 fixed top-0 z-50 shadow-md transition-colors duration-300">
       <nav className="max-w-7xl mx-auto flex justify-between items-center">
         <Link href="/" className="hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300">
           <Image src="/logoHome.png" alt="Logo do Aplicativo de Enquetes" width={120} height={40} objectFit="contain" />
