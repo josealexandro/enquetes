@@ -29,10 +29,6 @@ interface CommentProps {
   onDeleteComment: (commentId: string) => void;
   replies?: Comment[];
   totalRepliesCount?: number;
-  depth: number;
-  getReplies: (commentId: string) => Comment[];
-  countReplies: (commentId: string) => number;
-  className?: string;
 }
 
 export default function CommentComponent({
@@ -41,39 +37,36 @@ export default function CommentComponent({
   onDeleteComment,
   replies = [],
   totalRepliesCount = 0,
-  depth,
-  getReplies,
-  countReplies,
-  className,
 }: CommentProps) {
   const [showReplyForm, setShowReplyForm] = useState(false);
-  const [showReplies, setShowReplies] = useState(depth > 0);
+  const [showReplies, setShowReplies] = useState(true);
   const { user, isMasterUser } = useAuth();
-
-  const MAX_INDENT_LEVEL = 2; // Definir o número máximo de níveis de indentação
 
   const handleReplySubmit = async (text: string) => {
     await onAddReply(comment.id, text);
     setShowReplyForm(false);
   };
 
-  const canDeleteComment = user && (user.uid === comment.authorId || isMasterUser);
+  const canDeleteComment =
+    user && (user.uid === comment.authorId || isMasterUser);
 
   return (
     <div
-      className={`mb-4 transition-all duration-300 ${className || ""}`}
       style={{
-        marginLeft: depth > 0 ? Math.min(depth, MAX_INDENT_LEVEL) * 12 : 0, // Limitar a indentação máxima
-        maxWidth: `calc(100% - ${Math.min(depth, MAX_INDENT_LEVEL) * 12}px)`, // Ajustar maxWidth para o novo limite
+        marginLeft: 0, // Todas as respostas e comentários de nível superior sem margem à esquerda
       }}
     >
-      <div className="border-l border-zinc-700/40 pl-3">
+      <div className="border-l border-zinc-700/40">
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           <span className="font-medium text-zinc-200">{comment.author}</span>{" "}
-          <span className="text-xs text-zinc-500">• {formatTimeAgo(comment.timestamp)}</span>
+          <span className="text-xs text-zinc-500">
+            • {formatTimeAgo(comment.timestamp)}
+          </span>
         </p>
 
-        <p className="text-zinc-100 mt-1 break-words">{comment.text}</p>
+        <p className="text-zinc-100 mt-1 break-words whitespace-normal">
+          {comment.text}
+        </p>
 
         <div className="flex items-center space-x-3 mt-2 text-sm flex-wrap">
           <button
@@ -116,18 +109,15 @@ export default function CommentComponent({
         )}
 
         {showReplies && replies.length > 0 && (
-          <div className="mt-3 space-y-3">
+          <div className="mt-3 space-y-3" style={{ marginLeft: '20px' }}>
             {replies.map((reply) => (
               <CommentComponent
                 key={reply.id}
                 comment={reply}
                 onAddReply={onAddReply}
                 onDeleteComment={onDeleteComment}
-                replies={getReplies(reply.id)}
-                totalRepliesCount={countReplies(reply.id)}
-                depth={depth + 1}
-                getReplies={getReplies}
-                countReplies={countReplies}
+                replies={[]} // Respostas de respostas não são exibidas
+                totalRepliesCount={0} // Respostas de respostas não contam
               />
             ))}
           </div>

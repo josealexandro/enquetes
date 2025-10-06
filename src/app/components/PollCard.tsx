@@ -230,36 +230,22 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
     }
   };
 
-  const getReplies = (commentId: string) => {
-    return comments.filter(c => c.parentId === commentId).sort((a, b) => a.timestamp - b.timestamp);
-  };
-
-  const countReplies = (commentId: string): number => {
-    let count = 0;
-    const directReplies = comments.filter(c => c.parentId === commentId);
-    count += directReplies.length;
-    directReplies.forEach(reply => {
-      count += countReplies(reply.id);
-    });
-    return count;
-  };
-
-  const renderComments = (parentComments: Comment[], depth: number) => {
+  const renderComments = (parentComments: Comment[]) => {
     return parentComments.map((comment) => {
-      const directReplies = getReplies(comment.id);
-      const totalCount = countReplies(comment.id);
+      const directReplies = comments.filter(c => c.parentId === comment.id).sort((a, b) => a.timestamp - b.timestamp);
+      const totalCount = directReplies.length;
 
       return (
-        <div key={comment.id} className="w-full">
+        <div key={comment.id}>
           <CommentComponent
             comment={comment}
-            onAddReply={(replyParentId, text) => handleAddComment(text, replyParentId)}
+            onAddReply={(replyParentId, text) => handleAddComment(text, comment.id)} // Respostas sempre vão para o comentário original
             onDeleteComment={handleDeleteComment}
             replies={directReplies} // Passar as respostas diretas
             totalRepliesCount={totalCount} // Passar a contagem total de respostas
-            depth={depth + 1} // Adicionado
-            getReplies={getReplies} // Adicionado
-            countReplies={countReplies} // Adicionado
+            // depth={depth === 0 ? 1 : 1} // Removido
+            // getReplies={getReplies} // Removido
+            // countReplies={countReplies} // Removido
           />
         </div>
       );
@@ -400,9 +386,9 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
             })}
           </ul>
 
-          <div onClick={(_e) => _e.stopPropagation()}> {/* Nova div para agrupar comentários e formulário, impedindo a propagação */} 
+          <div className="w-full overflow-hidden" onClick={(_e) => _e.stopPropagation()}> {/* Nova div para agrupar comentários e formulário, impedindo a propagação */} 
             <CommentForm pollId={poll.id} onAddComment={handleAddComment} />
-            {renderComments(topLevelComments, 0)}
+            {renderComments(topLevelComments)}
           </div>
         </>
       )}
