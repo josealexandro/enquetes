@@ -2,7 +2,22 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    domains: ["www.gravatar.com"],
+    // Remover 'domains' para usar 'remotePatterns'
+    // domains: ["www.gravatar.com", "firebasestorage.googleapis.com"],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'www.gravatar.com',
+        port: '',
+        pathname: '/avatar/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        port: '',
+        pathname: '/v0/b/poll-app1366.firebasestorage.app/o/**',
+      },
+    ],
   },
   /* config options here */
 };
