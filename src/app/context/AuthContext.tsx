@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { auth } from "@/lib/firebase"; // Importar a instância de autenticação do Firebase
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore para buscar roles
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Importar funções do Firebase Storage
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"; // Importar doc, getDoc, setDoc e serverTimestamp do Firestore
+import { doc, getDoc, setDoc, serverTimestamp, Timestamp, FieldValue } from "firebase/firestore"; // Importar doc, getDoc, setDoc e serverTimestamp do Firestore
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -18,7 +18,7 @@ interface UserDataToSave {
   email: string | null;
   displayName: string | null;
   accountType: 'personal' | 'commercial';
-  createdAt: any; // serverTimestamp é um tipo complexo, mas por enquanto 'any' é aceitável aqui se for apenas para o tipo do FireStore
+  createdAt: Timestamp | FieldValue; // serverTimestamp é um tipo complexo, mas por enquanto 'any' é aceitável aqui se for apenas para o tipo do FireStore
 }
 
 interface AuthContextType {
