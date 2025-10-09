@@ -1,0 +1,59 @@
+@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Removendo as variáveis de cor para deixar o Tailwind gerenciar */
+}
+
+body {
+  /* Remove default margins and padding */
+  margin: 0;
+  /* Removendo as propriedades background e color fixas para permitir que o Tailwind gerencie */
+  font-family: var(--font-inter), sans-serif;
+}
+
+/* Remover #root já que o layout é gerenciado pelo Next.js e Tailwind */
+/* #root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  --background: #0f0f0f;
+  --foreground: #e0f7fa;
+  --primary: #00ffff;
+  --secondary: #ff00cc;
+  --accent: #39ff14;
+} */
+
+input, button {
+  font-size: 1rem;
+}
+
+@media (max-width: 640px) {
+  .text-xl {
+    font-size: 1.25rem;
+  }
+  .text-3xl {
+    font-size: 1.75rem;
+  }
+  .px-4 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 1s ease-out forwards;
+}
