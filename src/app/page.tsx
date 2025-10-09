@@ -181,7 +181,7 @@ export default function Home() {
       })),
       creator: {
         name: user.displayName || user.email || "Usuário Logado", // Usar displayName, fallback para email ou "Usuário Logado"
-        avatarUrl: "https://www.gravatar.com/avatar/?d=mp", // Pode ser personalizado com o avatar do usuário
+        avatarUrl: user.avatarUrl || "https://www.gravatar.com/avatar/?d=mp", // Usar o avatarUrl do usuário, com fallback para Gravatar
         id: user.uid, // Adicionar o ID do criador aqui
       },
       createdAt: Date.now(), // Timestamp em milissegundos

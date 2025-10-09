@@ -21,7 +21,7 @@ interface HeaderProps {
 export default function Header({ showLoginModal, setShowLoginModal, showSignupModal, setShowSignupModal }: HeaderProps) {
   const [darkMode, setDarkMode] = useState(false); // Inicializa com valor padrão (modo claro)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
-  const { user, logout, loading } = useAuth();
+  const { user, logout /*, loading */ } = useAuth(); // Remover loading, pois não está sendo usado
   // REMOVIDO: const { openLoginModal, openSignupModal } = useAuthModal();
 
   // useEffect para inicializar o tema APENAS no lado do cliente
@@ -122,6 +122,15 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
             </>
           ) : (
             <>
+              {user.avatarUrl && (
+                <Image 
+                  src={user.avatarUrl}
+                  alt="Avatar do Usuário"
+                  width={32}
+                  height={32}
+                  className="rounded-full"
+                />
+              )}
               <span className="text-white">Olá, {user.email}!</span>
               <motion.button
                 onClick={() => { logout(); setIsMobileMenuOpen(false); }}

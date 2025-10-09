@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { auth } from "@/lib/firebase"; // Importar a instância de autenticação do Firebase
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore para buscar roles
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Importar funções do Firebase Storage
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"; // Importar doc, getDoc, setDoc e serverTimestamp do Firestore
 import {
   createUserWithEmailAndPassword,
@@ -13,12 +14,26 @@ import {
   updateProfile,
 } from "firebase/auth";
 
+interface UserDataToSave {
+  email: string | null;
+  displayName: string | null;
+  accountType: 'personal' | 'commercial';
+  createdAt: any; // serverTimestamp é um tipo complexo, mas por enquanto 'any' é aceitável aqui se for apenas para o tipo do FireStore
+}
+
 interface AuthContextType {
-  user: (User & { displayName?: string | null }) | null; // O tipo de usuário agora é o User do Firebase
+  user: (User & {
+    displayName?: string | null;
+    accountType?: 'personal' | 'commercial';
+    avatarUrl?: string | null; // Adicionar avatarUrl aqui
+  }) | null; // O tipo de usuário agora é o User do Firebase
   loading: boolean;
   isMasterUser: boolean; // Novo campo para indicar se o usuário é mestre
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, displayName: string) => Promise<void>;
+  signup: (email: string, password: string, displayName: string,
+    accountType: 'personal' | 'commercial',
+    avatarFile?: File | null
+  ) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -40,14 +55,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // const masterUserRef = doc(db, "masterUsers", firebaseUser.uid);
         // const masterUserDoc = await getDoc(masterUserRef);
 
-        // Buscar displayName do Firestore
-        // const userDocRef = doc(db, "users", firebaseUser.uid);
-        // const userDoc = await getDoc(userDocRef);
-        // const userData = userDoc.exists() ? userDoc.data() : null;
+        // Buscar displayName e accountType do Firestore
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        const userData = userDoc.exists() ? userDoc.data() : null;
 
         setUser({
           ...firebaseUser,
           displayName: firebaseUser.displayName || null, // Usar displayName direto do firebaseUser por enquanto
+          accountType: (userData?.accountType as 'personal' | 'commercial') || 'personal', // Adicionar accountType do Firestore
+          avatarUrl: firebaseUser.photoURL || null, // Adicionar avatarUrl
         });
 
         setIsMasterUser(false); // Definir como false temporariamente
@@ -74,20 +91,41 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const signup = async (email: string, password: string, displayName: string) => {
+  const signup = async (
+    email: string,
+    password: string,
+    displayName: string,
+    accountType: 'personal' | 'commercial',
+    avatarFile?: File | null
+  ) => {
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
 
-      // Salvar o displayName no Firestore
-      await setDoc(doc(db, "users", firebaseUser.uid), {
+      const userDataToSave: UserDataToSave = {
         email: firebaseUser.email,
         displayName: displayName,
+        accountType: accountType,
         createdAt: serverTimestamp(), // Adicionar timestamp de criação
-      });
+      };
+
+      // Salvar o displayName e accountType no Firestore
+      await setDoc(doc(db, "users", firebaseUser.uid), userDataToSave);
+      
+      let photoURL: string | null = null;
+      if (avatarFile) {
+        const storage = getStorage();
+        const avatarRef = ref(storage, `avatars/${firebaseUser.uid}/${avatarFile.name}`);
+        const snapshot = await uploadBytes(avatarRef, avatarFile);
+        photoURL = await getDownloadURL(snapshot.ref);
+      }
+
       // Atualizar o perfil do Firebase Auth também
-      await updateProfile(firebaseUser, { displayName: displayName });
+      await updateProfile(firebaseUser, { 
+        displayName: displayName, 
+        photoURL: photoURL // Usar a URL do avatar carregado ou null
+      });
 
 
     } catch (error: unknown) {
