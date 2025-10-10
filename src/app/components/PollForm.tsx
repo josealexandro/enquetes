@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useAuth } from "@/app/context/AuthContext";
 
 interface PollFormProps {
-  onAddPoll?: (title: string, options: string[], category: string) => void;
   onPollCreated?: () => void; // New prop for callback
 }
 
-export default function PollForm({ onAddPoll, onPollCreated }: PollFormProps) {
+export default function PollForm({ onPollCreated }: PollFormProps) {
   const [title, setTitle] = useState("");
   const [options, setOptions] = useState(["", ""]);
   const [category, setCategory] = useState("Geral"); // Novo estado para a categoria, com valor padrão
@@ -63,9 +65,20 @@ export default function PollForm({ onAddPoll, onPollCreated }: PollFormProps) {
     }
 
     try {
-      if (onAddPoll) {
-        await onAddPoll(trimmedTitle, filteredOptions, category); // Chamar onAddPoll e aguardar com a categoria
+      const { user } = useAuth();
+      if (!user) {
+        throw new Error("Usuário não autenticado.");
       }
+
+      const pollsCollectionRef = collection(db, "polls");
+      await addDoc(pollsCollectionRef, {
+        title: trimmedTitle,
+        options: filteredOptions.map(optionText => ({ text: optionText, votes: 0 })),
+        category: category,
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+      });
+
       setFeedbackMessage("Enquete criada com sucesso!");
       setFeedbackType("success");
       setTitle("");
