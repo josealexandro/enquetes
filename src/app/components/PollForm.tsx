@@ -16,6 +16,7 @@ export default function PollForm({ onPollCreated }: PollFormProps) {
   const [category, setCategory] = useState("Geral"); // Novo estado para a categoria, com valor padrão
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "error" | null>(null);
+  const { user } = useAuth();
 
   const categories = ["Geral", "Política", "Games", "Gastronomia", "Filme", "Esportes", "Tecnologia", "Educação", "Música"];
 
@@ -64,12 +65,13 @@ export default function PollForm({ onPollCreated }: PollFormProps) {
       return;
     }
 
-    try {
-      const { user } = useAuth();
-      if (!user) {
-        throw new Error("Usuário não autenticado.");
-      }
+    if (!user) {
+      setFeedbackMessage("Usuário não autenticado.");
+      setFeedbackType("error");
+      return;
+    }
 
+    try {
       const pollsCollectionRef = collection(db, "polls");
       await addDoc(pollsCollectionRef, {
         title: trimmedTitle,

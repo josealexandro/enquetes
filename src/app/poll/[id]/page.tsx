@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { useAuth } from "@/app/context/AuthContext";
+import { PollOption } from "@/app/types/poll";
 
 export default function PollPage() {
   const params = useParams() as { id?: string | string[] };
@@ -33,7 +34,7 @@ export default function PollPage() {
         if (docSnap.exists()) {
           const data = docSnap.data();
           // Ensure options have an 'id' for consistency if not present in DB
-          const optionsWithIds = data.options.map((opt: any) => ({ ...opt, id: opt.id || Math.random().toString(36).substring(7) }));
+          const optionsWithIds = data.options.map((opt: PollOption) => ({ ...opt, id: opt.id || Math.random().toString(36).substring(7) }));
 
           setPoll({
             id: docSnap.id,
