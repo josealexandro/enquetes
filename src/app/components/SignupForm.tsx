@@ -25,7 +25,7 @@ export default function SignupForm({ onSignupSuccess }: SignupFormProps) {
     }
 
     try {
-      await signup(email, password, displayName);
+      await signup(email, password, displayName, 'personal', null);
       onSignupSuccess?.();
     } catch (err: unknown) {
       setError(

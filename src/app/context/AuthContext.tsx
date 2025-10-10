@@ -44,7 +44,11 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<(User & {
+    displayName?: string | null;
+    accountType?: 'personal' | 'commercial';
+    avatarUrl?: string | null;
+  }) | null>(null);
   const [loading, setLoading] = useState(true);
   const [isMasterUser, setIsMasterUser] = useState(false); // Novo estado
 
