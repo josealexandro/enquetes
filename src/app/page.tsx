@@ -181,7 +181,7 @@ export default function Home() {
       })),
       creator: {
         name: user.displayName || user.email || "Usuário Logado", // Usar displayName, fallback para email ou "Usuário Logado"
-        avatarUrl: user.avatarUrl || "https://www.gravatar.com/avatar/?d=mp", // Usar o avatarUrl do usuário, com fallback para Gravatar
+        avatarUrl: user.photoURL || "https://www.gravatar.com/avatar/?d=mp", // Usar o avatarUrl do usuário, com fallback para Gravatar
         id: user.uid, // Adicionar o ID do criador aqui
       },
       createdAt: Date.now(), // Timestamp em milissegundos
@@ -213,17 +213,31 @@ export default function Home() {
       return;
     }
 
+    const pollToUpdate = polls.find(p => p.id === pollId);
+    if (!pollToUpdate) {
+      return;
+    }
+
+    // Preparar as opções atualizadas para a UI otimista e para o Firestore
+    const updatedOptionsForOptimisticUI = pollToUpdate.options.map((option) =>
+      option.id === optionId
+        ? { ...option, votes: option.votes + 1 }
+        : option
+    );
+
+    // Preparar o array votedBy atualizado para a UI otimista e para o Firestore (apenas para enquetes comerciais)
+    const updatedVotedByForOptimisticUI = pollToUpdate.isCommercial && user
+      ? [...(pollToUpdate.votedBy || []), user.uid]
+      : pollToUpdate.votedBy;
+
     // Otimista: Atualiza a UI imediatamente
     setPolls((prevPolls) =>
       prevPolls.map((poll) =>
         poll.id === pollId
           ? {
               ...poll,
-              options: poll.options.map((option) =>
-                option.id === optionId
-                  ? { ...option, votes: option.votes + 1 }
-                  : option
-              ),
+              options: updatedOptionsForOptimisticUI,
+              votedBy: updatedVotedByForOptimisticUI,
             }
           : poll
       )
@@ -231,15 +245,22 @@ export default function Home() {
 
     try {
       const pollRef = doc(db, "polls", pollId);
-      // Para evitar sobrescrever votos de outros usuários, busco o poll mais recente
-      // Isso pode ser otimizado com transações ou um modelo de dados diferente no Firestore para votos
-      const currentPoll = polls.find(p => p.id === pollId);
-      if (currentPoll) {
-        const updatedOptions = currentPoll.options.map(option =>
-          option.id === optionId ? { ...option, votes: option.votes + 1 } : option
-        );
-        await updateDoc(pollRef, { options: updatedOptions });
-      }
+      
+      // Não precisamos buscar currentPoll novamente se já temos pollToUpdate
+      // Usaremos a mesma lógica de atualização para o Firestore que preparamos acima
+      const updatedOptionsForFirestore = pollToUpdate.options.map(option =>
+        option.id === optionId ? { ...option, votes: option.votes + 1 } : option
+      );
+      
+      const updatedVotedByForFirestore = pollToUpdate.isCommercial && user
+        ? [...(pollToUpdate.votedBy || []), user.uid]
+        : pollToUpdate.votedBy;
+
+      await updateDoc(pollRef, {
+        options: updatedOptionsForFirestore,
+        ...(pollToUpdate.isCommercial && { votedBy: updatedVotedByForFirestore }),
+      });
+
     } catch (error) {
       console.error("Erro ao votar:", error);
       alert("Erro ao registrar voto. Tente novamente.");
@@ -254,6 +275,8 @@ export default function Home() {
                     ? { ...option, votes: option.votes - 1 }
                     : option
                 ),
+                // Remover user.uid de votedBy se a reversão for para enquete comercial
+                votedBy: poll.isCommercial && user ? (poll.votedBy || []).filter(uid => uid !== user.uid) : poll.votedBy,
               }
             : poll
         )
@@ -361,7 +384,7 @@ export default function Home() {
                   transition={{ duration: 0.3 }}
                   className="w-full"
                 >
-                  <PollForm onAddPoll={addPoll} onPollCreated={() => { handlePollCreated(); setShowPollForm(false); }} />
+                  <PollForm onPollCreated={() => { handlePollCreated(); setShowPollForm(false); }} />
                 </motion.div>
               </AnimatePresence>
             )}
@@ -412,7 +435,13 @@ export default function Home() {
                     <LayoutGroup>
                       {filteredPublicPolls.map((poll) => (
                         <motion.div key={poll.id} variants={itemVariants} className="w-[90%] mx-auto flex-shrink-0 snap-center md:w-full md:min-w-[320px] md:max-w-[360px]">
-                          <PollCard poll={poll} onVote={handleVote} onDelete={handleDeletePoll} onCardClick={handlePublicCardClick} />
+                          <PollCard 
+                            poll={poll} 
+                            onVote={handleVote} 
+                            onDelete={handleDeletePoll} 
+                            onCardClick={handlePublicCardClick} 
+                            userVoted={user ? poll.votedBy?.includes(user.uid) || false : false} // Passar userVoted
+                          />
                         </motion.div>
                       ))}
                     </LayoutGroup>
@@ -460,7 +489,13 @@ export default function Home() {
                     <LayoutGroup>
                       {filteredCommercialPolls.map((poll) => (
                         <motion.div key={poll.id} variants={itemVariants} className="w-[90%] mx-auto flex-shrink-0 snap-center md:w-full md:min-w-[320px] md:max-w-[360px]">
-                          <PollCard poll={poll} onVote={handleVote} onDelete={handleDeletePoll} onCardClick={handleCommercialCardClick} />
+                          <PollCard 
+                            poll={poll} 
+                            onVote={handleVote} 
+                            onDelete={handleDeletePoll} 
+                            onCardClick={handleCommercialCardClick} 
+                            userVoted={user ? poll.votedBy?.includes(user.uid) || false : false} // Passar userVoted
+                          />
                         </motion.div>
                       ))}
                     </LayoutGroup>

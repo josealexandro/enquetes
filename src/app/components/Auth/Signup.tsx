@@ -6,21 +6,22 @@ import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 interface SignupProps {
   onSignupSuccess?: () => void;
   onSwitchToLogin?: () => void;
+  onSignupSuccessWithAccountType?: (accountType: 'personal' | 'commercial') => void; // Nova prop
 }
 
-export default function Signup({ onSignupSuccess, onSwitchToLogin }: SignupProps) {
+export default function Signup({ onSignupSuccess, onSwitchToLogin, onSignupSuccessWithAccountType }: SignupProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [displayName, setDisplayName] = useState(""); // Novo estado para o nome/apelido
-  const [accountType, setAccountType] = useState<'personal' | 'commercial'>('personal'); // Reintroduzir o estado para o tipo de conta
-  const [avatarFile, setAvatarFile] = useState<File | null>(null); // Reintroduzir o estado para o arquivo de avatar
-  const [brandName, setBrandName] = useState(""); // Reintroduzir estado para nome da marca
-  const [logoUrl, setLogoUrl] = useState(""); // Reintroduzir estado para URL do logo
-  const [brandColor1, setBrandColor1] = useState(""); // Reintroduzir estado para cor da marca 1
-  const [brandColor2, setBrandColor2] = useState(""); // Reintroduzir estado para cor da marca 2
-  const [brandColor3, setBrandColor3] = useState(""); // Reintroduzir estado para cor da marca 3
-  const [presentationText, setPresentationText] = useState(""); // Reintroduzir estado para texto de apresentação
+  const [displayName, setDisplayName] = useState(""); // Restaurado
+  const [accountType, setAccountType] = useState<'personal' | 'commercial'>('personal');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null); // Restaurado
+  // REMOVIDO: const [brandName, setBrandName] = useState("");
+  // REMOVIDO: const [logoUrl, setLogoUrl] = useState("");
+  // REMOVIDO: const [brandColor1, setBrandColor1] = useState("");
+  // REMOVIDO: const [brandColor2, setBrandColor2] = useState("");
+  // REMOVIDO: const [brandColor3, setBrandColor3] = useState("");
+  // REMOVIDO: const [presentationText, setPresentationText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { signup } = useAuth(); // Usar o hook useAuth
@@ -36,25 +37,20 @@ export default function Signup({ onSignupSuccess, onSwitchToLogin }: SignupProps
       return;
     }
 
-    if (displayName.trim().length < 3) {
-      setError("O nome/apelido deve ter pelo menos 3 caracteres.");
+    // Validação de displayName apenas para contas pessoais
+    if (accountType === 'personal' && displayName.trim().length < 3) {
+      setError("O nome/apelido deve ter pelo menos 3 caracteres para contas pessoais.");
       setLoading(false);
       return;
     }
 
-    // Validação adicional para campos comerciais
-    if (accountType === 'commercial') {
-      if (brandName.trim().length < 3) {
-        setError("O nome da marca deve ter pelo menos 3 caracteres.");
-        setLoading(false);
-        return;
-      }
-      // Adicione validações para logoUrl, brandColor, presentationText se necessário
-    }
-
     try {
-      await signup(email, password, displayName, accountType, avatarFile);
-      onSignupSuccess?.();
+      const finalDisplayName = accountType === 'personal' ? displayName : email; // Usar email como nome para contas comerciais
+      const finalAvatarFile = accountType === 'personal' ? avatarFile : null; // Nulo para contas comerciais
+
+      await signup(email, password, finalDisplayName, accountType, finalAvatarFile); 
+      // Chamar a nova prop com o accountType
+      onSignupSuccessWithAccountType?.(accountType);
     } catch (error: unknown) {
       if (error instanceof Error) {
         setError(error.message);
@@ -103,27 +99,31 @@ export default function Signup({ onSignupSuccess, onSwitchToLogin }: SignupProps
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && <p className="text-red-500 text-center">{error}</p>}
-        {/* Campo para Nome / Apelido */}
-        <input
-          type="text"
-          placeholder="Nome / Apelido"
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          className="w-full px-4 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder-zinc-500 dark:placeholder-zinc-400"
-          required
-        />
         
-        {/* Campo para Upload de Avatar */}
-        <div>
-          <label htmlFor="avatarUpload" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Foto de Perfil</label>
-          <input
-            type="file"
-            id="avatarUpload"
-            accept="image/*"
-            onChange={(e) => setAvatarFile(e.target.files ? e.target.files[0] : null)}
-            className="mt-1 block w-full text-zinc-900 dark:text-zinc-100 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900 file:text-indigo-700 dark:file:text-indigo-300 hover:file:bg-indigo-100 dark:hover:file:bg-indigo-800"
-          />
-        </div>
+        {/* Campos para Conta Pessoal */}
+        {accountType === 'personal' && (
+          <>
+            <input
+              type="text"
+              placeholder="Nome / Apelido"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className="w-full px-4 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder-zinc-500 dark:placeholder-zinc-400"
+              required
+            />
+            
+            <div>
+              <label htmlFor="avatarUpload" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Foto de Perfil</label>
+              <input
+                type="file"
+                id="avatarUpload"
+                accept="image/*"
+                onChange={(e) => setAvatarFile(e.target.files ? e.target.files[0] : null)}
+                className="mt-1 block w-full text-zinc-900 dark:text-zinc-100 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900 file:text-indigo-700 dark:file:text-indigo-300 hover:file:bg-indigo-100 dark:hover:file:bg-indigo-800"
+              />
+            </div>
+          </>
+        )}
 
         <input
           type="email"
@@ -150,72 +150,8 @@ export default function Signup({ onSignupSuccess, onSwitchToLogin }: SignupProps
           required
         />
         
-        {/* Campos para Conta Comercial */}
-        {accountType === 'commercial' && (
-          <div className="space-y-4 p-4 border border-blue-200 dark:border-blue-700 rounded-md bg-blue-50 dark:bg-blue-900">
-            <p className="font-semibold text-blue-800 dark:text-blue-200">Detalhes da Marca</p>
-            <div>
-              <label htmlFor="brandName" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Nome da Marca</label>
-              <input
-                type="text"
-                id="brandName"
-                placeholder="Nome da sua marca"
-                value={brandName}
-                onChange={(e) => setBrandName(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-zinc-50 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
-                required={accountType === 'commercial'}
-              />
-            </div>
-            <div>
-              <label htmlFor="logoUrl" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">URL do Logo</label>
-              <input
-                type="text"
-                id="logoUrl"
-                placeholder="https://seulogo.com/logo.png"
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-zinc-50 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Cores da Marca (hex)</label>
-              <div className="flex space-x-2 mt-1">
-                <input
-                  type="text"
-                  placeholder="#RRGGBB"
-                  value={brandColor1}
-                  onChange={(e) => setBrandColor1(e.target.value)}
-                  className="w-1/3 px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-zinc-50 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
-                />
-                <input
-                  type="text"
-                  placeholder="#RRGGBB"
-                  value={brandColor2}
-                  onChange={(e) => setBrandColor2(e.target.value)}
-                  className="w-1/3 px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-zinc-50 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
-                />
-                <input
-                  type="text"
-                  placeholder="#RRGGBB"
-                  value={brandColor3}
-                  onChange={(e) => setBrandColor3(e.target.value)}
-                  className="w-1/3 px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-zinc-50 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
-                />
-              </div>
-            </div>
-            <div>
-              <label htmlFor="presentationText" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Texto de Apresentação</label>
-              <textarea
-                id="presentationText"
-                placeholder="Apresente sua marca em poucas palavras..."
-                rows={3}
-                value={presentationText}
-                onChange={(e) => setPresentationText(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-zinc-50 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
-              />
-            </div>
-          </div>
-        )}
+        {/* REMOVIDO: Campos para Conta Comercial */}
+        
         <button
           type="submit"
           className="w-full px-4 py-2 rounded bg-gradient-to-r from-cyan-500 to-purple-600 text-white font-poppins font-bold shadow-md hover:scale-105 transition-transform duration-300"

@@ -30,6 +30,7 @@ export interface Poll {
   dislikes: number; // Novo campo para o número de descurtidas
   dislikedBy: string[]; // Novo campo para armazenar os IDs dos usuários que descurtiram
   isCommercial: boolean; // Novo campo para indicar se a enquete é comercial
+  votedBy?: string[]; // Novo campo para armazenar os IDs dos usuários que já votaram
   // creatorId?: string; // Remover esta linha, pois o ID agora está dentro de 'creator'
 }
 

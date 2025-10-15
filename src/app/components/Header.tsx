@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from 'next/navigation'; // Importar useRouter
 import { useState, useEffect } from "react";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSun, faMoon } from '@fortawesome/free-solid-svg-icons';
@@ -22,6 +23,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
   const [darkMode, setDarkMode] = useState(false); // Inicializa com valor padrão (modo claro)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
   const { user, logout /*, loading */ } = useAuth(); // Remover loading, pois não está sendo usado
+  const router = useRouter(); // Inicializar useRouter
   // REMOVIDO: const { openLoginModal, openSignupModal } = useAuthModal();
 
   // useEffect para inicializar o tema APENAS no lado do cliente
@@ -67,10 +69,16 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
     setIsMobileMenuOpen(false); // Close mobile menu on login
   };
 
-  const handleSignupSuccess = () => {
+  const handleSignupSuccessWithAccountType = (accountType: 'personal' | 'commercial') => {
     setShowSignupModal(false);
     setShowLoginModal(false);
     setIsMobileMenuOpen(false); // Close mobile menu on signup
+    // Redirecionar para o dashboard se for uma conta comercial
+    if (accountType === 'commercial') {
+      router.push('/dashboard');
+    } else {
+      router.push('/'); // Redirecionar para a página inicial padrão para contas pessoais
+    }
   };
 
   // if (loading) {
@@ -101,6 +109,9 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
         <div className={`md:flex items-center space-x-6 ${isMobileMenuOpen ? "flex flex-col absolute top-full left-0 w-full bg-zinc-800 p-4 shadow-md items-center space-y-4" : "hidden"}`}>
           <Link href="/" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
           <Link href="/enquetes" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300" onClick={() => setIsMobileMenuOpen(false)}>Enquetes</Link>
+          {user && user.accountType === 'commercial' && (
+            <Link href="/dashboard" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300" onClick={() => setIsMobileMenuOpen(false)}>Dashboard</Link>
+          )}
           {!user ? (
             <>
               <motion.button
@@ -177,7 +188,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
             )}
             {showSignupModal && (
               <Signup
-                onSignupSuccess={handleSignupSuccess}
+                onSignupSuccessWithAccountType={handleSignupSuccessWithAccountType}
                 onSwitchToLogin={() => {
                   setShowSignupModal(false);
                   setShowLoginModal(true);

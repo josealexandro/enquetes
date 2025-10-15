@@ -4,13 +4,15 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { v4 as uuidv4 } from "uuid"; // Importar uuidv4
 import { useAuth } from "@/app/context/AuthContext";
 
 interface PollFormProps {
   onPollCreated?: () => void; // New prop for callback
+  isCommercial?: boolean; // Nova prop para indicar se é uma enquete comercial
 }
 
-export default function PollForm({ onPollCreated }: PollFormProps) {
+export default function PollForm({ onPollCreated, isCommercial = false }: PollFormProps) {
   const [title, setTitle] = useState("");
   const [options, setOptions] = useState(["", ""]);
   const [category, setCategory] = useState("Geral"); // Novo estado para a categoria, com valor padrão
@@ -75,10 +77,15 @@ export default function PollForm({ onPollCreated }: PollFormProps) {
       const pollsCollectionRef = collection(db, "polls");
       await addDoc(pollsCollectionRef, {
         title: trimmedTitle,
-        options: filteredOptions.map(optionText => ({ text: optionText, votes: 0 })),
+        options: filteredOptions.map(optionText => ({ id: uuidv4(), text: optionText, votes: 0 })),
         category: category,
-        createdBy: user.uid,
+        creator: { // Salvar o objeto creator completo
+          name: user.displayName || user.email || "Usuário Logado",
+          avatarUrl: user.photoURL || "https://www.gravatar.com/avatar/?d=mp", // Fallback para Gravatar
+          id: user.uid,
+        },
         createdAt: serverTimestamp(),
+        isCommercial: isCommercial,
       });
 
       setFeedbackMessage("Enquete criada com sucesso!");

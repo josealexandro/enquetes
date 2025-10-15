@@ -27,6 +27,7 @@ interface AuthContextType {
     accountType?: 'personal' | 'commercial';
     avatarUrl?: string | null; // Adicionar avatarUrl aqui
   }) | null; // O tipo de usuário agora é o User do Firebase
+  firebaseAuthUser: User | null; // Novo campo para o objeto User original do Firebase Auth
   loading: boolean;
   isMasterUser: boolean; // Novo campo para indicar se o usuário é mestre
   login: (email: string, password: string) => Promise<void>;
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     accountType?: 'personal' | 'commercial';
     avatarUrl?: string | null;
   }) | null>(null);
+  const [firebaseAuthUser, setFirebaseAuthUser] = useState<User | null>(null); // Novo estado
   const [loading, setLoading] = useState(true);
   const [isMasterUser, setIsMasterUser] = useState(false); // Novo estado
 
@@ -64,16 +66,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const userDoc = await getDoc(userDocRef);
         const userData = userDoc.exists() ? userDoc.data() : null;
 
-        setUser({
+        setFirebaseAuthUser(firebaseUser); // Armazenar o objeto User original
+        const customUser = {
           ...firebaseUser,
           displayName: firebaseUser.displayName || null, // Usar displayName direto do firebaseUser por enquanto
           accountType: (userData?.accountType as 'personal' | 'commercial') || 'personal', // Adicionar accountType do Firestore
           avatarUrl: firebaseUser.photoURL || null, // Adicionar avatarUrl
-        });
+        };
+        setUser(customUser);
 
         setIsMasterUser(false); // Definir como false temporariamente
       } else {
         setUser(null);
+        setFirebaseAuthUser(null); // Limpar também o firebaseAuthUser
         setIsMasterUser(false);
       }
       setLoading(false);
@@ -85,7 +90,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      setFirebaseAuthUser(userCredential.user); // Armazenar o objeto User original após login
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
       console.error("Erro ao fazer login:", errorMessage);
@@ -106,6 +112,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
+      setFirebaseAuthUser(firebaseUser); // Armazenar o objeto User original após cadastro
 
       const userDataToSave: UserDataToSave = {
         email: firebaseUser.email,
@@ -145,6 +152,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true);
     try {
       await signOut(auth);
+      setFirebaseAuthUser(null); // Limpar o objeto User original no logout
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
       console.error("Erro ao fazer logout:", errorMessage);
@@ -155,7 +163,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isMasterUser, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, isMasterUser, login, signup, logout, firebaseAuthUser }}>
       {children}
     </AuthContext.Provider>
   );

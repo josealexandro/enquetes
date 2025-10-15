@@ -19,9 +19,10 @@ interface PollCardProps {
   onVote: (pollId: string, optionId: string) => void;
   onDelete: (pollId: string) => void;
   onCardClick?: (isCardExpanded: boolean) => void; // Novo prop para lidar com o clique no card, passando o estado de expansão
+  userVoted: boolean; // Nova prop para indicar se o usuário já votou
 }
 
-export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCardProps) {
+export default function PollCard({ poll, onVote, onDelete, onCardClick, userVoted }: PollCardProps) {
   const [votedOptionId, setVotedOptionId] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [isClient, setIsClient] = useState(false);
@@ -31,6 +32,11 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
   const { user, isMasterUser } = useAuth(); // Obter o usuário logado e o status de mestre
   const [showAuthPrompt, setShowAuthPrompt] = useState(false); // Novo estado para controlar a visibilidade do AuthPromptCard
   const { openLoginModal, openSignupModal } = useAuthModal(); // Usar o contexto para abrir modais
+
+  console.log("PollCard renderizado.");
+  console.log("User:", user);
+  console.log("Poll:", poll);
+  console.log("Is Master User:", isMasterUser);
 
   // Efeito para carregar o estado do voto do localStorage
   useEffect(() => {
@@ -174,6 +180,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
       setShowAuthPrompt(true); // Mostrar o card de prompt de autenticação
       return;
     }
+    // Adicionar verificação para `userVoted` para enquetes comerciais
     if (votedOptionId) return;
     onVote(poll.id, optionId);
     setVotedOptionId(optionId);
@@ -266,7 +273,13 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
       }} // Adicionado o manipulador de clique
     >
       <div className="flex items-center text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-        <Image src={poll.creator.avatarUrl} alt={poll.creator.name} width={32} height={32} className="w-8 h-8 rounded-full mr-2" />
+        <Image 
+          src={poll.creator.avatarUrl || "https://www.gravatar.com/avatar/?d=mp"} // Usar fallback para Gravatar se avatarUrl for nulo/vazio
+          alt={poll.creator.name || "Avatar do criador"} // Adicionar fallback para alt
+          width={32}
+          height={32}
+          className="w-8 h-8 rounded-full mr-2"
+        />
         <span>{poll.creator.name}</span>
       </div>
 
@@ -359,8 +372,10 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
                     <motion.button
                       whileHover={{ scale: 1.02, x: 5 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => { handleVoteClick(option.id); }}
-                      disabled={!!votedOptionId}
+                      onClick={() => { 
+                        handleVoteClick(option.id); 
+                      }}
+                      disabled={!!votedOptionId} // Desabilitar se já votou localmente
                       className={`text-left font-medium transition-colors duration-200 ${
                         votedOptionId === option.id
                           ? "text-blue-600 dark:text-blue-400"
