@@ -1,22 +1,23 @@
 "use client";
 
 import React, { useEffect } from "react";
+import Link from "next/link"; // Importar Link
 import { useRouter } from 'next/navigation'; // Importar useRouter para redirecionamento
 import { useAuth } from "../context/AuthContext";
 import DashboardComponent from "../components/Dashboard"; // Renomear para evitar conflito
-import { Poll } from "../types/poll"; // Importar a interface Poll
+// Removido: import { Poll } from "../types/poll"; // Importar a interface Poll
 
 export default function DashboardPage() {
-  const { user, loading, isMasterUser } = useAuth();
+  const { user, loading } = useAuth(); // Remover isMasterUser da desestruturação
   const router = useRouter();
-
+  
   // Redirecionar se o usuário não for comercial ou não estiver logado após o carregamento
   useEffect(() => {
     if (!loading && (!user || user.accountType !== 'commercial')) {
       router.push('/'); // Redirecionar para a página inicial
     }
   }, [user, loading, router]);
-
+  
   if (loading || !user || user.accountType !== 'commercial') {
     return (
       <div className="flex h-screen bg-gray-900 text-white justify-center items-center">
@@ -24,7 +25,7 @@ export default function DashboardPage() {
       </div>
     );
   }
-
+  
   return (
     <div className="flex h-screen bg-gray-900 text-white">
       {/* Sidebar */}
@@ -33,14 +34,14 @@ export default function DashboardPage() {
         <nav>
           <ul>
             <li className="mb-2">
-              <a href="/" className="flex items-center p-2 rounded-lg bg-gray-700">
+              <Link href="/" className="flex items-center p-2 rounded-lg bg-gray-700">
                 <span className="mr-2">🏠</span> Início
-              </a>
+              </Link>
             </li>
             <li className="mb-2">
-              <a href="/enquetes" className="flex items-center p-2 rounded-lg">
+              <Link href="/enquetes" className="flex items-center p-2 rounded-lg">
                 <span className="mr-2">📊</span> Enquetes
-              </a>
+              </Link>
             </li>
             <li className="mb-2">
               <a href="#" className="flex items-center p-2 rounded-lg">
@@ -68,14 +69,14 @@ export default function DashboardPage() {
               </a>
             </li>
             <li className="mb-2">
-              <a href="/dashboard" className="flex items-center p-2 rounded-lg bg-gray-700">
+              <Link href="/dashboard" className="flex items-center p-2 rounded-lg bg-gray-700">
                 <span className="mr-2">📝</span> Minhas Enquetes
-              </a>
+              </Link>
             </li>
           </ul>
         </nav>
       </aside>
-
+      
       {/* Main Content */}
       <main className="flex-1 p-8 overflow-y-auto">
         <DashboardComponent />

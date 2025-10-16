@@ -166,43 +166,6 @@ export default function Home() {
     setIsCommercialCarouselPaused(isCardExpanded);
   };
 
-  const addPoll = async (title: string, options: string[], category: string) => {
-    if (!user) {
-      alert("Você precisa estar logado para criar uma enquete.");
-      return;
-    }
-
-    const newPoll: Omit<Poll, "id"> = {
-      title,
-      options: options.map((opt) => ({
-        id: uuidv4(), // Usar uuid para IDs de opções
-        text: opt,
-        votes: 0,
-      })),
-      creator: {
-        name: user.displayName || user.email || "Usuário Logado", // Usar displayName, fallback para email ou "Usuário Logado"
-        avatarUrl: user.photoURL || "https://www.gravatar.com/avatar/?d=mp", // Usar o avatarUrl do usuário, com fallback para Gravatar
-        id: user.uid, // Adicionar o ID do criador aqui
-      },
-      createdAt: Date.now(), // Timestamp em milissegundos
-      category, // Adicionar a categoria aqui
-      likes: 0, // Inicializar curtidas como 0
-      likedBy: [], // Inicializar likedBy como um array vazio
-      dislikes: 0, // Inicializar descurtidas como 0
-      dislikedBy: [], // Inicializar dislikedBy como um array vazio
-      isCommercial: isMasterUser, // Adicionar o campo isCommercial com base no status do usuário
-      // creatorId: user.uid, // Remover esta linha
-    };
-
-    try {
-      await addDoc(collection(db, "polls"), newPoll);
-      // setPolls((prev) => [...prev, { id: docRef.id, ...newPoll }]); // onSnapshot vai atualizar o estado
-    } catch (error) {
-      console.error("Erro ao adicionar enquete:", error);
-      alert("Erro ao criar enquete. Tente novamente.");
-    }
-  };
-
   const handlePollCreated = () => {
     setActiveFilter("mine");
   };
@@ -440,7 +403,7 @@ export default function Home() {
                             onVote={handleVote} 
                             onDelete={handleDeletePoll} 
                             onCardClick={handlePublicCardClick} 
-                            userVoted={user ? poll.votedBy?.includes(user.uid) || false : false} // Passar userVoted
+                            
                           />
                         </motion.div>
                       ))}
@@ -494,7 +457,7 @@ export default function Home() {
                             onVote={handleVote} 
                             onDelete={handleDeletePoll} 
                             onCardClick={handleCommercialCardClick} 
-                            userVoted={user ? poll.votedBy?.includes(user.uid) || false : false} // Passar userVoted
+                            
                           />
                         </motion.div>
                       ))}
