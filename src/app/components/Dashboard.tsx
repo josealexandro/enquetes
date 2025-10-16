@@ -127,9 +127,14 @@ const Dashboard = () => {
         setTimeout(() => setShowCreatePollModal(true), 10);
       }
       // O AuthContext deve reagir a `onAuthStateChanged` e atualizar o `user` automaticamente
-    } catch (error: any) { // Adicionar ': any' para acessar propriedades de erro
-      console.error("Erro ao atualizar nome da empresa:", error.code, error.message); // Logar código e mensagem do erro
-      setFeedbackMessage("Erro ao atualizar nome da empresa.");
+    } catch (error: unknown) { // Use unknown e faça verificação de tipo
+      if (error instanceof Error) {
+        console.error("Erro ao atualizar nome da empresa:", error.message); // Logar apenas a mensagem
+        setFeedbackMessage(error.message); // Usar a mensagem de erro diretamente
+      } else {
+        console.error("Erro desconhecido ao atualizar nome da empresa:", error);
+        setFeedbackMessage("Erro ao atualizar nome da empresa.");
+      }
       setFeedbackType("error");
     } finally {
       setTimeout(() => setFeedbackMessage(null), 3000);
@@ -273,7 +278,7 @@ const Dashboard = () => {
                   poll={poll} 
                   onVote={handleVote} 
                   onDelete={handleDeletePoll} 
-                  userVoted={user ? poll.votedBy?.includes(user.uid) || false : false} // Passar userVoted
+                  
                 />
               ))}
             </div>

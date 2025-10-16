@@ -4,12 +4,11 @@ import { useState } from "react";
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 
 interface SignupProps {
-  onSignupSuccess?: () => void;
   onSwitchToLogin?: () => void;
   onSignupSuccessWithAccountType?: (accountType: 'personal' | 'commercial') => void; // Nova prop
 }
 
-export default function Signup({ onSignupSuccess, onSwitchToLogin, onSignupSuccessWithAccountType }: SignupProps) {
+export default function Signup({ onSwitchToLogin, onSignupSuccessWithAccountType }: SignupProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

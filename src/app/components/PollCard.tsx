@@ -19,10 +19,9 @@ interface PollCardProps {
   onVote: (pollId: string, optionId: string) => void;
   onDelete: (pollId: string) => void;
   onCardClick?: (isCardExpanded: boolean) => void; // Novo prop para lidar com o clique no card, passando o estado de expansão
-  userVoted: boolean; // Nova prop para indicar se o usuário já votou
 }
 
-export default function PollCard({ poll, onVote, onDelete, onCardClick, userVoted }: PollCardProps) {
+export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCardProps) {
   const [votedOptionId, setVotedOptionId] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [isClient, setIsClient] = useState(false);
