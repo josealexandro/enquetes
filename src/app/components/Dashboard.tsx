@@ -105,6 +105,7 @@ const Dashboard = () => {
       // 1. Atualizar no Firebase Auth
       if (firebaseAuthUser) {
         await updateProfile(firebaseAuthUser, { displayName: editedCompanyName.trim() });
+        await firebaseAuthUser.reload(); // Forçar a recarga do objeto User para obter o displayName atualizado
       } else {
         console.error("Erro: firebaseAuthUser não está disponível para updateProfile.");
         setFeedbackMessage("Erro: Usuário não autenticado para atualizar o perfil.");
