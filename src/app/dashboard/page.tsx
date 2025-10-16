@@ -1,15 +1,18 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react"; // Adicionar useState
 import Link from "next/link"; // Importar Link
 import { useRouter } from 'next/navigation'; // Importar useRouter para redirecionamento
 import { useAuth } from "../context/AuthContext";
 import DashboardComponent from "../components/Dashboard"; // Renomear para evitar conflito
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'; // Importar FontAwesomeIcon
+import { faBars, faTimes } from '@fortawesome/free-solid-svg-icons'; // Importar ícones
 // Removido: import { Poll } from "../types/poll"; // Importar a interface Poll
 
 export default function DashboardPage() {
   const { user, loading } = useAuth(); // Remover isMasterUser da desestruturação
   const router = useRouter();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Estado para controlar a visibilidade da sidebar
   
   // Redirecionar se o usuário não for comercial ou não estiver logado após o carregamento
   useEffect(() => {
@@ -28,8 +31,27 @@ export default function DashboardPage() {
   
   return (
     <div className="flex h-screen bg-gray-900 text-white">
+      {/* Botão para abrir/fechar a sidebar em mobile */}
+      <button
+        className="md:hidden fixed top-4 left-4 z-50 p-2 text-white focus:outline-none"
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+      >
+        <FontAwesomeIcon icon={isSidebarOpen ? faTimes : faBars} size="lg" />
+      </button>
+
+      {/* Overlay para mobile */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black opacity-50 z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        ></div>
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-800 p-4">
+      <aside
+        className={`fixed inset-y-0 left-0 w-64 bg-gray-800 p-4 transform transition-transform duration-300 ease-in-out z-50 
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0`}
+      >
         <h1 className="text-2xl font-bold mb-6">ENQUETES</h1>
         <nav>
           <ul>
@@ -78,7 +100,7 @@ export default function DashboardPage() {
       </aside>
       
       {/* Main Content */}
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main className="flex-1 p-8 overflow-y-auto md:ml-64"> {/* Ajustar margem para desktop */}
         <DashboardComponent />
       </main>
     </div>
