@@ -1,11 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useRouter } from 'next/navigation'; // Importar useRouter para redirecionamento
 import { useAuth } from "../context/AuthContext";
-import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, where, onSnapshot, orderBy, doc, updateDoc } from "firebase/firestore"; // Importar doc e updateDoc
-import { updateProfile } from "firebase/auth"; // Importar updateProfile do Firebase Auth
 import DashboardComponent from "../components/Dashboard"; // Renomear para evitar conflito
 import { Poll } from "../types/poll"; // Importar a interface Poll
 
