@@ -3,6 +3,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  body {
+    @apply bg-white text-zinc-900 dark:bg-zinc-900 dark:text-white;
+  }
+}
+
 :root {
   /* Removendo as variáveis de cor para deixar o Tailwind gerenciar */
 }

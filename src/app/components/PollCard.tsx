@@ -262,7 +262,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
 
   return (
     <div
-      className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 mb-6 border border-transparent hover:border-indigo-500 transform hover:-translate-y-1 cursor-pointer w-[90%] mx-auto"
+      className="dark:bg-zinc-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 mb-6 border border-transparent hover:border-indigo-500 transform hover:-translate-y-1 cursor-pointer w-[90%] mx-auto"
       onClick={() => {
         const newExpandedState = !isExpanded; // Calcular o novo estado antes de definir
         setIsExpanded(newExpandedState);

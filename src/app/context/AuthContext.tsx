@@ -18,6 +18,7 @@ interface UserDataToSave {
   email: string | null;
   displayName: string | null;
   accountType: 'personal' | 'commercial';
+  commercialName?: string | null; // Adicionar commercialName
   createdAt: Timestamp | FieldValue; // serverTimestamp é um tipo complexo, mas por enquanto 'any' é aceitável aqui se for apenas para o tipo do FireStore
 }
 
@@ -25,6 +26,7 @@ interface AuthContextType {
   user: (User & {
     displayName?: string | null;
     accountType?: 'personal' | 'commercial';
+    commercialName?: string | null; // Adicionar commercialName
     avatarUrl?: string | null; // Adicionar avatarUrl aqui
   }) | null; // O tipo de usuário agora é o User do Firebase
   firebaseAuthUser: User | null; // Novo campo para o objeto User original do Firebase Auth
@@ -33,6 +35,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, displayName: string,
     accountType: 'personal' | 'commercial',
+    commercialName?: string | null, // Adicionar commercialName
     avatarFile?: File | null
   ) => Promise<void>;
   logout: () => Promise<void>;
@@ -48,6 +51,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<(User & {
     displayName?: string | null;
     accountType?: 'personal' | 'commercial';
+    commercialName?: string | null; // Adicionar commercialName
     avatarUrl?: string | null;
   }) | null>(null);
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<User | null>(null); // Novo estado
@@ -71,6 +75,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           ...firebaseUser,
           displayName: firebaseUser.displayName || null, // Usar displayName direto do firebaseUser por enquanto
           accountType: (userData?.accountType as 'personal' | 'commercial') || 'personal', // Adicionar accountType do Firestore
+          commercialName: (userData?.commercialName as string | null) || null, // Adicionar commercialName do Firestore
           avatarUrl: firebaseUser.photoURL || null, // Adicionar avatarUrl
         };
         setUser(customUser);
@@ -106,6 +111,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     password: string,
     displayName: string,
     accountType: 'personal' | 'commercial',
+    commercialName?: string | null,
     avatarFile?: File | null
   ) => {
     setLoading(true);
@@ -118,6 +124,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         email: firebaseUser.email,
         displayName: displayName,
         accountType: accountType,
+        ...(commercialName && { commercialName: commercialName }), // Adicionar commercialName condicionalmente
         createdAt: serverTimestamp(), // Adicionar timestamp de criação
       };
 

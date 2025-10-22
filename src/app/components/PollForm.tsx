@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+// import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Importar Firebase Storage
 import { v4 as uuidv4 } from "uuid"; // Importar uuidv4
 import { useAuth } from "@/app/context/AuthContext";
 
@@ -18,9 +19,14 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
   const [category, setCategory] = useState("Geral"); // Novo estado para a categoria, com valor padrão
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "error" | null>(null);
+  // const [imageFile, setImageFile] = useState<File | null>(null); // Estado para o arquivo de imagem
+  // const [uploadingImage, setUploadingImage] = useState(false); // Estado para o status do upload da imagem
   const { user } = useAuth();
 
   const categories = ["Geral", "Política", "Games", "Gastronomia", "Filme", "Esportes", "Tecnologia", "Educação", "Música"];
+
+  // const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+  // const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
   const handleOptionChange = (index: number, value: string) => {
     const updated = [...options];
@@ -36,8 +42,32 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
     setOptions(options.filter((_, i) => i !== index));
   };
 
+  // const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   if (e.target.files && e.target.files[0]) {
+  //     const file = e.target.files[0];
+  //     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+  //       setFeedbackMessage("Tipo de arquivo inválido. Apenas JPG, PNG, GIF e WebP são permitidos.");
+  //       setFeedbackType("error");
+  //       setImageFile(null);
+  //       return;
+  //     }
+  //     if (file.size > MAX_FILE_SIZE) {
+  //       setFeedbackMessage("A imagem é muito grande. O tamanho máximo permitido é 2MB.");
+  //       setFeedbackType("error");
+  //       setImageFile(null);
+  //       return;
+  //     }
+  //     setImageFile(file);
+  //   } else {
+  //     setImageFile(null);
+  //   }
+  //   setFeedbackMessage(null); // Limpa o feedback anterior se o usuário tentar novamente
+  // };
+
   const handleSubmit = async (e: React.FormEvent) => { // Tornar handleSubmit assíncrono
     e.preventDefault();
+
+    // if (uploadingImage) return; // Previne o envio enquanto a imagem está sendo carregada
 
     const trimmedTitle = title.trim();
     const filteredOptions = options.map(opt => opt.trim()).filter(opt => opt !== "");
@@ -73,6 +103,28 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
       return;
     }
 
+    // let imageUrl: string | undefined = undefined; // Inicializa imageUrl como undefined
+
+    // if (isCommercial && imageFile) {
+    //   setUploadingImage(true); // Inicia o estado de upload
+    //   try {
+    //     const storage = getStorage();
+    //     const imageRef = ref(storage, `poll_images/${uuidv4()}-${imageFile.name}`);
+    //     await uploadBytes(imageRef, imageFile);
+    //     imageUrl = await getDownloadURL(imageRef);
+    //     setFeedbackMessage("Imagem enviada com sucesso!");
+    //     setFeedbackType("success");
+    //   } catch (error) {
+    //     console.error("Erro ao fazer upload da imagem:", error);
+    //     setFeedbackMessage("Erro ao fazer upload da imagem.");
+    //     setFeedbackType("error");
+    //     setUploadingImage(false); // Garante que o estado de upload seja resetado em caso de erro
+    //     return; // Interrompe o envio da enquete se o upload da imagem falhar
+    //   } finally {
+    //     setUploadingImage(false); // Finaliza o estado de upload, seja com sucesso ou erro
+    //   }
+    // }
+
     try {
       const pollsCollectionRef = collection(db, "polls");
       await addDoc(pollsCollectionRef, {
@@ -86,6 +138,7 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
         },
         createdAt: serverTimestamp(),
         isCommercial: isCommercial,
+        // ...(imageUrl && { imageUrl }), // Adiciona imageUrl apenas se existir
       });
 
       setFeedbackMessage("Enquete criada com sucesso!");
@@ -108,7 +161,7 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
   return (
     <form
       onSubmit={handleSubmit}
-      className="w-full max-w-2xl mx-auto bg-white dark:bg-zinc-800 p-8 rounded-lg shadow-md space-y-4"
+      className="w-full max-w-2xl mx-auto dark:bg-zinc-800 p-8 rounded-lg shadow-md space-y-4"
     >
       <h2 className="text-3xl font-poppins font-semibold text-center text-zinc-900 dark:text-white">
         Criar Nova Enquete
@@ -121,6 +174,30 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
           {feedbackMessage}
         </div>
       )}
+
+      {/* {isCommercial && (
+        <div className="flex flex-col gap-2">
+          <label htmlFor="image-upload" className="text-zinc-900 dark:text-white font-medium">Upload de Imagem (opcional):</label>
+          <input
+            id="image-upload"
+            type="file"
+            accept={ACCEPTED_IMAGE_TYPES.join(", ")}
+            onChange={handleImageChange}
+            className="w-full px-4 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white"
+          />
+          {uploadingImage && (
+            <div className="flex items-center justify-center p-2">
+              <svg className="animate-spin h-5 w-5 text-cyan-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span className="ml-2 text-cyan-500">Enviando imagem...</span>
+            </div>
+          )}
+          {imageFile && <p className="text-zinc-600 dark:text-zinc-300">Arquivo selecionado: {imageFile.name}</p>}
+        </div>
+      )}
+ */}
 
       <select
         value={category}
@@ -181,9 +258,10 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
 
       <motion.button
         type="submit"
-        className="w-full px-4 py-2 rounded bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-poppins font-bold shadow-md hover:scale-105 transition-transform duration-300"
+        className={`w-full px-4 py-2 rounded bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-poppins font-bold shadow-md hover:scale-105 transition-transform duration-300`}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
+        // disabled={uploadingImage} // Desabilita o botão durante o upload da imagem
       >
         Criar Enquete
       </motion.button>

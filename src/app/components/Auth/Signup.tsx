@@ -13,6 +13,7 @@ export default function Signup({ onSwitchToLogin, onSignupSuccessWithAccountType
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [displayName, setDisplayName] = useState(""); // Restaurado
+  const [commercialName, setCommercialName] = useState(""); // Novo estado para nome comercial
   const [accountType, setAccountType] = useState<'personal' | 'commercial'>('personal');
   const [avatarFile, setAvatarFile] = useState<File | null>(null); // Restaurado
   // REMOVIDO: const [brandName, setBrandName] = useState("");
@@ -43,11 +44,20 @@ export default function Signup({ onSwitchToLogin, onSignupSuccessWithAccountType
       return;
     }
 
+    // Validação de commercialName apenas para contas comerciais
+    if (accountType === 'commercial' && commercialName.trim().length < 3) {
+      setError("O nome comercial deve ter pelo menos 3 caracteres para contas comerciais.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const finalDisplayName = accountType === 'personal' ? displayName : email; // Usar email como nome para contas comerciais
       const finalAvatarFile = accountType === 'personal' ? avatarFile : null; // Nulo para contas comerciais
 
-      await signup(email, password, finalDisplayName, accountType, finalAvatarFile); 
+      await signup(email, password, finalDisplayName, accountType, 
+        accountType === 'commercial' ? commercialName : null, // Passar commercialName se for conta comercial
+        finalAvatarFile);
       // Chamar a nova prop com o accountType
       onSignupSuccessWithAccountType?.(accountType);
     } catch (error: unknown) {
@@ -122,6 +132,18 @@ export default function Signup({ onSwitchToLogin, onSignupSuccessWithAccountType
               />
             </div>
           </>
+        )}
+
+        {/* Campos para Conta Comercial */}
+        {accountType === 'commercial' && (
+          <input
+            type="text"
+            placeholder="Nome da Empresa / Marca"
+            value={commercialName}
+            onChange={(e) => setCommercialName(e.target.value)}
+            className="w-full px-4 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder-zinc-500 dark:placeholder-zinc-400"
+            required
+          />
         )}
 
         <input

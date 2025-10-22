@@ -5,10 +5,12 @@ import { useAuth } from "../context/AuthContext";
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
 import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, deleteDoc } from "firebase/firestore"; // Importar doc, updateDoc e deleteDoc
 import { updateProfile } from "firebase/auth"; // Importar updateProfile do Firebase Auth
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Importar Firebase Storage
 import PollForm from "./PollForm"; // Importar o PollForm
 import PollCard from "./PollCard"; // Importar o PollCard
 import { Poll } from "../types/poll"; // Importar a interface Poll
-// import { v4 as uuidv4 } from "uuid"; // Para gerar IDs únicos para as opções
+import { v4 as uuidv4 } from "uuid"; // Para gerar IDs únicos para as opções
+import Image from "next/image"; // Importar o componente Image do Next.js
 
 // Removido: Interfaces PollOption e PollToSave, e a função handleCreateCommercialPoll
 
@@ -20,13 +22,22 @@ const Dashboard = () => {
   const [averageVotesPerPoll, setAverageVotesPerPoll] = useState(0); // Novo estado
   const [showCreatePollModal, setShowCreatePollModal] = useState(false);
   const [editedCompanyName, setEditedCompanyName] = useState(user?.displayName || ""); // Novo estado para o nome da empresa editável
+  const [imageFile, setImageFile] = useState<File | null>(null); // Estado para o arquivo de imagem selecionado
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null); // Estado para a URL de pré-visualização da imagem
+  const [uploadingImage, setUploadingImage] = useState(false); // Estado para o status do upload da imagem
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "error" | null>(null);
 
   const companyNameDisplay = user?.displayName || "Empresa"; // Usado apenas para exibição inicial
 
+  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+  const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
   // Inicializa editedCompanyName com o displayName do usuário quando o componente é montado ou o usuário muda
   useEffect(() => {
+    if (user?.photoURL) {
+      setImagePreviewUrl(user.photoURL);
+    }
     if (user?.displayName) {
       setEditedCompanyName(user.displayName);
     } else if (!user && !loading) {
@@ -94,18 +105,85 @@ const Dashboard = () => {
     }
   }, [userPolls]);
 
-  const handleSaveCompanyName = async () => {
-    if (!user || !editedCompanyName.trim()) {
-      setFeedbackMessage("Nome da empresa não pode estar vazio.");
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        setFeedbackMessage("Tipo de arquivo inválido. Apenas JPG, PNG, GIF e WebP são permitidos.");
+        setFeedbackType("error");
+        setImageFile(null);
+        setImagePreviewUrl(user?.photoURL || null); // Reverte para a imagem atual do usuário
+        return;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        setFeedbackMessage("A imagem é muito grande. O tamanho máximo permitido é 2MB.");
+        setFeedbackType("error");
+        setImageFile(null);
+        setImagePreviewUrl(user?.photoURL || null); // Reverte para a imagem atual do usuário
+        return;
+      }
+      setImageFile(file);
+      setImagePreviewUrl(URL.createObjectURL(file)); // Pré-visualização instantânea
+      setFeedbackMessage(null); // Limpa feedback anterior
+    } else {
+      setImageFile(null);
+      setImagePreviewUrl(user?.photoURL || null); // Reverte para a imagem atual do usuário
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user || (!editedCompanyName.trim() && !imageFile)) {
+      setFeedbackMessage("Nome da empresa ou imagem não pode estar vazio.");
       setFeedbackType("error");
+      return;
+    }
+
+    if (uploadingImage) return; // Previne múltiplos envios
+
+    let newPhotoURL: string | undefined = user?.photoURL || undefined;
+    let updateRequired = false;
+
+    if (editedCompanyName.trim() !== (user?.displayName || "")) {
+      updateRequired = true;
+    }
+
+    if (imageFile) {
+      setUploadingImage(true);
+      try {
+        const storage = getStorage();
+        const imageRef = ref(storage, `profile_images/${user.uid}-${uuidv4()}-${imageFile.name}`);
+        await uploadBytes(imageRef, imageFile);
+        newPhotoURL = await getDownloadURL(imageRef);
+        setFeedbackMessage("Imagem enviada com sucesso!");
+        setFeedbackType("success");
+        updateRequired = true;
+      } catch (error) {
+        console.error("Erro ao fazer upload da imagem:", error);
+        setFeedbackMessage("Erro ao fazer upload da imagem.");
+        setFeedbackType("error");
+        setImageFile(null); // Limpa o arquivo selecionado em caso de erro
+        setImagePreviewUrl(user?.photoURL || null); // Reverte a pré-visualização
+        return; // Interrompe o processo se o upload da imagem falhar
+      } finally {
+        setUploadingImage(false);
+      }
+    }
+
+    if (!updateRequired) {
+      setFeedbackMessage("Nenhuma alteração detectada para salvar.");
+      setFeedbackType("error");
+      setTimeout(() => setFeedbackMessage(null), 3000);
       return;
     }
 
     try {
       // 1. Atualizar no Firebase Auth
       if (firebaseAuthUser) {
-        await updateProfile(firebaseAuthUser, { displayName: editedCompanyName.trim() });
-        await firebaseAuthUser.reload(); // Forçar a recarga do objeto User para obter o displayName atualizado
+        await updateProfile(firebaseAuthUser, { 
+          displayName: editedCompanyName.trim(),
+          photoURL: newPhotoURL,
+        });
+        await firebaseAuthUser.reload(); // Forçar a recarga do objeto User
       } else {
         console.error("Erro: firebaseAuthUser não está disponível para updateProfile.");
         setFeedbackMessage("Erro: Usuário não autenticado para atualizar o perfil.");
@@ -115,26 +193,27 @@ const Dashboard = () => {
       }
 
       // 2. Opcional: Atualizar no Firestore se for um usuário comercial
-      // Isso é útil se o displayName for usado em outras partes da UI ou lógica baseada em Firestore
       if (user?.uid) {
         const userDocRef = doc(db, "users", user.uid);
-        await updateDoc(userDocRef, { displayName: editedCompanyName.trim() });
+        const updateData: { displayName: string; photoURL?: string } = {
+          displayName: editedCompanyName.trim(),
+        };
+        if (newPhotoURL) {
+          updateData.photoURL = newPhotoURL;
+        }
+        await updateDoc(userDocRef, updateData);
       }
-      setFeedbackMessage("Nome da empresa atualizado com sucesso!");
+      setFeedbackMessage("Perfil atualizado com sucesso!");
       setFeedbackType("success");
-      // Forçar re-renderização do PollForm se o modal estiver aberto
-      if (showCreatePollModal) {
-        setShowCreatePollModal(false);
-        setTimeout(() => setShowCreatePollModal(true), 10);
-      }
-      // O AuthContext deve reagir a `onAuthStateChanged` e atualizar o `user` automaticamente
-    } catch (error: unknown) { // Use unknown e faça verificação de tipo
+      setImageFile(null); // Limpa o arquivo após o upload e salvamento
+
+    } catch (error: unknown) { 
       if (error instanceof Error) {
-        console.error("Erro ao atualizar nome da empresa:", error.message); // Logar apenas a mensagem
-        setFeedbackMessage(error.message); // Usar a mensagem de erro diretamente
+        console.error("Erro ao atualizar perfil:", error.message); 
+        setFeedbackMessage(error.message);
       } else {
-        console.error("Erro desconhecido ao atualizar nome da empresa:", error);
-        setFeedbackMessage("Erro ao atualizar nome da empresa.");
+        console.error("Erro desconhecido ao atualizar perfil:", error);
+        setFeedbackMessage("Erro ao atualizar perfil.");
       }
       setFeedbackType("error");
     } finally {
@@ -249,7 +328,7 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-container">
-      <h2 className="text-3xl font-bold mb-6">Olá, {companyNameDisplay}!</h2>
+      <h2 className="text-3xl font-bold mb-6">Olá, {user?.displayName || "Empresa"}!</h2>
 
       {/* Plano Comercial */}
       <div className="bg-gray-800 p-6 rounded-lg shadow-md mb-6 flex justify-between items-center">
@@ -305,28 +384,65 @@ const Dashboard = () => {
       {/* Personalização */}
       <div className="bg-gray-800 p-6 rounded-lg shadow-md">
         <h3 className="text-xl font-semibold mb-4">Personalização</h3>
-        <div>
-          <label htmlFor="companyName" className="block text-gray-400 mb-2">Nome da empresa</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              id="companyName"
-              value={editedCompanyName}
-              onChange={(e) => setEditedCompanyName(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        <div className="space-y-4">
+          {/* Seção de upload de imagem */}
+          <div className="flex flex-col items-center mb-6">
+            <Image
+              src={imagePreviewUrl || user?.photoURL || "/logoPrincipal.png"}
+              alt="Pré-visualização do Avatar"
+              width={128}
+              height={128}
+              className="rounded-full object-cover border-4 border-indigo-500 mb-4"
             />
-            <button
-              onClick={handleSaveCompanyName}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition duration-300"
-            >
-              Salvar
-            </button>
+            <label htmlFor="profile-image-upload" className="block text-gray-400 mb-2">Alterar Imagem de Perfil</label>
+            <input
+              id="profile-image-upload"
+              type="file"
+              accept={ACCEPTED_IMAGE_TYPES.join(", ")}
+              onChange={handleImageChange}
+              className="w-full max-w-sm px-4 py-2 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
+            />
+            {uploadingImage && (
+              <div className="flex items-center justify-center p-2 mt-2">
+                <svg className="animate-spin h-5 w-5 text-cyan-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="ml-2 text-cyan-500">Enviando imagem...</span>
+              </div>
+            )}
+            {feedbackMessage && feedbackType === "error" && (
+              <div className="mt-2 p-3 rounded-md text-white bg-red-500">
+                {feedbackMessage}
+              </div>
+            )}
           </div>
-          {feedbackMessage && (
-            <div className={`mt-2 p-3 rounded-md text-white ${feedbackType === "success" ? "bg-green-500" : "bg-red-500"}`}>
-              {feedbackMessage}
+
+          {/* Seção de nome da empresa */}
+          <div>
+            <label htmlFor="companyName" className="block text-gray-400 mb-2">Nome da empresa</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                id="companyName"
+                value={editedCompanyName}
+                onChange={(e) => setEditedCompanyName(e.target.value)}
+                className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <button
+                onClick={handleSaveProfile}
+                disabled={uploadingImage} // Desabilita o botão enquanto a imagem está sendo carregada
+                className={`px-4 py-2 bg-green-600 text-white font-bold rounded-lg transition duration-300 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700'}`}
+              >
+                Salvar Alterações
+              </button>
             </div>
-          )}
+            {feedbackMessage && feedbackType === "success" && (
+              <div className="mt-2 p-3 rounded-md text-white bg-green-500">
+                {feedbackMessage}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

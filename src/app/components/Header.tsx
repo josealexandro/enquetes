@@ -20,7 +20,8 @@ interface HeaderProps {
 }
 
 export default function Header({ showLoginModal, setShowLoginModal, showSignupModal, setShowSignupModal }: HeaderProps) {
-  const [darkMode, setDarkMode] = useState(false); // Inicializa com valor padrão (modo claro)
+  const [darkMode, setDarkMode] = useState(false); // Inicializa como false para evitar hidratação
+  const [mounted, setMounted] = useState(false); // Novo estado para controlar a montagem no cliente
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
   const { user, logout /*, loading */ } = useAuth(); // Remover loading, pois não está sendo usado
   const router = useRouter(); // Inicializar useRouter
@@ -32,35 +33,32 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
       const savedTheme = localStorage.getItem('theme');
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       
-      if (savedTheme) {
-        setDarkMode(savedTheme === 'dark');
-        if (savedTheme === 'dark') {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-      } else if (prefersDark) {
+      if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
         setDarkMode(true);
-        document.documentElement.classList.add('dark');
       } else {
         setDarkMode(false);
-        document.documentElement.classList.remove('dark');
       }
+      setMounted(true); // O componente foi montado no cliente
     }
   }, []); // Executar apenas uma vez na montagem do cliente
 
+  // useEffect para reagir às mudanças do darkMode (incluindo a inicialização do cliente)
   useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
+    if (typeof window !== 'undefined') {
+      if (darkMode) {
+        document.documentElement.classList.add("dark");
+        localStorage.setItem("theme", "dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+        localStorage.setItem("theme", "light");
+      }
     }
   }, [darkMode]); // Este useEffect agora reage apenas às mudanças no estado darkMode
 
   const toggleDarkMode = () => {
-    setDarkMode((prevMode) => !prevMode);
+    setDarkMode((prevMode) => {
+      return !prevMode;
+    });
   };
 
   const handleLoginSuccess = () => {
@@ -142,7 +140,12 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
                   className="rounded-full"
                 />
               )}
-              <span className="text-white">Olá, {user.email}!</span>
+              <span className="text-white">
+                Olá, {user.accountType === 'commercial' && user.commercialName
+                  ? user.commercialName
+                  : user.displayName || user.email}
+                !
+              </span>
               <motion.button
                 onClick={() => { logout(); setIsMobileMenuOpen(false); }}
                 className="px-4 py-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors duration-300"
@@ -160,7 +163,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            <FontAwesomeIcon icon={darkMode ? faSun : faMoon} size="lg" />
+            {mounted && <FontAwesomeIcon icon={darkMode ? faSun : faMoon} size="lg" />}
           </motion.button>
         </div>
       </nav>
