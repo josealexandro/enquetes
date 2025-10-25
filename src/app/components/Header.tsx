@@ -132,13 +132,15 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
           ) : (
             <>
               {user.avatarUrl && (
-                <Image 
-                  src={user.avatarUrl}
-                  alt="Avatar do Usuário"
-                  width={32}
-                  height={32}
-                  className="rounded-full"
-                />
+                <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-zinc-700"> {/* Adicionado wrapper para garantir o recorte redondo */}
+                  <Image 
+                    src={user.avatarUrl}
+                    alt="Avatar do Usuário"
+                    width={32}
+                    height={32}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
               )}
               <span className="text-white">
                 Olá, {user.accountType === 'commercial' && user.commercialName

@@ -31,6 +31,7 @@ export interface Poll {
   dislikedBy: string[]; // Novo campo para armazenar os IDs dos usuários que descurtiram
   isCommercial: boolean; // Novo campo para indicar se a enquete é comercial
   votedBy?: string[]; // Novo campo para armazenar os IDs dos usuários que já votaram
+  rank?: number; // Novo campo para classificar as enquetes (1: ouro, 2: prata, 3: bronze)
   // imageUrl?: string; // Novo campo para a URL da imagem da enquete (opcional)
   // creatorId?: string; // Remover esta linha, pois o ID agora está dentro de 'creator'
 }

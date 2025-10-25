@@ -5,14 +5,15 @@ import PollCard from "./components/PollCard";
 import { Poll } from "./types/poll";
 import { v4 as uuidv4 } from "uuid";
 // import useLocalStorage from "./hooks/useLocalStorage"; // Remover useLocalStorage
-import { useState, useMemo, useEffect, useRef } from "react"; // Adicionar useEffect
+import { useState, useMemo, useEffect, useRef, useCallback } from "react"; // Adicionar useEffect
 import { useAuth } from "./context/AuthContext";
 import { motion } from "framer-motion";
 import { LayoutGroup, AnimatePresence } from "framer-motion"; // Importar AnimatePresence
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore"; // Importar funções do Firestore
+import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDoc } from "firebase/firestore"; // Importar funções do Firestore e getDoc
 // Removido: import LoginForm from "./components/LoginForm";
 // Removido: import SignupForm from "./components/SignupForm";
+import PollPodium from "./components/PollPodium"; // Importar PollPodium
 
 export default function Home() {
   const [polls, setPolls] = useState<Poll[]>([]); // Mudar para useState
@@ -43,20 +44,44 @@ export default function Home() {
     // Removendo a ordenação inicial para lidar com ela no frontend, ou podemos buscar duas coleções separadas se a filtragem de segurança for necessária
     const q = query(pollsCollection, orderBy("createdAt", "desc")); 
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedPolls = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        const creatorId = data.creator?.id || data.creatorId; 
+    const unsubscribe = onSnapshot(q, async (snapshot) => { // Adicionar async aqui
+      const fetchedPollsPromises = snapshot.docs.map(async (docSnap) => { // Mudar para docSnap
+        const data = docSnap.data();
+        const creatorId = data.creator?.id || data.createdBy; // Usar createdBy como fallback
+
+        let creatorName = "Usuário Desconhecido";
+        let creatorAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"; // Default Gravatar
+
+        if (creatorId) {
+          const userDocRef = doc(db, "users", creatorId);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            creatorName = userData.name || userData.displayName || "Usuário";
+            creatorAvatarUrl = userData.avatarUrl || "https://www.gravatar.com/avatar/?d=mp";
+          }
+        }
+        
+        // Garantir que as opções tenham um 'id' para consistência, se não estiverem presentes no DB
+        const optionsWithIds = data.options.map((opt) => ({
+          ...opt,
+          id: opt.id || Math.random().toString(36).substring(7)
+        }));
+
         return {
-          id: doc.id,
+          id: docSnap.id, // Usar docSnap.id
           ...data,
+          options: optionsWithIds, // Usar as opções com IDs garantidos
           creator: {
-            ...data.creator,
-            id: creatorId, 
+            id: creatorId,
+            name: creatorName,
+            avatarUrl: creatorAvatarUrl,
           },
-          isCommercial: data.isCommercial || false, // Garantir que isCommercial exista e seja booleano
+          isCommercial: data.isCommercial || false,
         } as Poll;
       });
+
+      const fetchedPolls = await Promise.all(fetchedPollsPromises); // Esperar por todas as promessas
       setPolls(fetchedPolls);
       setLoadingPolls(false);
     }, (error) => {
@@ -90,6 +115,20 @@ export default function Home() {
     }
     return sortedPolls;
   }, [publicPolls, activeFilter, user]);
+
+  const podiumPolls = useMemo(() => {
+    // Filtrar as enquetes com rank 1, 2 e 3 e ordená-las
+    return filteredPublicPolls
+      .filter(poll => poll.rank && (poll.rank >= 1 && poll.rank <= 3))
+      .sort((a, b) => (a.rank || 0) - (b.rank || 0))
+      .slice(0, 3); // Garantir que apenas os top 3 sejam selecionados
+  }, [filteredPublicPolls]);
+
+  const otherPublicPolls = useMemo(() => {
+    // Filtrar as enquetes públicas que não estão no pódio
+    const podiumIds = new Set(podiumPolls.map(poll => poll.id));
+    return filteredPublicPolls.filter(poll => !podiumIds.has(poll.id));
+  }, [filteredPublicPolls, podiumPolls]);
 
   const filteredCommercialPolls = useMemo(() => {
     let sortedPolls = [...commercialPolls];
@@ -170,7 +209,7 @@ export default function Home() {
     setActiveFilter("mine");
   };
 
-  const handleVote = async (pollId: string, optionId: string) => {
+  const handleVote = useCallback(async (pollId: string, optionId: string) => {
     if (!user) {
       alert("Você precisa estar logado para votar.");
       return;
@@ -178,18 +217,24 @@ export default function Home() {
 
     const pollToUpdate = polls.find(p => p.id === pollId);
     if (!pollToUpdate) {
+      console.error("handleVote (na página) - Enquete não encontrada:", pollId);
       return;
     }
 
-    // Preparar as opções atualizadas para a UI otimista e para o Firestore
-    const updatedOptionsForOptimisticUI = pollToUpdate.options.map((option) =>
-      option.id === optionId
-        ? { ...option, votes: option.votes + 1 }
-        : option
-    );
+    console.log("handleVote (na página) - Chamado para pollId:", pollId, "com optionId:", optionId);
+    console.log("handleVote (na página) - Poll antes da atualização:", JSON.parse(JSON.stringify(pollToUpdate)));
 
-    // Preparar o array votedBy atualizado para a UI otimista e para o Firestore (apenas para enquetes comerciais)
-    const updatedVotedByForOptimisticUI = pollToUpdate.isCommercial && user
+    // Preparar as opções atualizadas para a UI otimista e para o Firestore
+    const updatedOptionsForOptimisticUI = pollToUpdate.options.map((option) => {
+      const isThisOptionVoted = option.id === optionId; // Adicionar log para a comparação
+      const newOption = isThisOptionVoted ? { ...option, votes: option.votes + 1 } : option;
+      console.log("handleVote (na página) - UI Otimista - Opção:", option.id, "Clicada:", isThisOptionVoted, "Votos antes:", option.votes, "Votos depois:", newOption.votes);
+      return newOption;
+    });
+    console.log("handleVote (na página) - UI Otimista - Updated Options:", JSON.parse(JSON.stringify(updatedOptionsForOptimisticUI)));
+
+    // Preparar o array votedBy atualizado para a UI otimista e para o Firestore
+    const updatedVotedByForOptimisticUI = user
       ? [...(pollToUpdate.votedBy || []), user.uid]
       : pollToUpdate.votedBy;
 
@@ -211,17 +256,22 @@ export default function Home() {
       
       // Não precisamos buscar currentPoll novamente se já temos pollToUpdate
       // Usaremos a mesma lógica de atualização para o Firestore que preparamos acima
-      const updatedOptionsForFirestore = pollToUpdate.options.map(option =>
-        option.id === optionId ? { ...option, votes: option.votes + 1 } : option
-      );
+      const updatedOptionsForFirestore = pollToUpdate.options.map(option => {
+        const isThisOptionVoted = option.id === optionId; // Adicionar log para a comparação
+        const newOption = isThisOptionVoted ? { ...option, votes: option.votes + 1 } : option;
+        console.log("handleVote (na página) - Firestore - Opção:", option.id, "Clicada:", isThisOptionVoted, "Votos antes:", option.votes, "Votos depois:", newOption.votes);
+        return newOption;
+      });
+      console.log("handleVote (na página) - Firestore - Updated Options:", JSON.parse(JSON.stringify(updatedOptionsForFirestore)));
       
-      const updatedVotedByForFirestore = pollToUpdate.isCommercial && user
+      // Remover a condição de isCommercial para que votedBy seja sempre atualizado
+      const updatedVotedByForFirestore = user
         ? [...(pollToUpdate.votedBy || []), user.uid]
         : pollToUpdate.votedBy;
 
       await updateDoc(pollRef, {
         options: updatedOptionsForFirestore,
-        ...(pollToUpdate.isCommercial && { votedBy: updatedVotedByForFirestore }),
+        votedBy: updatedVotedByForFirestore, // VotedBy agora é sempre atualizado
       });
 
     } catch (error) {
@@ -245,7 +295,7 @@ export default function Home() {
         )
       );
     }
-  };
+  }, [user, polls, setPolls]); // Adicionar dependências para useCallback
 
   const handleDeletePoll = async (pollId: string) => {
     if (!user) {
@@ -379,13 +429,26 @@ export default function Home() {
               </motion.button>
             </div>
 
+            {/* Seção do Pódio de Enquetes */}
+            {podiumPolls.length > 0 && (
+              <>
+                <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Pódio das Enquetes</h2>
+                <PollPodium 
+                  polls={podiumPolls}
+                  onVote={handleVote}
+                  onDelete={handleDeletePoll}
+                  onCardClick={handlePublicCardClick} // Usar o mesmo manipulador do carrossel público
+                />
+              </>
+            )}
+
             {/* Seção de Enquetes Públicas */}
-            <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Enquetes Públicas</h2>
+            <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Outras Enquetes Públicas</h2>
             <div className="relative w-full">
               {loadingPolls ? (
                 <p className="text-zinc-600 dark:text-zinc-400">Carregando enquetes públicas...</p>
-              ) : filteredPublicPolls.length === 0 ? (
-                <p className="text-zinc-600 dark:text-zinc-400">Nenhuma enquete pública encontrada.</p>
+              ) : otherPublicPolls.length === 0 ? (
+                <p className="text-zinc-600 dark:text-zinc-400">Nenhuma outra enquete pública encontrada.</p>
               ) : (
                 <div className="sm:mx-12"> {/* Novo wrapper para o carrossel, criando espaço para as setas */}
                   <motion.div
@@ -396,7 +459,7 @@ export default function Home() {
                     className="w-full flex overflow-x-auto snap-x snap-mandatory gap-8 scrollbar-hide"
                   >
                     <LayoutGroup>
-                      {filteredPublicPolls.map((poll) => (
+                      {otherPublicPolls.map((poll) => (
                         <motion.div key={poll.id} variants={itemVariants} className="w-[90%] mx-auto flex-shrink-0 snap-center md:w-full md:min-w-[320px] md:max-w-[360px]">
                           <PollCard 
                             poll={poll} 

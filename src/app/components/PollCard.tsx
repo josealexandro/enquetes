@@ -27,7 +27,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
   const [isClient, setIsClient] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false); // Novo estado para controlar a expansão
-  const [currentTotalVotes, setCurrentTotalVotes] = useState(poll.options.reduce((sum, opt) => sum + opt.votes, 0));
+  const [currentTotalVotes, setCurrentTotalVotes] = useState(poll.options.reduce((sum, opt) => sum + opt.votes, 0)); // Revertido para o estado original
   const { user, isMasterUser } = useAuth(); // Obter o usuário logado e o status de mestre
   const [showAuthPrompt, setShowAuthPrompt] = useState(false); // Novo estado para controlar a visibilidade do AuthPromptCard
   const { openLoginModal, openSignupModal } = useAuthModal(); // Usar o contexto para abrir modais
@@ -49,7 +49,8 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
 
   // Update currentTotalVotes if the poll's total votes change externally (e.g., via real-time DB)
   useEffect(() => {
-    setCurrentTotalVotes(poll.options.reduce((sum, opt) => sum + opt.votes, 0));
+    const total = poll.options.reduce((sum, opt) => sum + opt.votes, 0);
+    setCurrentTotalVotes(total);
   }, [poll.options]);
 
   // useEffect para carregar comentários do Firestore em tempo real
@@ -179,15 +180,16 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
       setShowAuthPrompt(true); // Mostrar o card de prompt de autenticação
       return;
     }
-    // Adicionar verificação para `userVoted` para enquetes comerciais
-    if (votedOptionId) return;
+    if (votedOptionId || poll.votedBy?.includes(user.uid)) {
+      return; // Já votou, não faz nada
+    }
     onVote(poll.id, optionId);
     setVotedOptionId(optionId);
     if (typeof window !== "undefined" && user) {
       localStorage.setItem(`poll_vote_${user.uid}_${poll.id}`, optionId);
     }
-    // Manually update total votes for immediate feedback (before state sync)
-    setCurrentTotalVotes(prev => prev + 1);
+    // Remove manual update of total votes. `useEffect` will handle it on prop change from DB.
+    // setCurrentTotalVotes(prev => prev + 1);
   };
 
   const handleAddComment = async (text: string, parentId?: string) => {
@@ -271,15 +273,47 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
         }
       }} // Adicionado o manipulador de clique
     >
-      <div className="flex items-center text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-        <Image 
-          src={poll.creator.avatarUrl || "https://www.gravatar.com/avatar/?d=mp"} // Usar fallback para Gravatar se avatarUrl for nulo/vazio
-          alt={poll.creator.name || "Avatar do criador"} // Adicionar fallback para alt
-          width={32}
-          height={32}
-          className="w-8 h-8 rounded-full mr-2"
-        />
-        <span>{poll.creator.name}</span>
+      <div className="flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+        <div className="flex items-center flex-grow max-w-[calc(100%-48px)]"> {/* Ajustado max-w para dar espaço ao troféu */}
+          <Image
+            src={poll.creator.avatarUrl || "https://www.gravatar.com/avatar/?d=mp"} // Usar fallback para Gravatar se avatarUrl for nulo/vazio
+            alt={poll.creator.name || "Avatar do criador"} // Adicionar fallback para alt
+            width={32}
+            height={32}
+            className="w-8 h-8 rounded-full mr-2"
+          />
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap">{poll.creator.name}</span>
+        </div>
+        {poll.rank && (
+          <motion.div
+            className="ml-auto w-8 h-8 flex items-center justify-center"
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1, rotate: [0, 10, -10, 0] }}
+            transition={{
+              duration: 0.8,
+              ease: [0, 0.71, 0.2, 1.01],
+              repeat: Infinity,
+              repeatType: "reverse",
+              repeatDelay: 2
+            }}
+          >
+            {poll.rank === 1 && (
+              <div className="relative w-full h-full rounded-full flex items-center justify-center bg-yellow-400 shadow-lg shadow-yellow-500/50">
+                <Image src="/trofeu.png" alt="Troféu de Ouro" width={32} height={32} className="w-8 h-8 p-1" />
+              </div>
+            )}
+            {poll.rank === 2 && (
+              <div className="relative w-full h-full rounded-full flex items-center justify-center bg-gray-400 shadow-lg shadow-gray-500/50">
+                <Image src="/trofeuPrata.png" alt="Troféu de Prata" width={32} height={32} className="w-8 h-8 p-1" />
+              </div>
+            )}
+            {poll.rank === 3 && (
+              <div className="relative w-full h-full rounded-full flex items-center justify-center bg-amber-700 shadow-lg shadow-amber-800/50">
+                <Image src="/trofeuBronze.png" alt="Troféu de Bronze" width={32} height={32} className="w-8 h-8 p-1" />
+              </div>
+            )}
+          </motion.div>
+        )}
       </div>
 
       <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white max-w-full break-words overflow-hidden mb-4 line-clamp-2"> {/* Ajustado max-w para dar mais espaço ao título e adicionado line-clamp-2 */}
@@ -363,7 +397,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
 
           <ul className="space-y-4"> {/* Removido max-h e overflow */}
             {poll.options.map((option) => {
-              const percent = currentTotalVotes ? Math.round((option.votes / currentTotalVotes) * 100) : 0;
+              const percent = (currentTotalVotes && currentTotalVotes > 0) ? Math.round((option.votes / currentTotalVotes) * 100) : 0;
 
               return (
                 <li key={option.id}>
@@ -371,9 +405,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
                     <motion.button
                       whileHover={{ scale: 1.02, x: 5 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => { 
-                        handleVoteClick(option.id); 
-                      }}
+                      onClick={() => handleVoteClick(option.id)} // Correção aqui: passar option.id diretamente
                       disabled={!!votedOptionId} // Desabilitar se já votou localmente
                       className={`text-left font-medium transition-colors duration-200 ${
                         votedOptionId === option.id
