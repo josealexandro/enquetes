@@ -2,7 +2,7 @@
 
 import PollForm from "./components/PollForm";
 import PollCard from "./components/PollCard";
-import { Poll } from "./types/poll";
+import { Poll, PollOption } from "./types/poll"; // Importar PollOption aqui
 // Removido: import { v4 as uuidv4 } from "uuid";
 // import useLocalStorage from "./hooks/useLocalStorage"; // Remover useLocalStorage
 import { useState, useMemo, useEffect, useRef, useCallback } from "react"; // Adicionar useEffect
@@ -63,7 +63,7 @@ export default function Home() {
         }
         
         // Garantir que as opções tenham um 'id' para consistência, se não estiverem presentes no DB
-        const optionsWithIds = data.options.map((opt) => ({
+        const optionsWithIds = data.options.map((opt: PollOption) => ({ // Adicionar : PollOption
           ...opt,
           id: opt.id || Math.random().toString(36).substring(7)
         }));
