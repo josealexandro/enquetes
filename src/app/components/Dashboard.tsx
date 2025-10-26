@@ -28,8 +28,6 @@ const Dashboard = () => {
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "error" | null>(null);
 
-  const companyNameDisplay = user?.displayName || "Empresa"; // Usado apenas para exibição inicial
-
   const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
   const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 

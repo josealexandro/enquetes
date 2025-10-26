@@ -3,14 +3,14 @@
 import PollForm from "./components/PollForm";
 import PollCard from "./components/PollCard";
 import { Poll } from "./types/poll";
-import { v4 as uuidv4 } from "uuid";
+// Removido: import { v4 as uuidv4 } from "uuid";
 // import useLocalStorage from "./hooks/useLocalStorage"; // Remover useLocalStorage
 import { useState, useMemo, useEffect, useRef, useCallback } from "react"; // Adicionar useEffect
 import { useAuth } from "./context/AuthContext";
 import { motion } from "framer-motion";
 import { LayoutGroup, AnimatePresence } from "framer-motion"; // Importar AnimatePresence
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDoc } from "firebase/firestore"; // Importar funções do Firestore e getDoc
+import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, getDoc } from "firebase/firestore"; // addDoc Removido
 // Removido: import LoginForm from "./components/LoginForm";
 // Removido: import SignupForm from "./components/SignupForm";
 import PollPodium from "./components/PollPodium"; // Importar PollPodium
