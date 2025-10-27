@@ -19,9 +19,12 @@ interface PollCardProps {
   onVote: (pollId: string, optionId: string) => void;
   onDelete: (pollId: string) => void;
   onCardClick?: (isCardExpanded: boolean) => void; // Novo prop para lidar com o clique no card, passando o estado de expansão
+  rankColor?: string; // Adicionar rankColor como prop opcional
+  textColorClass?: string; // Adicionar textColorClass como prop opcional
+  borderColor?: string; // Adicionar borderColor como prop opcional
 }
 
-export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCardProps) {
+export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorClass, borderColor }: PollCardProps) {
   const [votedOptionId, setVotedOptionId] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [isClient, setIsClient] = useState(false);
@@ -180,9 +183,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
       setShowAuthPrompt(true); // Mostrar o card de prompt de autenticação
       return;
     }
-    if (votedOptionId || poll.votedBy?.includes(user.uid)) {
-      return; // Já votou, não faz nada
-    }
+    if (votedOptionId || poll.votedBy?.includes(user.uid)) return; // Adicionar verificação de votedBy do Firestore
     onVote(poll.id, optionId);
     setVotedOptionId(optionId);
     if (typeof window !== "undefined" && user) {
@@ -264,7 +265,14 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
 
   return (
     <div
-      className="dark:bg-zinc-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 mb-6 border border-transparent hover:border-indigo-500 transform hover:-translate-y-1 cursor-pointer w-[90%] mx-auto"
+      className={`rounded-lg transition-all duration-300 p-6 mb-6 transform hover:-translate-y-1 cursor-pointer w-[90%] mx-auto
+        ${isExpanded
+          ? poll.rank
+            ? `bg-zinc-700 dark:bg-zinc-800 border-2 ${borderColor} shadow-md`
+            : `bg-zinc-800 border border-transparent shadow-md` // Para cards não ranqueados abertos: mudei dark:bg-zinc-800 para bg-zinc-800 para um cinza mais claro
+          : `${rankColor ? rankColor : "bg-zinc-800"} border border-transparent hover:shadow-xl` // Para cards fechados: se não ranqueado, use bg-zinc-800
+        }
+      `}
       onClick={() => {
         const newExpandedState = !isExpanded; // Calcular o novo estado antes de definir
         setIsExpanded(newExpandedState);
@@ -273,7 +281,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
         }
       }} // Adicionado o manipulador de clique
     >
-      <div className="flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+      <div className="flex items-center justify-between text-sm text-white mb-4">
         <div className="flex items-center flex-grow max-w-[calc(100%-48px)]"> {/* Ajustado max-w para dar espaço ao troféu */}
           <Image
             src={poll.creator.avatarUrl || "https://www.gravatar.com/avatar/?d=mp"} // Usar fallback para Gravatar se avatarUrl for nulo/vazio
@@ -282,7 +290,9 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
             height={32}
             className="w-8 h-8 rounded-full mr-2"
           />
-          <span className="overflow-hidden text-ellipsis whitespace-nowrap">{poll.creator.name}</span>
+          <span className={`overflow-hidden text-ellipsis whitespace-nowrap ${isExpanded ? "text-white" : textColorClass}`}> {/* Aplicar textColorClass */}
+            {poll.creator.name}
+          </span>
         </div>
         {poll.rank && (
           <motion.div
@@ -298,17 +308,17 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
             }}
           >
             {poll.rank === 1 && (
-              <div className="relative w-full h-full rounded-full flex items-center justify-center bg-yellow-400 shadow-lg shadow-yellow-500/50">
+              <div className="relative w-full h-full rounded-full flex items-center justify-center bg-yellow-400 shadow-lg shadow-yellow-500/50 border border-black">
                 <Image src="/trofeu.png" alt="Troféu de Ouro" width={32} height={32} className="w-8 h-8 p-1" />
               </div>
             )}
             {poll.rank === 2 && (
-              <div className="relative w-full h-full rounded-full flex items-center justify-center bg-gray-400 shadow-lg shadow-gray-500/50">
+              <div className="relative w-full h-full rounded-full flex items-center justify-center bg-gray-400 shadow-lg shadow-gray-500/50 border border-black">
                 <Image src="/trofeuPrata.png" alt="Troféu de Prata" width={32} height={32} className="w-8 h-8 p-1" />
               </div>
             )}
             {poll.rank === 3 && (
-              <div className="relative w-full h-full rounded-full flex items-center justify-center bg-amber-700 shadow-lg shadow-amber-800/50">
+              <div className="relative w-full h-full rounded-full flex items-center justify-center bg-amber-700 shadow-lg shadow-amber-800/50 border border-black">
                 <Image src="/trofeuBronze.png" alt="Troféu de Bronze" width={32} height={32} className="w-8 h-8 p-1" />
               </div>
             )}
@@ -316,7 +326,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
         )}
       </div>
 
-      <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white max-w-full break-words overflow-hidden mb-4 line-clamp-2"> {/* Ajustado max-w para dar mais espaço ao título e adicionado line-clamp-2 */}
+      <h2 className={`text-2xl font-semibold max-w-full break-words overflow-hidden mb-4 line-clamp-2 ${isExpanded ? "text-white" : textColorClass}`}> {/* Aplicar textColorClass */}
         {poll.title}
       </h2>
 
@@ -405,19 +415,21 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick }: PollCa
                     <motion.button
                       whileHover={{ scale: 1.02, x: 5 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => handleVoteClick(option.id)} // Correção aqui: passar option.id diretamente
+                      onClick={() => { 
+                        handleVoteClick(option.id); 
+                      }}
                       disabled={!!votedOptionId} // Desabilitar se já votou localmente
                       className={`text-left font-medium transition-colors duration-200 ${
                         votedOptionId === option.id
                           ? "text-blue-600 dark:text-blue-400"
                           : votedOptionId
                           ? "text-zinc-400"
-                          : "text-zinc-800 dark:text-zinc-200 hover:text-blue-600"
+                          : isExpanded ? "text-white" : textColorClass
                       }`}
                     >
                       {option.text}
                     </motion.button>
-                    <span key={option.votes} className="text-sm text-zinc-600 dark:text-zinc-400 animate-pulse-once">
+                    <span key={option.votes} className={`text-sm animate-pulse-once ${isExpanded ? "text-white" : textColorClass}`}> {/* Aplicar textColorClass */}
                       {option.votes} votos ({percent}%)
                     </span>
                   </div>
