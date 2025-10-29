@@ -81,8 +81,27 @@ export default function Home() {
         } as Poll;
       });
 
-      const fetchedPolls = await Promise.all(fetchedPollsPromises); // Esperar por todas as promessas
-      setPolls(fetchedPolls);
+      let fetchedPolls = await Promise.all(fetchedPollsPromises); // Esperar por todas as promessas
+
+      // Calcular engajamento e atribuir ranks
+      fetchedPolls = fetchedPolls
+        .map(poll => {
+          const totalVotes = poll.options.reduce((sum, opt) => sum + opt.votes, 0);
+          const engagement = (poll.likes || 0) + totalVotes;
+          return { ...poll, engagement };
+        })
+        .sort((a, b) => (b.engagement || 0) - (a.engagement || 0)); // Ordenar por engajamento decrescente
+
+      // Atribuir ranks aos top 3
+      const rankedPolls = fetchedPolls.map((poll, index) => {
+        if (index === 0) return { ...poll, rank: 1 }; // Ouro
+        if (index === 1) return { ...poll, rank: 2 }; // Prata
+        if (index === 2) return { ...poll, rank: 3 }; // Bronze
+        return poll;
+      });
+
+      setPolls(rankedPolls);
+      console.log("Enquetes carregadas e ranqueadas:", rankedPolls); // Log para depuração
       setLoadingPolls(false);
     }, (error) => {
       console.error("Erro ao carregar enquetes:", error);
@@ -118,11 +137,13 @@ export default function Home() {
 
   const podiumPolls = useMemo(() => {
     // Filtrar as enquetes com rank 1, 2 e 3 e ordená-las
-    return filteredPublicPolls
+    const filteredPodium = polls // Alterado de filteredPublicPolls para polls
       .filter(poll => poll.rank && (poll.rank >= 1 && poll.rank <= 3))
       .sort((a, b) => (a.rank || 0) - (b.rank || 0))
       .slice(0, 3); // Garantir que apenas os top 3 sejam selecionados
-  }, [filteredPublicPolls]);
+    console.log("Podium Polls:", filteredPodium); // Log para depuração
+    return filteredPodium;
+  }, [polls]); // Alterado de filteredPublicPolls para polls
 
   const otherPublicPolls = useMemo(() => {
     // Filtrar as enquetes públicas que não estão no pódio
@@ -368,6 +389,19 @@ export default function Home() {
         </p>
       </div>
 
+      {/* Novo Pódio de Enquetes no Topo */}
+      {podiumPolls.length > 0 && (
+        <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl flex flex-col items-center gap-8 px-4">
+          <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Pódio das Enquetes</h2>
+          <PollPodium 
+            polls={podiumPolls}
+            onVote={handleVote}
+            onDelete={handleDeletePoll}
+            onCardClick={handlePublicCardClick} 
+          />
+        </div>
+      )}
+
       <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl flex flex-col items-center gap-8 px-4">
         {!isClient ? (
           <p className="text-zinc-600 dark:text-zinc-400">Carregando conteúdo...</p>
@@ -428,19 +462,6 @@ export default function Home() {
                 Minhas
               </motion.button>
             </div>
-
-            {/* Seção do Pódio de Enquetes */}
-            {podiumPolls.length > 0 && (
-              <>
-                <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Pódio das Enquetes</h2>
-                <PollPodium 
-                  polls={podiumPolls}
-                  onVote={handleVote}
-                  onDelete={handleDeletePoll}
-                  onCardClick={handlePublicCardClick} // Usar o mesmo manipulador do carrossel público
-                />
-              </>
-            )}
 
             {/* Seção de Enquetes Públicas */}
             <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Outras Enquetes Públicas</h2>

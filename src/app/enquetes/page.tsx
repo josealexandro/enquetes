@@ -159,7 +159,15 @@ export default function EnquetesPage() {
           </div>
         )}
 
-        <div className="flex flex-wrap justify-center gap-2 mb-8">
+        {/* Seção do Pódio de Enquetes */}
+        {podiumPolls.length > 0 && (
+          <>
+            <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6 text-center">Pódio das Enquetes</h2>
+            <PollPodium polls={podiumPolls} onVote={handleVote} onDelete={handleDeletePoll} />
+          </>
+        )}
+
+        <div className="flex flex-wrap justify-center gap-2 mb-8 mt-8"> {/* Adicionado mt-8 aqui */}
           {categories.map((cat) => (
             <motion.button
               key={cat}
@@ -174,14 +182,6 @@ export default function EnquetesPage() {
             </motion.button>
           ))}
         </div>
-
-        {/* Seção do Pódio de Enquetes */}
-        {podiumPolls.length > 0 && (
-          <>
-            <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6 text-center">Pódio das Enquetes</h2>
-            <PollPodium polls={podiumPolls} onVote={handleVote} onDelete={handleDeletePoll} />
-          </>
-        )}
 
         {loadingPolls ? (
           <p className="text-center text-zinc-600 dark:text-zinc-400">Carregando enquetes...</p>
