@@ -204,28 +204,8 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       return;
     }
 
-    // Atualização otimista da UI
-    const updatedOptionsForOptimisticUI = pollToUpdate.options.map((option) =>
-      option.id === optionId
-        ? { ...option, votes: option.votes + 1 }
-        : option
-    );
-
-    const updatedVotedByForOptimisticUI = pollToUpdate.isCommercial && user
-      ? [...(pollToUpdate.votedBy || []), user.uid]
-      : pollToUpdate.votedBy;
-
-    // setUserPolls((prevPolls) => // Removido: setUserPolls será atualizado automaticamente via onSnapshot
-    //   prevPolls.map((poll) =>
-    //     poll.id === pollId
-    //       ? {
-    //           ...poll,
-    //           options: updatedOptionsForOptimisticUI,
-    //           votedBy: updatedVotedByForOptimisticUI,
-    //         }
-    //       : poll
-    //   )
-    // );
+    // Otimista: Atualiza a UI imediatamente
+    // Removido: setPolls para evitar conflitos com onSnapshot e simplificar o fluxo
 
     try {
       const pollRef = doc(db, "polls", pollId);

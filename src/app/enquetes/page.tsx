@@ -29,7 +29,7 @@ export default function EnquetesPage() {
     }
 
     const unsubscribe = onSnapshot(q, async (snapshot) => { // Adicionar async aqui
-      let fetchedPollsPromises = snapshot.docs.map(async (docSnap) => {
+      const fetchedPollsPromises = snapshot.docs.map(async (docSnap) => { // Mudar para docSnap
         const data = docSnap.data();
         const creatorId = data.creator?.id || data.createdBy;
 
