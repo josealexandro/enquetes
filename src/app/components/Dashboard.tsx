@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth, AuthContextType } from "../context/AuthContext";
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore (ainda necessária para update/delete)
 import { doc, updateDoc, deleteDoc } from "firebase/firestore"; // Importar doc, updateDoc e deleteDoc
 import { updateProfile } from "firebase/auth"; // Importar updateProfile do Firebase Auth
@@ -11,16 +11,11 @@ import PollCard from "./PollCard"; // Importar o PollCard
 import { Poll } from "../types/poll"; // Importar a interface Poll
 import { v4 as uuidv4 } from "uuid"; // Para gerar IDs únicos para as opções
 import Image from "next/image"; // Importar o componente Image do Next.js
-import { UserInfo, User } from "firebase/auth"; // Importar UserInfo e User para tipagem do user
-import { AuthContextType } from "../context/AuthContext"; // Importar AuthContextType
+// Removido: import { UserInfo, User } from "firebase/auth"; // Removido: UserInfo e User não são necessários aqui
+// Removido: import { AuthContextType } from "../context/AuthContext"; // Removido: AuthContextType não é necessário ser importado diretamente para o tipo CustomUser
 
-// Definir um tipo de usuário customizado que reflete a interface de usuário do AuthContext
-type CustomUser = (User & {
-  displayName?: string | null;
-  accountType?: 'personal' | 'commercial';
-  commercialName?: string | null;
-  avatarUrl?: string | null;
-}) | null;
+// O tipo de `user` vindo do `useAuth` já é o tipo correto, não precisamos redefini-lo aqui
+type CustomUser = AuthContextType["user"];
 
 interface DashboardProps {
   polls: Poll[];

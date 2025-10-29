@@ -22,7 +22,7 @@ interface UserDataToSave {
   createdAt: Timestamp | FieldValue; // serverTimestamp é um tipo complexo, mas por enquanto 'any' é aceitável aqui se for apenas para o tipo do FireStore
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: (User & {
     displayName?: string | null;
     accountType?: 'personal' | 'commercial';
