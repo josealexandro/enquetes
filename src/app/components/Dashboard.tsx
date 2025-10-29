@@ -11,11 +11,20 @@ import PollCard from "./PollCard"; // Importar o PollCard
 import { Poll } from "../types/poll"; // Importar a interface Poll
 import { v4 as uuidv4 } from "uuid"; // Para gerar IDs únicos para as opções
 import Image from "next/image"; // Importar o componente Image do Next.js
-import { UserInfo } from "firebase/auth"; // Importar UserInfo para tipagem do user
+import { UserInfo, User } from "firebase/auth"; // Importar UserInfo e User para tipagem do user
+import { AuthContextType } from "../context/AuthContext"; // Importar AuthContextType
+
+// Definir um tipo de usuário customizado que reflete a interface de usuário do AuthContext
+type CustomUser = (User & {
+  displayName?: string | null;
+  accountType?: 'personal' | 'commercial';
+  commercialName?: string | null;
+  avatarUrl?: string | null;
+}) | null;
 
 interface DashboardProps {
   polls: Poll[];
-  user: UserInfo; // Alterar para UserInfo, garantindo que não é nulo
+  user: Exclude<CustomUser, null>; // Usar o tipo CustomUser e garantir que não é nulo
 }
 
 const Dashboard = ({ polls, user }: DashboardProps) => {
