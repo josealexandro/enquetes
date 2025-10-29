@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, deleteDoc } from "firebase/firestore"; // Importar doc, updateDoc e deleteDoc
+import { db } from "@/lib/firebase"; // Importar a instância do Firestore (ainda necessária para update/delete)
+import { doc, updateDoc, deleteDoc } from "firebase/firestore"; // Importar doc, updateDoc e deleteDoc
 import { updateProfile } from "firebase/auth"; // Importar updateProfile do Firebase Auth
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Importar Firebase Storage
 import PollForm from "./PollForm"; // Importar o PollForm
@@ -11,17 +11,22 @@ import PollCard from "./PollCard"; // Importar o PollCard
 import { Poll } from "../types/poll"; // Importar a interface Poll
 import { v4 as uuidv4 } from "uuid"; // Para gerar IDs únicos para as opções
 import Image from "next/image"; // Importar o componente Image do Next.js
+import { UserInfo } from "firebase/auth"; // Importar UserInfo para tipagem do user
 
-// Removido: Interfaces PollOption e PollToSave, e a função handleCreateCommercialPoll
+interface DashboardProps {
+  polls: Poll[];
+  user: UserInfo; // Alterar para UserInfo, garantindo que não é nulo
+}
 
-const Dashboard = () => {
-  const { user, loading, isMasterUser, firebaseAuthUser } = useAuth(); // Obter firebaseAuthUser
+const Dashboard = ({ polls, user }: DashboardProps) => {
+  const { isMasterUser, firebaseAuthUser } = useAuth(); // Obter isMasterUser e firebaseAuthUser do contexto
   const [activePollsCount, setActivePollsCount] = useState(0);
-  const [userPolls, setUserPolls] = useState<Poll[]>([]); // Novo estado para as enquetes do usuário
-  const [totalResponsesThisMonth, setTotalResponsesThisMonth] = useState(0); // Novo estado
+  // Removido: const [totalResponsesThisMonth, setTotalResponsesThisMonth] = useState(0); // Novo estado
   const [averageVotesPerPoll, setAverageVotesPerPoll] = useState(0); // Novo estado
+  // Removido: const [totalCommercialCommentsThisMonth, setTotalCommercialCommentsThisMonth] = useState(0); // NOVO ESTADO
+  const [totalMonthlyEngagement, setTotalMonthlyEngagement] = useState(0); // NOVO ESTADO: Engajamento total do mês
   const [showCreatePollModal, setShowCreatePollModal] = useState(false);
-  const [editedCompanyName, setEditedCompanyName] = useState(user?.displayName || ""); // Novo estado para o nome da empresa editável
+  const [editedCompanyName, setEditedCompanyName] = useState(user.displayName || ""); // Novo estado para o nome da empresa editável
   const [imageFile, setImageFile] = useState<File | null>(null); // Estado para o arquivo de imagem selecionado
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null); // Estado para a URL de pré-visualização da imagem
   const [uploadingImage, setUploadingImage] = useState(false); // Estado para o status do upload da imagem
@@ -38,70 +43,43 @@ const Dashboard = () => {
     }
     if (user?.displayName) {
       setEditedCompanyName(user.displayName);
-    } else if (!user && !loading) {
+    } else {
       setEditedCompanyName(""); // Limpar se não houver usuário logado
     }
-  }, [user, loading]);
+  }, [user]);
 
-  // Efeito para contar enquetes ativas e buscar as enquetes do usuário
+  // Efeito para contar enquetes ativas e calcular estatísticas quando as enquetes do usuário são atualizadas
   useEffect(() => {
-    if (user && !loading) {
-      const pollsCollection = collection(db, "polls");
-      const q = query(pollsCollection, where("creator.id", "==", user.uid), orderBy("createdAt", "desc"));
+    // user é garantido como não nulo aqui
+    setActivePollsCount(polls.length);
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        setActivePollsCount(snapshot.size);
-        const fetchedPolls = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            title: data.title,
-            options: data.options,
-            creator: data.creator,
-            createdAt: data.createdAt,
-            category: data.category,
-            likes: data.likes || 0,
-            likedBy: data.likedBy || [],
-            dislikes: data.dislikes || 0,
-            dislikedBy: data.dislikedBy || [],
-            isCommercial: data.isCommercial || false,
-          } as Poll;
-        });
-        setUserPolls(fetchedPolls);
-      }, (error) => {
-        console.error("Erro ao buscar enquetes:", error);
-      });
+    let totalVotes = 0;
+    let monthlyResponses = 0; // Votos em enquetes criadas neste mês
+    let monthlyCommercialComments = 0; // Comentários em enquetes comerciais criadas neste mês
 
-      return () => unsubscribe();
-    }
-  }, [user, loading]);
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    const oneMonthAgoMillis = oneMonthAgo.getTime(); // Obter os milissegundos da data de um mês atrás
 
-  // Efeito para calcular estatísticas quando as enquetes do usuário são atualizadas
-  useEffect(() => {
-    if (userPolls.length > 0) {
-      let totalVotes = 0;
-      let pollsThisMonth = 0;
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    polls.forEach(poll => {
+      const pollTotalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
+      totalVotes += pollTotalVotes;
 
-      userPolls.forEach(poll => {
-        const pollTotalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
-        totalVotes += pollTotalVotes;
+      // Comparar usando toMillis() para objetos Timestamp
+      if (poll.createdAt && poll.createdAt.toMillis() >= oneMonthAgoMillis) {
+        monthlyResponses += pollTotalVotes;
+      }
 
-        // Para "Respostas neste mês", vamos considerar as enquetes criadas neste mês por simplicidade
-        // Uma implementação mais precisa exigiria armazenar o timestamp de cada voto.
-        if (poll.createdAt && (poll.createdAt as unknown as number) >= oneMonthAgo.getTime()) {
-          pollsThisMonth += pollTotalVotes;
-        }
-      });
+      if (poll.isCommercial && poll.commentCount && poll.createdAt && poll.createdAt.toMillis() >= oneMonthAgoMillis) {
+        monthlyCommercialComments += poll.commentCount;
+      }
+    });
 
-      setTotalResponsesThisMonth(pollsThisMonth);
-      setAverageVotesPerPoll(totalVotes / userPolls.length);
-    } else {
-      setTotalResponsesThisMonth(0);
-      setAverageVotesPerPoll(0);
-    }
-  }, [userPolls]);
+    setAverageVotesPerPoll(polls.length > 0 ? totalVotes / polls.length : 0);
+    setTotalMonthlyEngagement(monthlyResponses + monthlyCommercialComments); // Combina as duas métricas
+
+    // Removido: o else para !user, pois user é garantido como não nulo
+  }, [polls, user]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -130,7 +108,7 @@ const Dashboard = () => {
   };
 
   const handleSaveProfile = async () => {
-    if (!user || (!editedCompanyName.trim() && !imageFile)) {
+    if (!editedCompanyName.trim() && !imageFile) { // Removida a verificação !user
       setFeedbackMessage("Nome da empresa ou imagem não pode estar vazio.");
       setFeedbackType("error");
       return;
@@ -138,10 +116,10 @@ const Dashboard = () => {
 
     if (uploadingImage) return; // Previne múltiplos envios
 
-    let newPhotoURL: string | undefined = user?.photoURL || undefined;
+    let newPhotoURL: string | undefined = user.photoURL || undefined;
     let updateRequired = false;
 
-    if (editedCompanyName.trim() !== (user?.displayName || "")) {
+    if (editedCompanyName.trim() !== (user.displayName || "")) {
       updateRequired = true;
     }
 
@@ -160,7 +138,7 @@ const Dashboard = () => {
         setFeedbackMessage("Erro ao fazer upload da imagem.");
         setFeedbackType("error");
         setImageFile(null); // Limpa o arquivo selecionado em caso de erro
-        setImagePreviewUrl(user?.photoURL || null); // Reverte a pré-visualização
+        setImagePreviewUrl(user.photoURL || null); // Reverte a pré-visualização
         return; // Interrompe o processo se o upload da imagem falhar
       } finally {
         setUploadingImage(false);
@@ -191,16 +169,15 @@ const Dashboard = () => {
       }
 
       // 2. Opcional: Atualizar no Firestore se for um usuário comercial
-      if (user?.uid) {
-        const userDocRef = doc(db, "users", user.uid);
-        const updateData: { displayName: string; photoURL?: string } = {
-          displayName: editedCompanyName.trim(),
-        };
-        if (newPhotoURL) {
-          updateData.photoURL = newPhotoURL;
-        }
-        await updateDoc(userDocRef, updateData);
+      // user é garantido como não nulo aqui
+      const userDocRef = doc(db, "users", user.uid);
+      const updateData: { displayName: string; photoURL?: string } = {
+        displayName: editedCompanyName.trim(),
+      };
+      if (newPhotoURL) {
+        updateData.photoURL = newPhotoURL;
       }
+      await updateDoc(userDocRef, updateData);
       setFeedbackMessage("Perfil atualizado com sucesso!");
       setFeedbackType("success");
       setImageFile(null); // Limpa o arquivo após o upload e salvamento
@@ -220,14 +197,8 @@ const Dashboard = () => {
   };
 
   const handleVote = async (pollId: string, optionId: string) => {
-    if (!user) {
-      setFeedbackMessage("Você precisa estar logado para votar.");
-      setFeedbackType("error");
-      setTimeout(() => setFeedbackMessage(null), 3000);
-      return;
-    }
-
-    const pollToUpdate = userPolls.find(p => p.id === pollId);
+    // user é garantido como não nulo aqui
+    const pollToUpdate = polls.find(p => p.id === pollId);
     if (!pollToUpdate) {
       console.error("Enquete não encontrada para o ID:", pollId);
       return;
@@ -244,17 +215,17 @@ const Dashboard = () => {
       ? [...(pollToUpdate.votedBy || []), user.uid]
       : pollToUpdate.votedBy;
 
-    setUserPolls((prevPolls) =>
-      prevPolls.map((poll) =>
-        poll.id === pollId
-          ? {
-              ...poll,
-              options: updatedOptionsForOptimisticUI,
-              votedBy: updatedVotedByForOptimisticUI,
-            }
-          : poll
-      )
-    );
+    // setUserPolls((prevPolls) => // Removido: setUserPolls será atualizado automaticamente via onSnapshot
+    //   prevPolls.map((poll) =>
+    //     poll.id === pollId
+    //       ? {
+    //           ...poll,
+    //           options: updatedOptionsForOptimisticUI,
+    //           votedBy: updatedVotedByForOptimisticUI,
+    //         }
+    //       : poll
+    //   )
+    // );
 
     try {
       const pollRef = doc(db, "polls", pollId);
@@ -276,33 +247,27 @@ const Dashboard = () => {
       setFeedbackType("error");
       setTimeout(() => setFeedbackMessage(null), 3000);
       // Reverter a UI se o voto falhar
-      setUserPolls((prevPolls) =>
-        prevPolls.map((poll) =>
-          poll.id === pollId
-            ? {
-                ...poll,
-                options: poll.options.map((option) =>
-                  option.id === optionId
-                    ? { ...option, votes: option.votes - 1 }
-                    : option
-                ),
-                votedBy: poll.isCommercial && user ? (poll.votedBy || []).filter(uid => uid !== user.uid) : poll.votedBy,
-              }
-            : poll
-        )
-      );
+      // setUserPolls((prevPolls) => // Removido: setUserPolls será atualizado automaticamente via onSnapshot
+      //   prevPolls.map((poll) =>
+      //     poll.id === pollId
+      //       ? {
+      //           ...poll,
+      //           options: poll.options.map((option) =>
+      //             option.id === optionId
+      //               ? { ...option, votes: option.votes - 1 }
+      //               : option
+      //           ),
+      //           votedBy: poll.isCommercial && user ? (poll.votedBy || []).filter(uid => uid !== user.uid) : poll.votedBy,
+      //         }
+      //       : poll
+      //   )
+      // );
     }
   };
 
   const handleDeletePoll = async (pollId: string) => {
-    if (!user) {
-      setFeedbackMessage("Você precisa estar logado para excluir enquetes.");
-      setFeedbackType("error");
-      setTimeout(() => setFeedbackMessage(null), 3000);
-      return;
-    }
-
-    const pollToDelete = userPolls.find(p => p.id === pollId);
+    // user é garantido como não nulo aqui
+    const pollToDelete = polls.find(p => p.id === pollId);
     if (!pollToDelete || (pollToDelete.creator.id !== user.uid && !isMasterUser)) {
       setFeedbackMessage("Você não tem permissão para excluir esta enquete.");
       setFeedbackType("error");
@@ -346,11 +311,11 @@ const Dashboard = () => {
       <div className="bg-gray-800 p-6 rounded-lg shadow-md mb-6">
         <h3 className="text-xl font-semibold mb-4">Minhas enquetes</h3>
         <div className="space-y-4">
-          {userPolls.length === 0 ? (
+          {polls.length === 0 ? (
             <p className="text-gray-400">Você ainda não criou nenhuma enquete.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {userPolls.map((poll) => (
+              {polls.map((poll) => (
                 <PollCard 
                   key={poll.id} 
                   poll={poll} 
@@ -369,8 +334,8 @@ const Dashboard = () => {
         <h3 className="text-xl font-semibold mb-4">Estatísticas</h3>
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-gray-700 p-4 rounded-lg text-center">
-            <p className="text-2xl font-bold">{totalResponsesThisMonth}</p>
-            <p className="text-gray-400">Respostas neste mês</p>
+            <p className="text-2xl font-bold">{totalMonthlyEngagement}</p>
+            <p className="text-gray-400">Engajamento total neste mês</p>
           </div>
           <div className="bg-gray-700 p-4 rounded-lg text-center">
             <p className="text-2xl font-bold">{averageVotesPerPoll.toFixed(1)}</p>

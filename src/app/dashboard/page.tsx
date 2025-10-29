@@ -1,26 +1,56 @@
 "use client";
 
-import React, { useEffect, useState } from "react"; // Adicionar useState
-import Link from "next/link"; // Importar Link
-import { useRouter } from 'next/navigation'; // Importar useRouter para redirecionamento
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from 'next/navigation';
 import { useAuth } from "../context/AuthContext";
-import DashboardComponent from "../components/Dashboard"; // Renomear para evitar conflito
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'; // Importar FontAwesomeIcon
-import { faBars, faTimes } from '@fortawesome/free-solid-svg-icons'; // Importar ícones
-// Removido: import { Poll } from "../types/poll"; // Importar a interface Poll
+import DashboardComponent from "../components/Dashboard";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBars, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { collection, query, orderBy, onSnapshot, getDocs, where } from "firebase/firestore"; // Importar funcionalidades do Firestore
+import { db } from "@/lib/firebase"; // Importar a instância do Firestore
+import { Poll } from "../types/poll"; // Importar a interface Poll
 
 export default function DashboardPage() {
-  const { user, loading } = useAuth(); // Remover isMasterUser da desestruturação
+  const { user, loading } = useAuth();
   const router = useRouter();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Estado para controlar a visibilidade da sidebar
-  
-  // Redirecionar se o usuário não for comercial ou não estiver logado após o carregamento
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [polls, setPolls] = useState<Poll[]>([]); // Estado para armazenar as enquetes
+
   useEffect(() => {
     if (!loading && (!user || user.accountType !== 'commercial')) {
-      router.push('/'); // Redirecionar para a página inicial
+      router.push('/');
     }
   }, [user, loading, router]);
-  
+
+  // Hook para buscar as enquetes
+  useEffect(() => {
+    if (!user) return;
+
+    const pollsCollection = collection(db, "polls");
+    const q = query(pollsCollection, where("creator.id", "==", user.uid), orderBy("createdAt", "desc"));
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const fetchedPollsPromises = snapshot.docs.map(async (docSnap) => {
+        const data = docSnap.data();
+        const commentsQuery = query(collection(db, `polls/${docSnap.id}/comments`));
+        const commentsSnapshot = await getDocs(commentsQuery);
+        const commentCount = commentsSnapshot.size;
+
+        return {
+          id: docSnap.id,
+          ...data,
+          commentCount: commentCount,
+          createdAt: data.createdAt, // Firebase retorna Timestamp, a interface Poll agora aceita isso
+        } as Poll;
+      });
+      const fetchedPolls = await Promise.all(fetchedPollsPromises);
+      setPolls(fetchedPolls);
+    });
+
+    return () => unsubscribe();
+  }, [user]); // Dependência do usuário para recarregar quando o usuário mudar
+
   if (loading || !user || user.accountType !== 'commercial') {
     return (
       <div className="flex h-screen bg-gray-900 text-white justify-center items-center">
@@ -28,7 +58,7 @@ export default function DashboardPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="flex h-screen bg-gray-900 text-white">
       {/* Botão para abrir/fechar a sidebar em mobile */}
@@ -77,7 +107,7 @@ export default function DashboardPage() {
             </li>
             <li className="mb-2">
               <a href="#" className="flex items-center p-2 rounded-lg">
-                <span className="mr-2">🏢</span> Perfil da Empresa
+                <span className="mr-2">🏢</span> Perfil da Empresa\
               </a>
             </li>
             <li className="mb-2">
@@ -100,8 +130,8 @@ export default function DashboardPage() {
       </aside>
       
       {/* Main Content */}
-      <main className="flex-1 p-8 overflow-y-auto md:ml-64"> {/* Ajustar margem para desktop */}
-        <DashboardComponent />
+      <main className="flex-1 p-8 overflow-y-auto md:ml-64">
+        <DashboardComponent polls={polls} user={user!} /> {/* Passar as enquetes como prop, user garantido como não nulo */}
       </main>
     </div>
   );

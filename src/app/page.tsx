@@ -10,7 +10,7 @@ import { useAuth } from "./context/AuthContext";
 import { motion } from "framer-motion";
 import { LayoutGroup, AnimatePresence } from "framer-motion"; // Importar AnimatePresence
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, getDoc } from "firebase/firestore"; // addDoc Removido
+import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, getDoc, Timestamp } from "firebase/firestore"; // addDoc Removido, Adicionar Timestamp
 // Removido: import LoginForm from "./components/LoginForm";
 // Removido: import SignupForm from "./components/SignupForm";
 import PollPodium from "./components/PollPodium"; // Importar PollPodium
@@ -68,6 +68,16 @@ export default function Home() {
           id: opt.id || Math.random().toString(36).substring(7)
         }));
 
+        // Garantir que createdAt seja sempre um objeto Timestamp
+        let pollCreatedAt = data.createdAt;
+        if (pollCreatedAt && typeof pollCreatedAt.toDate !== 'function') {
+          // Se for um objeto literal, converta para Timestamp
+          pollCreatedAt = new Timestamp(pollCreatedAt.seconds, pollCreatedAt.nanoseconds);
+        } else if (!pollCreatedAt) {
+          // Se não existir, use o timestamp atual como fallback
+          pollCreatedAt = Timestamp.now();
+        }
+
         return {
           id: docSnap.id, // Usar docSnap.id
           ...data,
@@ -78,6 +88,7 @@ export default function Home() {
             avatarUrl: creatorAvatarUrl,
           },
           isCommercial: data.isCommercial || false,
+          createdAt: pollCreatedAt, // Usar o Timestamp garantido
         } as Poll;
       });
 
@@ -122,7 +133,7 @@ export default function Home() {
   const filteredPublicPolls = useMemo(() => {
     let sortedPolls = [...publicPolls];
     if (activeFilter === "recent") {
-      sortedPolls.sort((a, b) => b.createdAt - a.createdAt);
+      sortedPolls.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
     } else if (activeFilter === "trending") {
       sortedPolls.sort((a, b) => {
         const votesA = a.options.reduce((sum, option) => sum + option.votes, 0);
@@ -154,7 +165,7 @@ export default function Home() {
   const filteredCommercialPolls = useMemo(() => {
     let sortedPolls = [...commercialPolls];
     if (activeFilter === "recent") {
-      sortedPolls.sort((a, b) => b.createdAt - a.createdAt);
+      sortedPolls.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
     } else if (activeFilter === "trending") {
       sortedPolls.sort((a, b) => {
         const votesA = a.options.reduce((sum, option) => sum + option.votes, 0);
@@ -392,7 +403,7 @@ export default function Home() {
       {/* Novo Pódio de Enquetes no Topo */}
       {podiumPolls.length > 0 && (
         <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl flex flex-col items-center gap-8 px-4">
-          <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Pódio das Enquetes</h2>
+          <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Mais Votadas</h2>
           <PollPodium 
             polls={podiumPolls}
             onVote={handleVote}

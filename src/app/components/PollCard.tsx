@@ -215,6 +215,10 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
     try {
       const commentsCollectionRef = collection(db, "polls", poll.id, "comments");
       await addDoc(commentsCollectionRef, newComment);
+
+      // Incrementar commentCount no documento da enquete principal
+      const pollRef = doc(db, "polls", poll.id);
+      await updateDoc(pollRef, { commentCount: increment(1) });
       // onSnapshot já vai atualizar o estado de comments, não precisamos fazer setComments aqui
     } catch (error) {
       console.error("Erro ao adicionar comentário:", error);
@@ -231,6 +235,10 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
     try {
       const commentRef = doc(db, "polls", poll.id, "comments", commentId);
       await deleteDoc(commentRef);
+
+      // Decrementar commentCount no documento da enquete principal
+      const pollRef = doc(db, "polls", poll.id);
+      await updateDoc(pollRef, { commentCount: increment(-1) });
       // onSnapshot já vai atualizar o estado de comments, não precisamos fazer setComments aqui
       console.log("Comentário excluído com sucesso!");
     } catch (error) {

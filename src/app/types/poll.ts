@@ -1,3 +1,5 @@
+import { Timestamp } from "firebase/firestore";
+
 export interface PollOption {
   id: string;
   text: string;
@@ -23,7 +25,7 @@ export interface Poll {
     avatarUrl: string;
     id: string; // Adicionar o ID do criador aqui
   };
-  createdAt: number; // Timestamp for sorting by recency
+  createdAt: Timestamp; // Timestamp para ordenação por recência
   category: string;
   likes: number; // Novo campo para o número de curtidas
   likedBy: string[]; // Novo campo para armazenar os IDs dos usuários que curtiram
@@ -32,6 +34,7 @@ export interface Poll {
   isCommercial: boolean; // Novo campo para indicar se a enquete é comercial
   votedBy?: string[]; // Novo campo para armazenar os IDs dos usuários que já votaram
   rank?: number; // Novo campo para classificar as enquetes (1: ouro, 2: prata, 3: bronze)
+  commentCount?: number; // Novo campo para armazenar o número total de comentários
   // imageUrl?: string; // Novo campo para a URL da imagem da enquete (opcional)
   // creatorId?: string; // Remover esta linha, pois o ID agora está dentro de 'creator'
 }

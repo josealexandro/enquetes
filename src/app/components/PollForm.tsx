@@ -138,6 +138,7 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
         },
         createdAt: serverTimestamp(),
         isCommercial: isCommercial,
+        commentCount: 0, // Inicializar commentCount com 0
         // ...(imageUrl && { imageUrl }), // Adiciona imageUrl apenas se existir
       });
 

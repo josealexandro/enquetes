@@ -4,7 +4,7 @@ import PollCard from "../components/PollCard";
 import { Poll, PollOption } from "../types/poll";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, where, arrayUnion, getDoc } from "firebase/firestore"; // Importar getDoc
+import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, where, arrayUnion, getDoc, getDocs } from "firebase/firestore"; // Importar getDoc e getDocs
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
 import PollPodium from "../components/PollPodium"; // Importar PollPodium
@@ -29,9 +29,9 @@ export default function EnquetesPage() {
     }
 
     const unsubscribe = onSnapshot(q, async (snapshot) => { // Adicionar async aqui
-      const fetchedPollsPromises = snapshot.docs.map(async (docSnap) => { // Mudar para const
+      let fetchedPollsPromises = snapshot.docs.map(async (docSnap) => {
         const data = docSnap.data();
-        const creatorId = data.creator?.id || data.createdBy; // Usar createdBy como fallback
+        const creatorId = data.creator?.id || data.createdBy;
 
         let creatorName = "Usuário Desconhecido";
         let creatorAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"; // Default Gravatar
@@ -45,6 +45,11 @@ export default function EnquetesPage() {
             creatorAvatarUrl = userData.avatarUrl || "https://www.gravatar.com/avatar/?d=mp";
           }
         }
+
+        // Obter a contagem de comentários para cada enquete
+        const commentsQuery = query(collection(db, `polls/${docSnap.id}/comments`));
+        const commentsSnapshot = await getDocs(commentsQuery);
+        const commentCount = commentsSnapshot.size;
 
         // Garantir que as opções tenham um 'id' para consistência, se não estiverem presentes no DB
         const optionsWithIds = data.options.map((opt: PollOption) => ({
@@ -61,6 +66,7 @@ export default function EnquetesPage() {
             name: creatorName,
             avatarUrl: creatorAvatarUrl,
           },
+          commentCount: commentCount, // Adicionar a contagem de comentários
         } as Poll;
       });
 
@@ -148,10 +154,8 @@ export default function EnquetesPage() {
 
   return (
     <main className="min-h-screen w-full px-4 py-24 bg-white dark:bg-zinc-900">
-      <div className="max-w-6xl mx-auto"> {/* Aumentado max-w */}
-        <h1 className="text-3xl font-bold mb-8 text-center text-zinc-900 dark:text-white">
-          Todas as Enquetes
-        </h1>
+      <div className="max-w-7xl mx-auto"> {/* Aumentado max-w */}
+        
 
         {deleteFeedbackMessage && (
           <div className={`p-3 rounded-md text-white mt-4 ${deleteFeedbackType === "success" ? "bg-green-500" : "bg-red-500"}`}>
@@ -162,7 +166,7 @@ export default function EnquetesPage() {
         {/* Seção do Pódio de Enquetes */}
         {podiumPolls.length > 0 && (
           <>
-            <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6 text-center">Pódio das Enquetes</h2>
+            <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6 text-center">Mais Votadas</h2>
             <PollPodium polls={podiumPolls} onVote={handleVote} onDelete={handleDeletePoll} />
           </>
         )}
