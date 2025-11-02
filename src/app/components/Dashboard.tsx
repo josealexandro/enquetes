@@ -11,6 +11,8 @@ import PollCard from "./PollCard"; // Importar o PollCard
 import { Poll } from "../types/poll"; // Importar a interface Poll
 import { v4 as uuidv4 } from "uuid"; // Para gerar IDs únicos para as opções
 import Image from "next/image"; // Importar o componente Image do Next.js
+import Link from 'next/link'; // Importar o componente Link do Next.js
+import slugify from "@/utils/slugify"; // Importar a função slugify
 // Removido: import { UserInfo, User } from "firebase/auth"; // Removido: UserInfo e User não são necessários aqui
 // Removido: import { AuthContextType } from "../context/AuthContext"; // Removido: AuthContextType não é necessário ser importado diretamente para o tipo CustomUser
 
@@ -36,9 +38,19 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
   const [uploadingImage, setUploadingImage] = useState(false); // Estado para o status do upload da imagem
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "error" | null>(null);
+  // Novos estados para as informações do rodapé
+  const [editedAboutUs, setEditedAboutUs] = useState(user.aboutUs || "");
+  const [editedContactEmail, setEditedContactEmail] = useState(user.contactEmail || "");
+  const [editedAddress, setEditedAddress] = useState(user.address || "");
+  const [editedFacebookUrl, setEditedFacebookUrl] = useState(user.facebookUrl || "");
+  const [editedInstagramUrl, setEditedInstagramUrl] = useState(user.instagramUrl || ""); // Antigo editedTwitterUrl
+  const [editedTwitterUrl, setEditedTwitterUrl] = useState(user.twitterUrl || ""); // Antigo editedLinkedinUrl
 
   const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
   const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
+  // Gerar o slug da empresa aqui para passar para o PollCard
+  const companySlug = user?.commercialName ? slugify(user.commercialName) : undefined;
 
   // Inicializa editedCompanyName com o displayName do usuário quando o componente é montado ou o usuário muda
   useEffect(() => {
@@ -50,6 +62,13 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     } else {
       setEditedCompanyName(""); // Limpar se não houver usuário logado
     }
+    // Inicializar os novos estados de informação do rodapé
+    setEditedAboutUs(user?.aboutUs || "");
+    setEditedContactEmail(user?.contactEmail || "");
+    setEditedAddress(user?.address || "");
+    setEditedFacebookUrl(user?.facebookUrl || "");
+    setEditedInstagramUrl(user?.instagramUrl || "");
+    setEditedTwitterUrl(user?.twitterUrl || "");
   }, [user]);
 
   // Efeito para contar enquetes ativas e calcular estatísticas quando as enquetes do usuário são atualizadas
@@ -127,6 +146,14 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       updateRequired = true;
     }
 
+    // Verificar se algum dos novos campos de rodapé foi alterado
+    if (editedAboutUs !== (user.aboutUs || "")) updateRequired = true;
+    if (editedContactEmail !== (user.contactEmail || "")) updateRequired = true;
+    if (editedAddress !== (user.address || "")) updateRequired = true;
+    if (editedFacebookUrl !== (user.facebookUrl || "")) updateRequired = true;
+    if (editedInstagramUrl !== (user.instagramUrl || "")) updateRequired = true;
+    if (editedTwitterUrl !== (user.twitterUrl || "")) updateRequired = true;
+
     if (imageFile) {
       setUploadingImage(true);
       try {
@@ -175,12 +202,29 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       // 2. Opcional: Atualizar no Firestore se for um usuário comercial
       // user é garantido como não nulo aqui
       const userDocRef = doc(db, "users", user.uid);
-      const updateData: { displayName: string; photoURL?: string } = {
+      const updateData: { 
+        displayName: string; 
+        photoURL?: string; 
+        aboutUs?: string; 
+        contactEmail?: string; 
+        address?: string; 
+        facebookUrl?: string; 
+        instagramUrl?: string; 
+        twitterUrl?: string; 
+      } = {
         displayName: editedCompanyName.trim(),
       };
       if (newPhotoURL) {
         updateData.photoURL = newPhotoURL;
       }
+      // Adicionar os novos campos ao updateData se tiverem sido alterados
+      if (editedAboutUs !== (user.aboutUs || "")) updateData.aboutUs = editedAboutUs;
+      if (editedContactEmail !== (user.contactEmail || "")) updateData.contactEmail = editedContactEmail;
+      if (editedAddress !== (user.address || "")) updateData.address = editedAddress;
+      if (editedFacebookUrl !== (user.facebookUrl || "")) updateData.facebookUrl = editedFacebookUrl;
+      if (editedInstagramUrl !== (user.instagramUrl || "")) updateData.instagramUrl = editedInstagramUrl;
+      if (editedTwitterUrl !== (user.twitterUrl || "")) updateData.twitterUrl = editedTwitterUrl;
+
       await updateDoc(userDocRef, updateData);
       setFeedbackMessage("Perfil atualizado com sucesso!");
       setFeedbackType("success");
@@ -305,7 +349,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                   poll={poll} 
                   onVote={handleVote} 
                   onDelete={handleDeletePoll} 
-                  
+                  companySlug={companySlug} // Passar o slug da empresa para o PollCard
                 />
               ))}
             </div>
@@ -376,19 +420,82 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                 onChange={(e) => setEditedCompanyName(e.target.value)}
                 className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
-              <button
-                onClick={handleSaveProfile}
-                disabled={uploadingImage} // Desabilita o botão enquanto a imagem está sendo carregada
-                className={`px-4 py-2 bg-green-600 text-white font-bold rounded-lg transition duration-300 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700'}`}
-              >
-                Salvar Alterações
-              </button>
             </div>
             {feedbackMessage && feedbackType === "success" && (
               <div className="mt-2 p-3 rounded-md text-white bg-green-500">
                 {feedbackMessage}
               </div>
             )}
+
+            {/* Campos de texto para as informações do rodapé */}
+            <div className="mt-6">
+              <label htmlFor="aboutUs" className="block text-gray-400 mb-2">Sobre Nós</label>
+              <textarea
+                id="aboutUs"
+                value={editedAboutUs}
+                onChange={(e) => setEditedAboutUs(e.target.value)}
+                className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[100px]"
+                rows={4}
+              ></textarea>
+            </div>
+            <div className="mt-4">
+              <label htmlFor="contactEmail" className="block text-gray-400 mb-2">Email de Contato</label>
+              <input
+                type="email"
+                id="contactEmail"
+                value={editedContactEmail}
+                onChange={(e) => setEditedContactEmail(e.target.value)}
+                className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div className="mt-4">
+              <label htmlFor="address" className="block text-gray-400 mb-2">Endereço</label>
+              <input
+                type="text"
+                id="address"
+                value={editedAddress}
+                onChange={(e) => setEditedAddress(e.target.value)}
+                className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div className="mt-4">
+              <label className="block text-gray-400 mb-2">Redes Sociais</label>
+              <input
+                type="url"
+                placeholder="URL do Facebook"
+                value={editedFacebookUrl}
+                onChange={(e) => setEditedFacebookUrl(e.target.value)}
+                className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2"
+              />
+              <input
+                type="url"
+                placeholder="URL do Instagram"
+                value={editedInstagramUrl}
+                onChange={(e) => setEditedInstagramUrl(e.target.value)}
+                className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2"
+              />
+              <input
+                type="url"
+                placeholder="URL do Twitter"
+                value={editedTwitterUrl}
+                onChange={(e) => setEditedTwitterUrl(e.target.value)}
+                className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            {/* Botão Salvar Alterações movido para cá */}
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={handleSaveProfile}
+                disabled={uploadingImage} // Desabilita o botão enquanto a imagem está sendo carregada
+                className={`px-6 py-3 bg-green-600 text-white font-bold rounded-lg transition duration-300 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700'}`}
+              >
+                Salvar Alterações
+              </button>
+            </div>
+
+            {/* Removido: Botão "Ver Página Pública da Empresa" */}
+
           </div>
         </div>
       </div>

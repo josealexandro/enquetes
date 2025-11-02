@@ -13,6 +13,7 @@ import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateD
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 import AuthPromptCard from "./Auth/AuthPromptCard"; // Importar AuthPromptCard
 import { useAuthModal } from "@/app/context/AuthModalContext"; // Importar useAuthModal
+import slugify from "@/utils/slugify"; // Importar slugify
 
 interface PollCardProps {
   poll: Poll;
@@ -22,9 +23,10 @@ interface PollCardProps {
   rankColor?: string; // Adicionar rankColor como prop opcional
   textColorClass?: string; // Adicionar textColorClass como prop opcional
   borderColor?: string; // Adicionar borderColor como prop opcional
+  companySlug?: string; // Novo prop: slug da empresa, opcional
 }
 
-export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorClass, borderColor }: PollCardProps) {
+export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorClass, borderColor, companySlug }: PollCardProps) {
   const [votedOptionId, setVotedOptionId] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [isClient, setIsClient] = useState(false);
@@ -75,7 +77,11 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
     return () => unsubscribe();
   }, [poll.id]);
 
-  const pollShareLink = `${window.location.origin}/poll/${poll.id}`;
+  // Gerar o link de compartilhamento condicionalmente
+  const pollShareLink = 
+    companySlug && poll.isCommercial
+      ? `${window.location.origin}/empresa/${companySlug}` // Alterado para a página pública da empresa
+      : `${window.location.origin}/poll/${poll.id}`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(pollShareLink);

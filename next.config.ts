@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'firebasestorage.googleapis.com',
         port: '',
-        pathname: '/v0/b/poll-app1366.firebasestorage.app/o/**',
+        pathname: '/v0/b/poll-app1366.firebasestorage.app/o/**', // Corrigido para firebasestorage.app
       },
     ],
   },

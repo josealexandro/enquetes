@@ -28,6 +28,12 @@ export interface AuthContextType {
     accountType?: 'personal' | 'commercial';
     commercialName?: string | null; // Adicionar commercialName
     avatarUrl?: string | null; // Adicionar avatarUrl aqui
+    aboutUs?: string | null; // Novo campo para "Sobre Nós"
+    contactEmail?: string | null; // Novo campo para email de contato
+    address?: string | null; // Novo campo para endereço
+    facebookUrl?: string | null; // Novo campo para URL do Facebook
+    instagramUrl?: string | null; // Novo campo para URL do Instagram (antigo twitterUrl)
+    twitterUrl?: string | null; // Novo campo para URL do Twitter (antigo linkedinUrl)
   }) | null; // O tipo de usuário agora é o User do Firebase
   firebaseAuthUser: User | null; // Novo campo para o objeto User original do Firebase Auth
   loading: boolean;
@@ -77,6 +83,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
           accountType: (userData?.accountType as 'personal' | 'commercial') || 'personal', // Adicionar accountType do Firestore
           commercialName: (userData?.commercialName as string | null) || null, // Adicionar commercialName do Firestore
           avatarUrl: firebaseUser.photoURL || null, // Adicionar avatarUrl
+          aboutUs: (userData?.aboutUs as string | null) || null, // Adicionar campo "Sobre Nós"
+          contactEmail: (userData?.contactEmail as string | null) || null, // Adicionar campo para email de contato
+          address: (userData?.address as string | null) || null, // Adicionar campo para endereço
+          facebookUrl: (userData?.facebookUrl as string | null) || null, // Adicionar campo para URL do Facebook
+          instagramUrl: (userData?.instagramUrl as string | null) || null, // Mapear para instagramUrl
+          twitterUrl: (userData?.twitterUrl as string | null) || null, // Mapear para twitterUrl
         };
         setUser(customUser);
 

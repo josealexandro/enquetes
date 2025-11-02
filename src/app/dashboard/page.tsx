@@ -10,6 +10,7 @@ import { faBars, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { collection, query, orderBy, onSnapshot, getDocs, where } from "firebase/firestore"; // Importar funcionalidades do Firestore
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
 import { Poll } from "../types/poll"; // Importar a interface Poll
+import slugify from "@/utils/slugify"; // Importar a função slugify
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
@@ -22,6 +23,14 @@ export default function DashboardPage() {
       router.push('/');
     }
   }, [user, loading, router]);
+
+  // Adicionado useEffect para logar o href gerado
+  useEffect(() => {
+    if (user?.accountType === 'commercial' && user?.commercialName) {
+      console.log("commercialName:", user.commercialName);
+      console.log("Generated href for public page:", `/empresa/${slugify(user.commercialName)}`);
+    }
+  }, [user]); // Dependência do usuário para logar quando o usuário mudar
 
   // Hook para buscar as enquetes
   useEffect(() => {
@@ -110,6 +119,13 @@ export default function DashboardPage() {
                 <span className="mr-2">🏢</span> Perfil da Empresa\
               </a>
             </li>
+            {user?.accountType === 'commercial' && user?.commercialName && (
+              <li className="mb-2">
+                <Link href={`/empresa/${slugify(user.commercialName)}`} className="flex items-center p-2 rounded-lg hover:bg-gray-700 transition-colors duration-200">
+                  <span className="mr-2">🌐</span> Ver Página Pública
+                </Link>
+              </li>
+            )}
             <li className="mb-2">
               <a href="#" className="flex items-center p-2 rounded-lg">
                 <span className="mr-2">💳</span> Assinatura

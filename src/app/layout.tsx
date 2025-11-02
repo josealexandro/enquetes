@@ -14,11 +14,7 @@ import { faEnvelope, faSun, faMoon } from '@fortawesome/free-solid-svg-icons';
 
 library.add(faFacebookF, faTwitter, faLinkedinIn, faGithub, faEnvelope, faSun, faMoon);
 
-import Header from "./components/Header";
-import Footer from "./components/Footer";
-import { AuthProvider } from "./context/AuthContext";
-import { AuthModalProvider } from "./context/AuthModalContext"; // Importar AuthModalProvider
-import { useState } from "react"; // Importar useState
+import ClientProvidersWrapper from "./components/ClientProvidersWrapper"; // Importar o novo ClientProvidersWrapper
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -47,26 +43,14 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showSignupModal, setShowSignupModal] = useState(false);
-
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${poppins.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${inter.variable} ${poppins.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}> {/* Removido pt-16 */}
         {/* O script de tema foi movido para Header.tsx para gerenciamento centralizado */}
         
-        <AuthProvider>
-          <AuthModalProvider onOpenLogin={() => setShowLoginModal(true)} onOpenSignup={() => setShowSignupModal(true)}>
-            <Header
-              showLoginModal={showLoginModal}
-              setShowLoginModal={setShowLoginModal}
-              showSignupModal={showSignupModal}
-              setShowSignupModal={setShowSignupModal}
-            />
-            {children}
-            <Footer />
-          </AuthModalProvider>
-        </AuthProvider>
+        <ClientProvidersWrapper> {/* Usar o novo componente wrapper */}
+          {children}
+        </ClientProvidersWrapper>
       </body>
     </html>
   );
