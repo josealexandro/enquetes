@@ -11,9 +11,9 @@ import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 import { useAuthModal } from "@/app/context/AuthModalContext"; // Importar useAuthModal
 import AuthPromptCard from "@/app/components/Auth/AuthPromptCard"; // Importar AuthPromptCard
 import Image from "next/image"; // Importar Image do next/image
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'; // Importar FontAwesomeIcon
-import { faFacebookF, faTwitter, faInstagram } from '@fortawesome/free-brands-svg-icons'; // Importar ícones de redes sociais
-import { faEnvelope } from '@fortawesome/free-solid-svg-icons'; // Importar ícone de envelope
+// Removido: import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'; // Importar FontAwesomeIcon
+// Removido: import { faFacebookF, faTwitter, faInstagram } from '@fortawesome/free-brands-svg-icons'; // Importar ícones de redes sociais
+// Removido: import { faEnvelope } from '@fortawesome/free-solid-svg-icons'; // Importar ícone de envelope
 import { useCompanyFooter } from "@/app/context/CompanyFooterContext"; // Re-importar useCompanyFooter
 
 interface CompanyProfilePageProps {
@@ -118,7 +118,7 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
             }
 
             // Garantir que as opções tenham um 'id' para consistência
-            const optionsWithIds = data.options.map((opt: any) => ({
+            const optionsWithIds = data.options.map((opt: { id?: string; votes: number; text: string }) => ({
               ...opt,
               id: opt.id || Math.random().toString(36).substring(7)
             }));
@@ -150,7 +150,7 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
     };
 
     fetchCompanyAndPolls();
-  }, [slug]);
+  }, [slug, setCompanyFooterData]); // Adicionado setCompanyFooterData como dependência
 
   if (loading) {
     return <div className="flex justify-center items-center min-h-screen text-2xl text-gray-700 dark:text-gray-300">Carregando...</div>;
