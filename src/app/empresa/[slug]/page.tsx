@@ -20,7 +20,7 @@ interface CompanyProfilePageProps {
   params: Promise<{ slug: string }>; // Atualizado para Promise
 }
 
-interface CompanyData {
+export interface CompanyData {
   id: string;
   displayName: string;
   commercialName: string;
