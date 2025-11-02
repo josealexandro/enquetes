@@ -11,7 +11,6 @@ import PollCard from "./PollCard"; // Importar o PollCard
 import { Poll } from "../types/poll"; // Importar a interface Poll
 import { v4 as uuidv4 } from "uuid"; // Para gerar IDs únicos para as opções
 import Image from "next/image"; // Importar o componente Image do Next.js
-import Link from 'next/link'; // Importar o componente Link do Next.js
 import slugify from "@/utils/slugify"; // Importar a função slugify
 // Removido: import { UserInfo, User } from "firebase/auth"; // Removido: UserInfo e User não são necessários aqui
 // Removido: import { AuthContextType } from "../context/AuthContext"; // Removido: AuthContextType não é necessário ser importado diretamente para o tipo CustomUser

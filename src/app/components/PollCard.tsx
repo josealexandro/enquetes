@@ -13,7 +13,6 @@ import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateD
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 import AuthPromptCard from "./Auth/AuthPromptCard"; // Importar AuthPromptCard
 import { useAuthModal } from "@/app/context/AuthModalContext"; // Importar useAuthModal
-import slugify from "@/utils/slugify"; // Importar slugify
 
 interface PollCardProps {
   poll: Poll;
