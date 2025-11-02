@@ -7,9 +7,10 @@ import slugify from "@/utils/slugify";
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 import Link from "next/link"; // Adicionado Link
 import Image from "next/image"; // Importar Image
+import { use } from "react"; // Adicionado use
 
 interface PollDetailPageProps {
-  params: { slug: string; pollSlug: string };
+  params: Promise<{ slug: string; pollSlug: string }>;
 }
 
 interface Option {
@@ -87,7 +88,8 @@ const getPollData = async (companySlug: string, pollSlug: string): Promise<PollD
 };
 
 const PollDetailPage: React.FC<PollDetailPageProps> = ({ params }) => { // Alterado para componente cliente
-  const { slug, pollSlug } = params;
+  const unwrappedParams = use(params); // Desembrulhar params com React.use
+  const { slug, pollSlug } = unwrappedParams; // Acessar slug do objeto desembrulhado
   const { user } = useAuth(); // Obter usuário logado
   const [poll, setPoll] = useState<PollDetailData | null>(null);
   const [loadingPoll, setLoadingPoll] = useState(true);
