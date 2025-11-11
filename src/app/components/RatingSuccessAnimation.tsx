@@ -35,7 +35,7 @@ const RatingSuccessAnimation: React.FC<RatingSuccessAnimationProps> = ({ show, o
       scale: [0.5, 1, 1.2, 0.8],
       transition: {
         duration: 1.5,
-        ease: [0, 0, 0.58, 1], // Corrigido erro de tipo para framer-motion ease
+        ease: "easeOut", // Revertido para string para tentar resolver o erro de tipo
       },
     },
   };
@@ -43,26 +43,30 @@ const RatingSuccessAnimation: React.FC<RatingSuccessAnimationProps> = ({ show, o
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-40 flex justify-center items-center overflow-hidden">
-      {stars.map((_, index) => (
-        <motion.div
-          key={index}
-          variants={starVariants}
-          initial="hidden"
-          animate="visible"
-          style={{
-            position: 'absolute',
-            left: `calc(50% + ${Math.random() * 80 - 40}px)`,
-            bottom: '40%',
-            fontSize: `${18 + Math.random() * 10}px`,
-            color: 'gold',
-          }}
-          transition={{ delay: index * 0.1, ...starVariants.visible.transition }}
-        >
-          <FontAwesomeIcon icon={solidStar} />
-        </motion.div>
-      ))}
-    </div>
+    <AnimatePresence> {/* Adicionar AnimatePresence aqui */}
+      {show && (
+        <div className="fixed inset-0 pointer-events-none z-40 flex justify-center items-center overflow-hidden">
+          {stars.map((_, index) => (
+            <motion.div
+              key={index}
+              variants={starVariants}
+              initial="hidden"
+              animate="visible"
+              style={{
+                position: 'absolute',
+                left: `calc(50% + ${Math.random() * 80 - 40}px)`,
+                bottom: '40%',
+                fontSize: `${18 + Math.random() * 10}px`,
+                color: 'gold',
+              }}
+              transition={{ delay: index * 0.1, ...starVariants.visible.transition }}
+            >
+              <FontAwesomeIcon icon={solidStar} />
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </AnimatePresence>
   );
 };
 
