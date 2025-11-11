@@ -13,6 +13,8 @@ import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateD
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 import AuthPromptCard from "./Auth/AuthPromptCard"; // Importar AuthPromptCard
 import { useAuthModal } from "@/app/context/AuthModalContext"; // Importar useAuthModal
+import HeartAnimation from "@/components/HeartAnimation"; // Importar o componente de animação
+import { useRef } from "react"; // Importar useRef
 
 interface PollCardProps {
   poll: Poll;
@@ -35,6 +37,9 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
   const { user, isMasterUser } = useAuth(); // Obter o usuário logado e o status de mestre
   const [showAuthPrompt, setShowAuthPrompt] = useState(false); // Novo estado para controlar a visibilidade do AuthPromptCard
   const { openLoginModal, openSignupModal } = useAuthModal(); // Usar o contexto para abrir modais
+  const [showHeartAnimation, setShowHeartAnimation] = useState(false);
+  const [heartAnimationPosition, setHeartAnimationPosition] = useState<{ x: number; y: number } | null>(null);
+  const pollCardRef = useRef<HTMLDivElement>(null); // Referência para o card da enquete
 
   console.log("PollCard renderizado.");
   console.log("User:", user);
@@ -111,7 +116,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
     }
   };
 
-  const handleLike = async () => {
+  const handleLike = async (event?: React.MouseEvent) => {
     if (!user) {
       setShowAuthPrompt(true); // Mostrar o card de prompt de autenticação
       return;
@@ -140,6 +145,14 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
           updateData.dislikedBy = arrayRemove(user.uid);
         }
         await updateDoc(pollRef, updateData);
+        // Disparar a animação de coração se o like for um novo like
+        if (!hasLiked && event) {
+          const rect = pollCardRef.current?.getBoundingClientRect();
+          if (rect) {
+            setHeartAnimationPosition({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+            setShowHeartAnimation(true);
+          }
+        }
       }
     } catch (error) {
       console.error("Erro ao curtir/descurtir enquete:", error);
@@ -278,7 +291,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
 
   return (
     <div
-      className={`rounded-lg transition-all duration-300 p-6 mb-6 transform hover:-translate-y-1 cursor-pointer w-[90%] mx-auto
+      className={`rounded-lg transition-all duration-300 p-6 mb-6 transform hover:-translate-y-1 cursor-pointer w-[90%] mx-auto relative
         ${isExpanded
           ? poll.rank
             ? `bg-zinc-700 dark:bg-zinc-800 border-2 ${borderColor} shadow-md`
@@ -293,6 +306,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
           onCardClick(newExpandedState); // Passar o novo estado de expansão
         }
       }} // Adicionado o manipulador de clique
+      ref={pollCardRef} // Atribuir a referência ao div principal
     >
       <div className="flex items-center justify-between text-sm text-white mb-4">
         <div className="flex items-center flex-grow max-w-[calc(100%-48px)]"> {/* Ajustado max-w para dar espaço ao troféu */}
@@ -377,7 +391,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
         </div>
 
         <button
-          onClick={handleLike}
+          onClick={(e) => handleLike(e)}
           className={`p-2 rounded-full transition-colors duration-200 ${
             user && poll.likedBy?.includes(user.uid)
               ? "text-red-500 hover:text-red-600 bg-red-100 dark:bg-red-900"
@@ -411,7 +425,14 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
           </button>
         )}
       </div>
-
+      {showHeartAnimation && heartAnimationPosition && (
+        <HeartAnimation
+          isVisible={showHeartAnimation}
+          onAnimationComplete={() => setShowHeartAnimation(false)}
+          originX={heartAnimationPosition.x}
+          originY={heartAnimationPosition.y}
+        />
+      )}
       {isExpanded && isClient && (
         <>
           {votedOptionId && (

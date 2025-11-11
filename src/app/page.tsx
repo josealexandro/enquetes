@@ -11,6 +11,7 @@ import { motion } from "framer-motion";
 import { LayoutGroup, AnimatePresence } from "framer-motion"; // Importar AnimatePresence
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
 import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, getDoc, Timestamp } from "firebase/firestore"; // addDoc Removido, Adicionar Timestamp
+import { useRouter } from 'next/navigation'; // Importar useRouter
 // Removido: import LoginForm from "./components/LoginForm";
 // Removido: import SignupForm from "./components/SignupForm";
 import PollPodium from "./components/PollPodium"; // Importar PollPodium
@@ -29,12 +30,6 @@ export default function Home() {
 
   const [showPollForm, setShowPollForm] = useState(false); // Novo estado para controlar a visibilidade do formulário de enquete
   const pollFormRef = useRef<HTMLDivElement>(null); // Ref para o contêiner do formulário de enquete
-
-  const publicCarouselRef = useRef<HTMLDivElement>(null);
-  const commercialCarouselRef = useRef<HTMLDivElement>(null);
-
-  const [isPublicCarouselPaused, setIsPublicCarouselPaused] = useState(false);
-  const [isCommercialCarouselPaused, setIsCommercialCarouselPaused] = useState(false);
 
   // useEffect para carregar enquetes do Firestore em tempo real
   useEffect(() => {
@@ -178,38 +173,6 @@ export default function Home() {
     return sortedPolls;
   }, [commercialPolls, activeFilter, user]);
 
-  // Efeito para rolagem automática das enquetes públicas
-  useEffect(() => {
-    if (!publicCarouselRef.current || filteredPublicPolls.length === 0 || isPublicCarouselPaused) return;
-
-    const interval = setInterval(() => {
-      // Removido: setCurrentPublicPollIndex e lógica de rolagem automática
-      // Esta lógica agora está sendo gerenciada fora de page.tsx ou removida conforme necessário.
-      // Para reintroduzir a rolagem, a lógica de index e scroll precisaria ser implementada com o novo design.
-
-      // Temporariamente removendo a lógica de rolagem para resolver o erro.
-      // Se a rolagem automática for necessária, precisará ser reconstruída usando useRef e useEffect.
-    }, 5000); // Rola a cada 5 segundos
-
-    return () => clearInterval(interval);
-  }, [filteredPublicPolls, isPublicCarouselPaused]);
-
-  // Efeito para rolagem automática das enquetes de comerciantes
-  useEffect(() => {
-    if (!commercialCarouselRef.current || filteredCommercialPolls.length === 0 || isCommercialCarouselPaused) return;
-
-    const interval = setInterval(() => {
-      // Removido: setCurrentCommercialPollIndex e lógica de rolagem automática
-      // Esta lógica agora está sendo gerenciada fora de page.tsx ou removida conforme necessário.
-      // Para reintroduzir a rolagem, a lógica de index e scroll precisaria ser implementada com o novo design.
-
-      // Temporariamente removendo a lógica de rolagem para resolver o erro.
-      // Se a rolagem automática for necessária, precisará ser reconstruída usando useRef e useEffect.
-    }, 5000); // Rola a cada 5 segundos
-
-    return () => clearInterval(interval);
-  }, [filteredCommercialPolls, isCommercialCarouselPaused]);
-
   // Efeito para detectar cliques fora do formulário de enquete
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -228,14 +191,6 @@ export default function Home() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showPollForm]);
-
-  const handlePublicCardClick = (isCardExpanded: boolean) => {
-    setIsPublicCarouselPaused(isCardExpanded);
-  };
-
-  const handleCommercialCardClick = (isCardExpanded: boolean) => {
-    setIsCommercialCarouselPaused(isCardExpanded);
-  };
 
   const handlePollCreated = () => {
     setActiveFilter("mine");
@@ -370,9 +325,11 @@ export default function Home() {
     show: { opacity: 1, y: 0 },
   };
 
+  const router = useRouter(); // Inicializar o router
+
   return (
     <main className="min-h-screen w-full flex flex-col items-center px-4 py-24 dark:bg-zinc-900 pt-20">
-      <div className="max-w-3xl w-full text-center mb-12 mt-10">
+      <div className="max-w-3xl w-full text-center mb-6 mt-4"> {/* Ajustado mb-12 para mb-6 e mt-10 para mt-4 */}
         <h1 className="text-5xl md:text-6xl font-extrabold text-zinc-900 dark:text-white leading-tight animate-fade-in">
           Bem-vindo ao Poll App!
         </h1>
@@ -386,15 +343,6 @@ export default function Home() {
           </div>
         )}
 
-        <div className="text-center mt-4">
-        <a
-          href="/enquetes"
-          className="inline-block px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
-        >
-          Ver todas as enquetes
-        </a>
-      </div>
-
         <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
           Crie enquetes e envie para outras pessoas.
         </p>
@@ -403,31 +351,32 @@ export default function Home() {
       {/* Novo Pódio de Enquetes no Topo */}
       {podiumPolls.length > 0 && (
         <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl flex flex-col items-center gap-8 px-4">
-          <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Mais Votadas</h2>
+          <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-6 mb-6">Mais Votadas</h2> {/* Ajustado mt-12 para mt-6 */}
           <PollPodium 
             polls={podiumPolls}
             onVote={handleVote}
             onDelete={handleDeletePoll}
-            onCardClick={handlePublicCardClick} 
           />
         </div>
       )}
 
-      <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl flex flex-col items-center gap-8 px-4">
+      <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-7xl px-4 mt-4"> {/* Restaurado lg:max-w-7xl para desapertar os cards */}
         {!isClient ? (
           <p className="text-zinc-600 dark:text-zinc-400">Carregando conteúdo...</p>
         ) : (
           <>
             {/* Botão para criar enquete */}
             {!showPollForm && (
-              <motion.button
-                onClick={() => setShowPollForm(true)}
-                className="w-full px-8 py-4 rounded-full bg-indigo-600 text-white text-xl font-bold shadow-lg hover:bg-indigo-700 transition-colors duration-300 transform hover:scale-105 mb-8"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                Crie sua enquete!
-              </motion.button>
+              <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl flex flex-col items-center gap-8 px-4 mx-auto"> {/* Adicionado mx-auto aqui */}
+                <motion.button
+                  onClick={() => setShowPollForm(true)}
+                  className="w-full px-8 py-4 rounded-full bg-indigo-600 text-white text-xl font-bold shadow-lg hover:bg-indigo-700 transition-colors duration-300 transform hover:scale-105 mb-8" // Botão preenche o novo pai, sem max-w e mx-auto
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Crie sua enquete!
+                </motion.button>
+              </div>
             )}
 
             {/* Renderizar PollForm condicionalmente */}
@@ -440,14 +389,14 @@ export default function Home() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.3 }}
-                  className="w-full"
+                  className="w-full mb-8"
                 >
                   <PollForm onPollCreated={() => { handlePollCreated(); setShowPollForm(false); }} />
                 </motion.div>
               </AnimatePresence>
             )}
 
-            <div className="flex space-x-4 mb-8">
+            <div className="flex space-x-4 mb-8 justify-center"> {/* Centralizar botões de filtro */}
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -472,114 +421,59 @@ export default function Home() {
               >
                 Minhas
               </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className={`ml-4 px-4 py-2 rounded-full text-sm font-medium transition-colors duration-300 bg-indigo-600 text-white hover:bg-indigo-700`}
+                onClick={() => router.push('/enquetes')}
+              >
+                Ver Todas as Enquetes
+              </motion.button>
             </div>
 
-            {/* Seção de Enquetes Públicas */}
-            <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Outras Enquetes Públicas</h2>
-            <div className="relative w-full">
-              {loadingPolls ? (
-                <p className="text-zinc-600 dark:text-zinc-400">Carregando enquetes públicas...</p>
-              ) : otherPublicPolls.length === 0 ? (
-                <p className="text-zinc-600 dark:text-zinc-400">Nenhuma outra enquete pública encontrada.</p>
-              ) : (
-                <div className="sm:mx-12"> {/* Novo wrapper para o carrossel, criando espaço para as setas */}
-                  <motion.div
-                    ref={publicCarouselRef}
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="show"
-                    className="w-full flex overflow-x-auto snap-x snap-mandatory gap-8 scrollbar-hide"
-                  >
-                    <LayoutGroup>
-                      {otherPublicPolls.map((poll) => (
-                        <motion.div key={poll.id} variants={itemVariants} className="w-[90%] mx-auto flex-shrink-0 snap-center md:w-full md:min-w-[320px] md:max-w-[360px]">
-                          <PollCard 
-                            poll={poll} 
-                            onVote={handleVote} 
-                            onDelete={handleDeletePoll} 
-                            onCardClick={handlePublicCardClick} 
-                            
-                          />
-                        </motion.div>
-                      ))}
-                    </LayoutGroup>
-                  </motion.div>
-                </div>
-              )}
-              <button
-                className="absolute left-4 top-1/2 -translate-y-1/2 bg-zinc-800 bg-opacity-50 text-white p-2 rounded-full z-10"
-                onClick={() => {
-                  if (publicCarouselRef.current) {
-                    publicCarouselRef.current.scrollBy({ left: -300, behavior: "smooth" });
-                  }
-                }}
-              >
-                &#9664;
-              </button>
-              <button
-                className="absolute right-4 top-1/2 -translate-y-1/2 bg-zinc-800 bg-opacity-50 text-white p-2 rounded-full z-10"
-                onClick={() => {
-                  if (publicCarouselRef.current) {
-                    publicCarouselRef.current.scrollBy({ left: 300, behavior: "smooth" });
-                  }
-                }}
-              >
-                &#9654;
-              </button>
-            </div>
+            {/* Novo layout de duas colunas para enquetes */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full mt-8">
+              {/* Coluna de Enquetes Públicas */}
+              <div>
+                <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mb-6 text-center">Enquetes Públicas</h2>
+                {loadingPolls ? (
+                  <p className="text-zinc-600 dark:text-zinc-400 text-center">Carregando enquetes públicas...</p>
+                ) : otherPublicPolls.length === 0 ? (
+                  <p className="text-zinc-600 dark:text-zinc-400 text-center">Nenhuma outra enquete pública encontrada.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {otherPublicPolls.slice(0, 8).map((poll) => (
+                      <PollCard
+                        key={poll.id}
+                        poll={poll}
+                        onVote={handleVote}
+                        onDelete={handleDeletePoll}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
 
-            {/* Seção de Enquetes de Comerciantes */}
-            <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-12 mb-6">Enquetes Comerciais</h2>
-            <div className="relative w-full">
-              {loadingPolls ? (
-                <p className="text-zinc-600 dark:text-zinc-400">Carregando enquetes de comerciantes...</p>
-              ) : filteredCommercialPolls.length === 0 ? (
-                <p className="text-zinc-600 dark:text-zinc-400">Nenhuma enquete de comerciante encontrada.</p>
-              ) : (
-                <div className="sm:mx-12"> {/* Novo wrapper para o carrossel, criando espaço para as setas */}
-                  <motion.div
-                    ref={commercialCarouselRef}
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="show"
-                    className="w-full flex overflow-x-auto snap-x snap-mandatory gap-8 scrollbar-hide"
-                  >
-                    <LayoutGroup>
-                      {filteredCommercialPolls.map((poll) => (
-                        <motion.div key={poll.id} variants={itemVariants} className="w-[90%] mx-auto flex-shrink-0 snap-center md:w-full md:min-w-[320px] md:max-w-[360px]">
-                          <PollCard 
-                            poll={poll} 
-                            onVote={handleVote} 
-                            onDelete={handleDeletePoll} 
-                            onCardClick={handleCommercialCardClick} 
-                            
-                          />
-                        </motion.div>
-                      ))}
-                    </LayoutGroup>
-                  </motion.div>
-                </div>
-              )}
-              <button
-                className="absolute left-4 top-1/2 -translate-y-1/2 bg-zinc-800 bg-opacity-50 text-white p-2 rounded-full z-10"
-                onClick={() => {
-                  if (commercialCarouselRef.current) {
-                    commercialCarouselRef.current.scrollBy({ left: -300, behavior: "smooth" });
-                  }
-                }}
-              >
-                &#9664;
-              </button>
-              <button
-                className="absolute right-4 top-1/2 -translate-y-1/2 bg-zinc-800 bg-opacity-50 text-white p-2 rounded-full z-10"
-                onClick={() => {
-                  if (commercialCarouselRef.current) {
-                    commercialCarouselRef.current.scrollBy({ left: 300, behavior: "smooth" });
-                  }
-                }}
-              >
-                &#9654;
-              </button>
+              {/* Coluna de Enquetes Comerciais */}
+              <div>
+                <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mb-6 text-center">Enquetes Comerciais</h2>
+                {loadingPolls ? (
+                  <p className="text-zinc-600 dark:text-zinc-400 text-center">Carregando enquetes comerciais...</p>
+                ) : filteredCommercialPolls.length === 0 ? (
+                  <p className="text-zinc-600 dark:text-zinc-400 text-center">Nenhuma enquete comercial encontrada.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredCommercialPolls.slice(0, 8).map((poll) => (
+                      <PollCard
+                        key={poll.id}
+                        poll={poll}
+                        onVote={handleVote}
+                        onDelete={handleDeletePoll}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}

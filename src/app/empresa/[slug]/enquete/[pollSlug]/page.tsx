@@ -108,6 +108,7 @@ const PollDetailPage: React.FC<PollDetailPageProps> = ({ params }) => { // Alter
   }, [slug, pollSlug]);
 
   const handleVote = async (optionId: string) => {
+    console.log("handleVote chamado para optionId:", optionId); // Novo log no início
     if (!user) {
       setFeedbackMessage("Você precisa estar logado para votar.");
       setFeedbackType("error");
@@ -150,6 +151,7 @@ const PollDetailPage: React.FC<PollDetailPageProps> = ({ params }) => { // Alter
           votedBy: updatedVotedBy,
         };
       });
+      // Disparar a animação de coração na posição do clique
 
       setFeedbackMessage("Voto registrado com sucesso!");
       setFeedbackType("success");
@@ -201,7 +203,7 @@ const PollDetailPage: React.FC<PollDetailPageProps> = ({ params }) => { // Alter
               key={option.id}
               onClick={() => handleVote(option.id)}
               disabled={!canVote} // Desabilita o botão se não puder votar
-              className={`flex justify-between items-center bg-gray-100 p-4 rounded-md shadow-sm w-full text-left
+              className={`flex justify-between items-center bg-gray-100 p-4 rounded-md shadow-sm w-full text-left relative
                 ${canVote ? 'hover:bg-gray-200 cursor-pointer' : 'cursor-not-allowed opacity-70'}
                 ${hasUserVoted && (poll.votedBy?.includes(user?.uid || '') && !poll.isCommercial) ? 'bg-blue-100 border-blue-500 border' : ''} /* Estilo para opção votada (não comercial) */
                 ${hasUserVoted && poll.isCommercial && poll.votedBy?.includes(user?.uid || '') ? 'bg-green-100 border-green-500 border' : ''} /* Estilo para opção votada (comercial) */

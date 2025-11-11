@@ -1,7 +1,7 @@
 "use client";
 
 import { Geist, Geist_Mono } from "next/font/google";
-import { Poppins, Inter } from "next/font/google";
+import { Poppins, Inter, Permanent_Marker } from "next/font/google"; // Adicionado Permanent_Marker
 import "./globals.css";
 
 import { config, library } from '@fortawesome/fontawesome-svg-core';
@@ -38,6 +38,13 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+// Definir a fonte Permanent Marker
+const permanentMarker = Permanent_Marker({
+  subsets: ["latin"],
+  weight: ["400"], // Permanent Marker geralmente tem apenas um peso
+  variable: "--font-permanent-marker",
+});
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -45,7 +52,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${poppins.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}> {/* Removido pt-16 */}
+      <body className={`${inter.variable} ${poppins.variable} ${geistSans.variable} ${geistMono.variable} ${permanentMarker.variable} antialiased`}> {/* Adicionado permanentMarker.variable */}
         {/* O script de tema foi movido para Header.tsx para gerenciamento centralizado */}
         
         <ClientProvidersWrapper> {/* Usar o novo componente wrapper */}
