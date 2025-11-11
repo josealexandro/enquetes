@@ -35,7 +35,7 @@ const RatingSuccessAnimation: React.FC<RatingSuccessAnimationProps> = ({ show, o
       scale: [0.5, 1, 1.2, 0.8],
       transition: {
         duration: 1.5,
-        ease: "easeOut",
+        ease: [0, 0, 0.58, 1], // Corrigido erro de tipo para framer-motion ease
       },
     },
   };

@@ -6,7 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faStar as solidStar } from '@fortawesome/free-solid-svg-icons';
 import { faStar as regularStar } from '@fortawesome/free-regular-svg-icons';
 import { db } from '@/lib/firebase';
-import { doc, collection, query, where, getDocs, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/app/context/AuthContext';
 import { motion } from 'framer-motion';
 

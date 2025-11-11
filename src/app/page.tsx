@@ -8,7 +8,7 @@ import { Poll, PollOption } from "./types/poll"; // Importar PollOption aqui
 import { useState, useMemo, useEffect, useRef, useCallback } from "react"; // Adicionar useEffect
 import { useAuth } from "./context/AuthContext";
 import { motion } from "framer-motion";
-import { LayoutGroup, AnimatePresence } from "framer-motion"; // Importar AnimatePresence
+import { AnimatePresence } from "framer-motion"; // Importar AnimatePresence
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
 import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, getDoc, Timestamp } from "firebase/firestore"; // addDoc Removido, Adicionar Timestamp
 import { useRouter } from 'next/navigation'; // Importar useRouter
@@ -308,21 +308,6 @@ export default function Home() {
       setDeleteFeedbackType("error");
       setTimeout(() => setDeleteFeedbackMessage(null), 3000);
     }
-  };
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 },
   };
 
   const router = useRouter(); // Inicializar o router
