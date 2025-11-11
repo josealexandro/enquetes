@@ -381,7 +381,7 @@ export default function Home() {
               </AnimatePresence>
             )}
 
-            <div className="flex space-x-4 mb-8 justify-center"> {/* Centralizar botões de filtro */}
+            <div className="flex flex-wrap space-x-2 sm:space-x-4 gap-y-4 mb-8 justify-center"> {/* Centralizar botões de filtro e permitir quebra de linha */}
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -409,7 +409,7 @@ export default function Home() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className={`ml-4 px-4 py-2 rounded-full text-sm font-medium transition-colors duration-300 bg-indigo-600 text-white hover:bg-indigo-700`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors duration-300 bg-indigo-600 text-white hover:bg-indigo-700`}
                 onClick={() => router.push('/enquetes')}
               >
                 Ver Todas as Enquetes
