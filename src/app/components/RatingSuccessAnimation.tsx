@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Transition } from 'framer-motion'; // Importar Transition
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faStar as solidStar } from '@fortawesome/free-solid-svg-icons';
 
@@ -11,6 +11,11 @@ interface RatingSuccessAnimationProps {
   onAnimationComplete: () => void;
   starsCount?: number;
 }
+
+const starDefaultTransition: Transition = {
+  duration: 1.5,
+  ease: "easeOut",
+}; 
 
 const RatingSuccessAnimation: React.FC<RatingSuccessAnimationProps> = ({ show, onAnimationComplete, starsCount = 5 }) => {
   const [stars, setStars] = useState<number[]>([]);
@@ -33,10 +38,6 @@ const RatingSuccessAnimation: React.FC<RatingSuccessAnimationProps> = ({ show, o
       opacity: [0, 1, 0.8, 0],
       y: [0, -100, -200, -300], // Sobe mais alto
       scale: [0.5, 1, 1.2, 0.8],
-      transition: {
-        duration: 1.5,
-        ease: "easeOut", // Revertido para string para tentar resolver o erro de tipo
-      },
     },
   };
 
@@ -59,7 +60,7 @@ const RatingSuccessAnimation: React.FC<RatingSuccessAnimationProps> = ({ show, o
                 fontSize: `${18 + Math.random() * 10}px`,
                 color: 'gold',
               }}
-              transition={{ delay: index * 0.1, ...starVariants.visible.transition }}
+              transition={{ delay: index * 0.1, ...starDefaultTransition }}
             >
               <FontAwesomeIcon icon={solidStar} />
             </motion.div>
