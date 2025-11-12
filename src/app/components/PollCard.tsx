@@ -15,6 +15,8 @@ import AuthPromptCard from "./Auth/AuthPromptCard"; // Importar AuthPromptCard
 import { useAuthModal } from "@/app/context/AuthModalContext"; // Importar useAuthModal
 import HeartAnimation from "@/components/HeartAnimation"; // Importar o componente de animação
 import { useRef } from "react"; // Importar useRef
+import { useRouter } from 'next/navigation'; // Importar useRouter
+import { getContrastTextColor } from "@/utils/colorUtils"; // Importar a função utilitária
 
 interface PollCardProps {
   poll: Poll;
@@ -25,9 +27,11 @@ interface PollCardProps {
   textColorClass?: string; // Adicionar textColorClass como prop opcional
   borderColor?: string; // Adicionar borderColor como prop opcional
   companySlug?: string; // Novo prop: slug da empresa, opcional
+  enableCompanyLink?: boolean; // Novo prop: Habilita o link da empresa
+  companyThemeColor?: string; // Novo prop: Cor do tema da empresa
 }
 
-export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorClass, borderColor, companySlug }: PollCardProps) {
+export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorClass, borderColor, companySlug, enableCompanyLink, companyThemeColor }: PollCardProps) {
   const [votedOptionId, setVotedOptionId] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [isClient, setIsClient] = useState(false);
@@ -40,6 +44,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
   const [showHeartAnimation, setShowHeartAnimation] = useState(false);
   const [heartAnimationPosition, setHeartAnimationPosition] = useState<{ x: number; y: number } | null>(null);
   const pollCardRef = useRef<HTMLDivElement>(null); // Referência para o card da enquete
+  const router = useRouter(); // Usar o useRouter para navegação
 
   console.log("PollCard renderizado.");
   console.log("User:", user);
@@ -294,11 +299,12 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
       className={`rounded-lg transition-all duration-300 p-6 mb-6 transform hover:-translate-y-1 cursor-pointer w-[90%] mx-auto relative
         ${isExpanded
           ? poll.rank
-            ? `bg-zinc-700 dark:bg-zinc-800 border-2 ${borderColor} shadow-md`
-            : `bg-zinc-800 border border-transparent shadow-md` // Para cards não ranqueados abertos: mudei dark:bg-zinc-800 para bg-zinc-800 para um cinza mais claro
-          : `${rankColor ? rankColor : "bg-zinc-800"} border border-transparent hover:shadow-xl` // Para cards fechados: se não ranqueado, use bg-zinc-800
+            ? `bg-zinc-700 dark:bg-zinc-800 border-2 ${borderColor} shadow-md` // Ranked, expanded: dark background with colored border
+            : `bg-zinc-800 border border-transparent shadow-md` // Not ranked, expanded: default dark background
+          : `${poll.rank ? rankColor : 'bg-zinc-800'} border border-transparent hover:shadow-xl` // Not expanded: if ranked use rank background, otherwise default dark background
         }
       `}
+      style={{ backgroundColor: (poll.isCommercial && companyThemeColor && !poll.rank) ? companyThemeColor : undefined }}
       onClick={() => {
         const newExpandedState = !isExpanded; // Calcular o novo estado antes de definir
         setIsExpanded(newExpandedState);
@@ -317,7 +323,22 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
             height={32}
             className="w-8 h-8 rounded-full mr-2"
           />
-          <span className={`overflow-hidden text-ellipsis whitespace-nowrap ${isExpanded ? "text-white" : textColorClass}`}> {/* Aplicar textColorClass */}
+          <span 
+            className={`overflow-hidden text-ellipsis whitespace-nowrap
+              ${poll.rank
+                ? "text-white" // If ranked, force white text for creator name
+                : (poll.isCommercial && companyThemeColor)
+                  ? getContrastTextColor(companyThemeColor) // Use a função para cor do tema
+                  : (isExpanded ? "text-white" : textColorClass) // Otherwise, default logic
+              }
+            `}
+            onClick={(e) => {
+              e.stopPropagation(); // Evita que o clique no nome do criador expanda/recolha o card
+              if (enableCompanyLink && poll.isCommercial && companySlug) {
+                router.push(`/empresa/${companySlug}`);
+              }
+            }}
+          > {/* Aplicar textColorClass */}
             {poll.creator.name}
           </span>
         </div>
@@ -353,7 +374,11 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
         )}
       </div>
 
-      <h2 className={`text-2xl font-semibold max-w-full break-words overflow-hidden mb-4 line-clamp-2 ${isExpanded ? "text-white" : textColorClass}`}> {/* Aplicar textColorClass */}
+      <h2 className={`text-2xl font-semibold max-w-full break-words overflow-hidden mb-4 line-clamp-2 
+        ${(poll.isCommercial && companyThemeColor && !poll.rank)
+          ? getContrastTextColor(companyThemeColor) // Use a função para cor do tema para o título
+          : (isExpanded ? "text-white" : textColorClass)}
+      `}> {/* Aplicar textColorClass */}
         {poll.title}
       </h2>
 
@@ -453,24 +478,37 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
                         handleVoteClick(option.id); 
                       }}
                       disabled={!!votedOptionId} // Desabilitar se já votou localmente
-                      className={`text-left font-medium transition-colors duration-200 ${
-                        votedOptionId === option.id
+                      className={`text-left font-medium transition-colors duration-200
+                        ${votedOptionId === option.id
                           ? "text-blue-600 dark:text-blue-400"
                           : votedOptionId
-                          ? "text-zinc-400"
-                          : isExpanded ? "text-white" : textColorClass
-                      }`}
+                            ? "text-zinc-400"
+                            : (poll.rank
+                                ? "text-white" // If ranked, force white text for options
+                                : (poll.isCommercial && companyThemeColor)
+                                  ? getContrastTextColor(companyThemeColor) // Use a função para cor do tema
+                                  : (isExpanded ? "text-white" : textColorClass) // Otherwise, default logic
+                              )
+                        }`
+                      }
                     >
                       {option.text}
                     </motion.button>
-                    <span key={option.votes} className={`text-sm animate-pulse-once ${isExpanded ? "text-white" : textColorClass}`}> {/* Aplicar textColorClass */}
+                    <span key={option.votes} className={`text-sm animate-pulse-once
+                      ${poll.rank
+                        ? "text-white" // If ranked, force white text for vote count
+                        : (poll.isCommercial && companyThemeColor)
+                          ? getContrastTextColor(companyThemeColor) // Use a função para cor do tema
+                          : (isExpanded ? "text-white" : textColorClass) // Otherwise, default logic
+                      }`
+                    }>
                       {option.votes} votos ({percent}%)
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 dark:bg-zinc-700 h-2 rounded">
                     <div
-                      className="bg-blue-500 h-2 rounded transition-all duration-500 ease-out"
-                      style={{ width: `${percent}%` }}
+                      className="h-2 rounded transition-all duration-500 ease-out"
+                      style={{ width: `${percent}%`, backgroundColor: poll.rank ? "#3b82f6" : ((poll.isCommercial && companyThemeColor && !poll.rank) ? companyThemeColor : "#3b82f6") }}
                     />
                   </div>
                 </li>

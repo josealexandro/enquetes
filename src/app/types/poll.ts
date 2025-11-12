@@ -24,6 +24,8 @@ export interface Poll {
     name: string;
     avatarUrl: string;
     id: string; // Adicionar o ID do criador aqui
+    commercialName?: string; // Adicionar commercialName aqui
+    themeColor?: string; // Novo campo para a cor do tema
   };
   createdAt: Timestamp; // Timestamp para ordenação por recência
   category: string;

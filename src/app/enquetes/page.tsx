@@ -8,6 +8,7 @@ import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, wher
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
 import PollPodium from "../components/PollPodium"; // Importar PollPodium
+import slugify from "@/utils/slugify"; // Importar a função slugify
 
 export default function EnquetesPage() {
   const [polls, setPolls] = useState<Poll[]>([]);
@@ -35,6 +36,8 @@ export default function EnquetesPage() {
 
         let creatorName = "Usuário Desconhecido";
         let creatorAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"; // Default Gravatar
+        let creatorCommercialName: string | undefined = undefined; // Novo campo para commercialName
+        let creatorThemeColor: string | undefined = undefined; // Novo campo para themeColor
 
         if (creatorId) {
           const userDocRef = doc(db, "users", creatorId);
@@ -43,6 +46,8 @@ export default function EnquetesPage() {
             const userData = userDocSnap.data();
             creatorName = userData.name || userData.displayName || "Usuário";
             creatorAvatarUrl = userData.avatarUrl || "https://www.gravatar.com/avatar/?d=mp";
+            creatorCommercialName = userData.commercialName || undefined; // Obter commercialName
+            creatorThemeColor = userData.themeColor || undefined; // Obter themeColor
           }
         }
 
@@ -65,6 +70,8 @@ export default function EnquetesPage() {
             id: creatorId,
             name: creatorName,
             avatarUrl: creatorAvatarUrl,
+            commercialName: creatorCommercialName, // Adicionar commercialName
+            themeColor: creatorThemeColor, // Adicionar themeColor
           },
           commentCount: commentCount, // Adicionar a contagem de comentários
         } as Poll;
@@ -197,7 +204,14 @@ export default function EnquetesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-8"> {/* Adicionado mt-8 para espaçamento */}
             {otherPolls.map((poll) => (
               <motion.div key={poll.id} className="w-full">
-                <PollCard poll={poll} onVote={handleVote} onDelete={handleDeletePoll} />
+                <PollCard 
+                  poll={poll} 
+                  onVote={handleVote} 
+                  onDelete={handleDeletePoll} 
+                  companySlug={poll.isCommercial && poll.creator.commercialName ? slugify(poll.creator.commercialName) : slugify(poll.creator.name)} // Passar slug apenas para enquetes comerciais
+                  enableCompanyLink={poll.isCommercial} // Habilitar link apenas para enquetes comerciais
+                  companyThemeColor={poll.isCommercial ? poll.creator.themeColor : undefined} // Passar themeColor apenas para enquetes comerciais
+                />
               </motion.div>
             ))}
           </div>

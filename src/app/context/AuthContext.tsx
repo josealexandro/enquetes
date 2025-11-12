@@ -20,6 +20,7 @@ interface UserDataToSave {
   accountType: 'personal' | 'commercial';
   commercialName?: string | null; // Adicionar commercialName
   createdAt: Timestamp | FieldValue; // serverTimestamp é um tipo complexo, mas por enquanto 'any' é aceitável aqui se for apenas para o tipo do FireStore
+  themeColor?: string | null; // Adicionar themeColor
 }
 
 export interface AuthContextType {
@@ -34,6 +35,7 @@ export interface AuthContextType {
     facebookUrl?: string | null; // Novo campo para URL do Facebook
     instagramUrl?: string | null; // Novo campo para URL do Instagram (antigo twitterUrl)
     twitterUrl?: string | null; // Novo campo para URL do Twitter (antigo linkedinUrl)
+    themeColor?: string | null; // Adicionar themeColor
   }) | null; // O tipo de usuário agora é o User do Firebase
   firebaseAuthUser: User | null; // Novo campo para o objeto User original do Firebase Auth
   loading: boolean;
@@ -59,6 +61,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     accountType?: 'personal' | 'commercial';
     commercialName?: string | null; // Adicionar commercialName
     avatarUrl?: string | null;
+    aboutUs?: string | null; // Novo campo para "Sobre Nós"
+    contactEmail?: string | null; // Novo campo para email de contato
+    address?: string | null; // Novo campo para endereço
+    facebookUrl?: string | null; // Novo campo para URL do Facebook
+    instagramUrl?: string | null; // Mapear para instagramUrl
+    twitterUrl?: string | null; // Mapear para twitterUrl
+    themeColor?: string | null; // Adicionar themeColor
   }) | null>(null);
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<User | null>(null); // Novo estado
   const [loading, setLoading] = useState(true);
@@ -89,6 +98,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           facebookUrl: (userData?.facebookUrl as string | null) || null, // Adicionar campo para URL do Facebook
           instagramUrl: (userData?.instagramUrl as string | null) || null, // Mapear para instagramUrl
           twitterUrl: (userData?.twitterUrl as string | null) || null, // Mapear para twitterUrl
+          themeColor: (userData?.themeColor as string | null) || null, // Adicionar themeColor do Firestore
         };
         setUser(customUser);
 
@@ -138,6 +148,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         accountType: accountType,
         ...(commercialName && { commercialName: commercialName }), // Adicionar commercialName condicionalmente
         createdAt: serverTimestamp(), // Adicionar timestamp de criação
+        themeColor: null, // Inicialmente nulo, pois não há um campo para tema na interface de cadastro
       };
 
       // Salvar o displayName e accountType no Firestore

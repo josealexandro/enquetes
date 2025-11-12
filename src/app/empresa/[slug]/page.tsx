@@ -36,6 +36,7 @@ export interface CompanyData {
   facebookUrl?: string;
   instagramUrl?: string; // Antigo twitterUrl
   twitterUrl?: string; // Antigo linkedinUrl
+  themeColor?: string; // Novo campo para a cor do tema da empresa
 }
 
 // Alterado para usar a interface Poll completa
@@ -62,6 +63,7 @@ const getCompanyData = async (slug: string): Promise<CompanyData | null> => {
           facebookUrl: data.facebookUrl || undefined,
           instagramUrl: data.instagramUrl || undefined, // Mapeia diretamente para instagramUrl
           twitterUrl: data.twitterUrl || undefined,   // Mapeia diretamente para twitterUrl
+          themeColor: data.themeColor || undefined, // Obter themeColor
         };
       }
     });
@@ -131,6 +133,8 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
 
             let creatorName = "Usuário Desconhecido";
             let creatorAvatarUrl = "https://www.gravatar.com/avatar/?d=mp";
+            let creatorCommercialName: string | undefined = undefined; // Adicionar para consistência
+            let creatorThemeColor: string | undefined = undefined; // Novo campo para themeColor
 
             if (creatorId) {
               const userDocRef = doc(db, "users", creatorId);
@@ -139,6 +143,8 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
                 const userData = userDocSnap.data();
                 creatorName = userData.name || userData.displayName || "Usuário";
                 creatorAvatarUrl = userData.avatarUrl || "https://www.gravatar.com/avatar/?d=mp";
+                creatorCommercialName = userData.commercialName || undefined; // Obter commercialName
+                creatorThemeColor = userData.themeColor || undefined; // Obter themeColor
               }
             }
 
@@ -156,6 +162,8 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
                 id: creatorId,
                 name: creatorName,
                 avatarUrl: creatorAvatarUrl,
+                commercialName: creatorCommercialName, // Adicionar commercialName
+                themeColor: creatorThemeColor, // Adicionar themeColor
               },
             } as Poll;
           });
@@ -338,6 +346,7 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
               onVote={handleVote}
               onDelete={handleDeletePoll}
               companySlug={slug}
+              companyThemeColor={company.themeColor || poll.creator.themeColor} // Passar a cor do tema da empresa
             />
           ))}
         </div>

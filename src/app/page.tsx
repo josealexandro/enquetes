@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation'; // Importar useRouter
 // Removido: import LoginForm from "./components/LoginForm";
 // Removido: import SignupForm from "./components/SignupForm";
 import PollPodium from "./components/PollPodium"; // Importar PollPodium
+import slugify from "@/utils/slugify"; // Importar a função slugify
 
 export default function Home() {
   const [polls, setPolls] = useState<Poll[]>([]); // Mudar para useState
@@ -46,6 +47,8 @@ export default function Home() {
 
         let creatorName = "Usuário Desconhecido";
         let creatorAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"; // Default Gravatar
+        let creatorCommercialName: string | undefined = undefined; // Novo campo para commercialName
+        let creatorThemeColor: string | undefined = undefined; // Novo campo para themeColor
 
         if (creatorId) {
           const userDocRef = doc(db, "users", creatorId);
@@ -54,6 +57,8 @@ export default function Home() {
             const userData = userDocSnap.data();
             creatorName = userData.name || userData.displayName || "Usuário";
             creatorAvatarUrl = userData.avatarUrl || "https://www.gravatar.com/avatar/?d=mp";
+            creatorCommercialName = userData.commercialName || undefined; // Obter commercialName
+            creatorThemeColor = userData.themeColor || undefined; // Obter themeColor
           }
         }
         
@@ -81,6 +86,8 @@ export default function Home() {
             id: creatorId,
             name: creatorName,
             avatarUrl: creatorAvatarUrl,
+            commercialName: creatorCommercialName, // Adicionar commercialName
+            themeColor: creatorThemeColor, // Adicionar themeColor
           },
           isCommercial: data.isCommercial || false,
           createdAt: pollCreatedAt, // Usar o Timestamp garantido
@@ -433,6 +440,8 @@ export default function Home() {
                         poll={poll}
                         onVote={handleVote}
                         onDelete={handleDeletePoll}
+                        companySlug={poll.isCommercial && poll.creator.commercialName ? slugify(poll.creator.commercialName) : slugify(poll.creator.name)} // Usar commercialName para enquetes comerciais
+                        enableCompanyLink={poll.isCommercial} // Habilitar link apenas para enquetes comerciais
                       />
                     ))}
                   </div>
@@ -454,6 +463,9 @@ export default function Home() {
                         poll={poll}
                         onVote={handleVote}
                         onDelete={handleDeletePoll}
+                        companySlug={poll.isCommercial && poll.creator.commercialName ? slugify(poll.creator.commercialName) : slugify(poll.creator.name)} // Usar commercialName para enquetes comerciais
+                        enableCompanyLink={poll.isCommercial} // Habilitar link apenas para enquetes comerciais
+                        companyThemeColor={poll.isCommercial ? poll.creator.themeColor : undefined} // Passar themeColor apenas para enquetes comerciais
                       />
                     ))}
                   </div>

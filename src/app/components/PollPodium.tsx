@@ -4,6 +4,7 @@ import React from 'react';
 import { Poll } from '../types/poll';
 import PollCard from './PollCard';
 import { motion } from 'framer-motion'; // Importar motion
+import slugify from "@/utils/slugify"; // Importar a função slugify
 
 interface PollPodiumProps {
   polls: Poll[];
@@ -77,6 +78,8 @@ export default function PollPodium({ polls, onVote, onDelete, onCardClick }: Pol
             rankColor={getRankBgClass(2)}
             borderColor={getRankBorderClass(2)}
             textColorClass={getTextColorClass(2)}
+            companySlug={pollRank2.isCommercial && pollRank2.creator.commercialName ? slugify(pollRank2.creator.commercialName) : slugify(pollRank2.creator.name)} // Usar commercialName para enquetes comerciais
+            enableCompanyLink={pollRank2.isCommercial} // Habilitar link apenas para enquetes comerciais
           />
         </motion.div>
       )}
@@ -98,6 +101,8 @@ export default function PollPodium({ polls, onVote, onDelete, onCardClick }: Pol
             rankColor={getRankBgClass(1)}
             borderColor={getRankBorderClass(1)}
             textColorClass={getTextColorClass(1)}
+            companySlug={pollRank1.isCommercial && pollRank1.creator.commercialName ? slugify(pollRank1.creator.commercialName) : slugify(pollRank1.creator.name)} // Usar commercialName para enquetes comerciais
+            enableCompanyLink={pollRank1.isCommercial} // Habilitar link apenas para enquetes comerciais
           />
         </motion.div>
       )}
@@ -119,6 +124,8 @@ export default function PollPodium({ polls, onVote, onDelete, onCardClick }: Pol
             rankColor={getRankBgClass(3)}
             borderColor={getRankBorderClass(3)}
             textColorClass={getTextColorClass(3)}
+            companySlug={pollRank3.isCommercial && pollRank3.creator.commercialName ? slugify(pollRank3.creator.commercialName) : slugify(pollRank3.creator.name)} // Usar commercialName para enquetes comerciais
+            enableCompanyLink={pollRank3.isCommercial} // Habilitar link apenas para enquetes comerciais
           />
         </motion.div>
       )}

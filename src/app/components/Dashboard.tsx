@@ -44,6 +44,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
   const [editedFacebookUrl, setEditedFacebookUrl] = useState(user.facebookUrl || "");
   const [editedInstagramUrl, setEditedInstagramUrl] = useState(user.instagramUrl || ""); // Antigo editedTwitterUrl
   const [editedTwitterUrl, setEditedTwitterUrl] = useState(user.twitterUrl || ""); // Antigo editedLinkedinUrl
+  const [editedThemeColor, setEditedThemeColor] = useState(user.themeColor || "#6366f1"); // Novo estado para o tema de cor
 
   const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
   const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -68,6 +69,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     setEditedFacebookUrl(user?.facebookUrl || "");
     setEditedInstagramUrl(user?.instagramUrl || "");
     setEditedTwitterUrl(user?.twitterUrl || "");
+    setEditedThemeColor(user?.themeColor || "#6366f1"); // Inicializa o estado com a cor do tema do usuário
   }, [user]);
 
   // Efeito para contar enquetes ativas e calcular estatísticas quando as enquetes do usuário são atualizadas
@@ -152,6 +154,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     if (editedFacebookUrl !== (user.facebookUrl || "")) updateRequired = true;
     if (editedInstagramUrl !== (user.instagramUrl || "")) updateRequired = true;
     if (editedTwitterUrl !== (user.twitterUrl || "")) updateRequired = true;
+    if (editedThemeColor !== (user.themeColor || "#6366f1")) updateRequired = true; // Verificar alteração no themeColor
 
     if (imageFile) {
       setUploadingImage(true);
@@ -210,6 +213,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
         facebookUrl?: string; 
         instagramUrl?: string; 
         twitterUrl?: string; 
+        themeColor?: string; // Adicionar themeColor
       } = {
         displayName: editedCompanyName.trim(),
       };
@@ -223,6 +227,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       if (editedFacebookUrl !== (user.facebookUrl || "")) updateData.facebookUrl = editedFacebookUrl;
       if (editedInstagramUrl !== (user.instagramUrl || "")) updateData.instagramUrl = editedInstagramUrl;
       if (editedTwitterUrl !== (user.twitterUrl || "")) updateData.twitterUrl = editedTwitterUrl;
+      if (editedThemeColor !== (user.themeColor || "#6366f1")) updateData.themeColor = editedThemeColor; // Adicionar themeColor ao updateData
 
       await updateDoc(userDocRef, updateData);
       setFeedbackMessage("Perfil atualizado com sucesso!");
@@ -349,6 +354,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                   onVote={handleVote} 
                   onDelete={handleDeletePoll} 
                   companySlug={companySlug} // Passar o slug da empresa para o PollCard
+                  companyThemeColor={user.themeColor} // Passar o tema de cor da empresa para o PollCard
                 />
               ))}
             </div>
@@ -479,6 +485,18 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                 value={editedTwitterUrl}
                 onChange={(e) => setEditedTwitterUrl(e.target.value)}
                 className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            {/* Seletor de cor do tema */}
+            <div className="mt-4">
+              <label htmlFor="themeColor" className="block text-gray-400 mb-2">Cor do Tema</label>
+              <input
+                type="color"
+                id="themeColor"
+                value={editedThemeColor}
+                onChange={(e) => setEditedThemeColor(e.target.value)}
+                className="w-full h-12 rounded-lg bg-gray-700 border border-gray-600 cursor-pointer"
               />
             </div>
 
