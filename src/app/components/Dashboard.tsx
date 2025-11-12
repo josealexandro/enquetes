@@ -354,7 +354,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                   onVote={handleVote} 
                   onDelete={handleDeletePoll} 
                   companySlug={companySlug} // Passar o slug da empresa para o PollCard
-                  companyThemeColor={user.themeColor} // Passar o tema de cor da empresa para o PollCard
+                  companyThemeColor={user.themeColor || undefined} // Passar o tema de cor da empresa para o PollCard, convertendo null para undefined
                 />
               ))}
             </div>
