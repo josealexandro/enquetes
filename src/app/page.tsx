@@ -357,7 +357,7 @@ export default function Home() {
       setPublicPolls(updateState);
       setCommercialPolls(updateState);
     }
-  }, [user, publicPolls, commercialPolls]); // Atualizado dependências
+  }, [user, publicPolls, commercialPolls, podiumPolls]); // Atualizado dependências: Adicionado podiumPolls
 
   const handleDeletePoll = async (pollId: string) => {
     if (!user) {
