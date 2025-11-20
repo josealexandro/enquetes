@@ -189,15 +189,16 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
           likedBy: arrayRemove(user.uid),
         });
       } else {
-        const updateData: Record<string, any> = {
+        await updateDoc(pollRef, {
           likes: increment(1),
           likedBy: arrayUnion(user.uid),
-        };
-        if (hasDisliked) {
-          updateData.dislikes = increment(-1);
-          updateData.dislikedBy = arrayRemove(user.uid);
-        }
-        await updateDoc(pollRef, updateData);
+          ...(hasDisliked
+            ? {
+                dislikes: increment(-1),
+                dislikedBy: arrayRemove(user.uid),
+              }
+            : {}),
+        });
       }
     } catch (error) {
       console.error("Erro ao curtir/descurtir enquete:", error);
@@ -247,15 +248,16 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
           dislikedBy: arrayRemove(user.uid),
         });
       } else {
-        const updateData: Record<string, any> = {
+        await updateDoc(pollRef, {
           dislikes: increment(1),
           dislikedBy: arrayUnion(user.uid),
-        };
-        if (hasLiked) {
-          updateData.likes = increment(-1);
-          updateData.likedBy = arrayRemove(user.uid);
-        }
-        await updateDoc(pollRef, updateData);
+          ...(hasLiked
+            ? {
+                likes: increment(-1),
+                likedBy: arrayRemove(user.uid),
+              }
+            : {}),
+        });
       }
     } catch (error) {
       console.error("Erro ao curtir/descurtir enquete:", error);
