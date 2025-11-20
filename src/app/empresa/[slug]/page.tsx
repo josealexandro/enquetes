@@ -267,7 +267,9 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
           )}
           <div className="flex flex-col ml-4 flex-grow">
             <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight drop-shadow-md">{company.commercialName}</h1>
-            <p className="text-base text-purple-100 font-semibold italic mt-1 font-permanent-marker drop-shadow-md">Just Do It</p> {/* Slogan com estilo diferenciado e sombra */}
+            {company.description && (
+               <p className="text-base text-purple-100 font-semibold italic mt-1 font-permanent-marker drop-shadow-md">{company.description}</p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2 ml-auto"> {/* Ícones empilhados verticalmente e alinhados à direita */}

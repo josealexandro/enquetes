@@ -10,175 +10,243 @@ import { useAuth } from "./context/AuthContext";
 import { motion } from "framer-motion";
 import { AnimatePresence } from "framer-motion"; // Importar AnimatePresence
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, getDoc, Timestamp } from "firebase/firestore"; // addDoc Removido, Adicionar Timestamp
-import { useRouter } from 'next/navigation'; // Importar useRouter
-// Removido: import LoginForm from "./components/LoginForm";
-// Removido: import SignupForm from "./components/SignupForm";
-import PollPodium from "./components/PollPodium"; // Importar PollPodium
-import slugify from "@/utils/slugify"; // Importar a função slugify
+import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, getDoc, Timestamp, limit, startAfter, getDocs, where, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
+import { useRouter } from 'next/navigation';
+import PollPodium from "./components/PollPodium";
+import slugify from "@/utils/slugify";
 
 export default function Home() {
-  const [polls, setPolls] = useState<Poll[]>([]); // Mudar para useState
-  const [loadingPolls, setLoadingPolls] = useState(true); // Novo estado para carregamento
+  // Separação dos estados das enquetes
+  const [publicPolls, setPublicPolls] = useState<Poll[]>([]);
+  const [commercialPolls, setCommercialPolls] = useState<Poll[]>([]);
+  const [podiumPolls, setPodiumPolls] = useState<Poll[]>([]);
+  
+  // Controles de Paginação
+  const [lastPublicDoc, setLastPublicDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [lastCommercialDoc, setLastCommercialDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMorePublic, setHasMorePublic] = useState(true);
+  const [hasMoreCommercial, setHasMoreCommercial] = useState(true);
+  const [loadingMorePublic, setLoadingMorePublic] = useState(false); // Novo loading para paginação
+  const [loadingMoreCommercial, setLoadingMoreCommercial] = useState(false); // Novo loading para paginação
+
+  const [loadingPolls, setLoadingPolls] = useState(true);
   const [deleteFeedbackMessage, setDeleteFeedbackMessage] = useState<string | null>(null);
   const [deleteFeedbackType, setDeleteFeedbackType] = useState<"success" | "error" | null>(null);
   const [activeFilter, setActiveFilter] = useState<"recent" | "trending" | "mine" | "public" | "commercial">("recent");
-  const { user, isMasterUser } = useAuth(); // Obter o usuário logado e o status de mestre
-  const [isClient, setIsClient] = useState(false); // Novo estado para montagem no cliente
+  const { user, isMasterUser } = useAuth();
+  const [isClient, setIsClient] = useState(false);
+  const [showPollForm, setShowPollForm] = useState(false);
+  const pollFormRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
-  // Removido: const [currentPublicPollIndex, setCurrentPublicPollIndex] = useState(0);
-  // Removido: const [currentCommercialPollIndex, setCurrentCommercialPollIndex] = useState(0);
+  // Função auxiliar para processar os dados da enquete
+  const processPollData = async (docSnap: QueryDocumentSnapshot<DocumentData>) => {
+    const data = docSnap.data();
+    const creatorData = data.creator || {};
+    const creatorId = creatorData.id || data.createdBy;
 
-  const [showPollForm, setShowPollForm] = useState(false); // Novo estado para controlar a visibilidade do formulário de enquete
-  const pollFormRef = useRef<HTMLDivElement>(null); // Ref para o contêiner do formulário de enquete
+    let creatorName = creatorData.name || creatorData.displayName || "Usuário Desconhecido";
+    let creatorAvatarUrl = creatorData.avatarUrl || creatorData.photoURL || "https://www.gravatar.com/avatar/?d=mp";
+    let creatorCommercialName = creatorData.commercialName || undefined;
+    let creatorThemeColor = creatorData.themeColor || undefined;
 
-  // useEffect para carregar enquetes do Firestore em tempo real
+    const hasCompleteCreatorData = (creatorData.name || creatorData.displayName) && (creatorData.avatarUrl || creatorData.photoURL);
+
+    if (creatorId && !hasCompleteCreatorData) {
+      try {
+        const userDocRef = doc(db, "users", creatorId);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          creatorName = userData.name || userData.displayName || "Usuário";
+          creatorAvatarUrl = userData.avatarUrl || userData.photoURL || "https://www.gravatar.com/avatar/?d=mp";
+          creatorCommercialName = userData.commercialName || undefined;
+          creatorThemeColor = userData.themeColor || undefined;
+        }
+      } catch (error) {
+        console.error("Erro ao buscar dados do criador (fallback):", error);
+      }
+    }
+    
+    const optionsWithIds = data.options.map((opt: PollOption) => ({
+      ...opt,
+      id: opt.id || Math.random().toString(36).substring(7)
+    }));
+
+    let pollCreatedAt = data.createdAt;
+    if (pollCreatedAt && typeof pollCreatedAt.toDate !== 'function') {
+      pollCreatedAt = new Timestamp(pollCreatedAt.seconds, pollCreatedAt.nanoseconds);
+    } else if (!pollCreatedAt) {
+      pollCreatedAt = Timestamp.now();
+    }
+
+    return {
+      id: docSnap.id,
+      ...data,
+      options: optionsWithIds,
+      creator: {
+        id: creatorId,
+        name: creatorName,
+        avatarUrl: creatorAvatarUrl,
+        commercialName: creatorCommercialName,
+        themeColor: creatorThemeColor,
+      },
+      isCommercial: data.isCommercial || false,
+      createdAt: pollCreatedAt,
+    } as Poll;
+  };
+
+  // Buscar Pódio (Separado)
   useEffect(() => {
-    setIsClient(true); // Marcar como montado no cliente
-    setLoadingPolls(true);
-    const pollsCollection = collection(db, "polls");
-    // Removendo a ordenação inicial para lidar com ela no frontend, ou podemos buscar duas coleções separadas se a filtragem de segurança for necessária
-    const q = query(pollsCollection, orderBy("createdAt", "desc")); 
-
-    const unsubscribe = onSnapshot(q, async (snapshot) => { // Adicionar async aqui
-      const fetchedPollsPromises = snapshot.docs.map(async (docSnap) => { // Mudar para docSnap
-        const data = docSnap.data();
-        const creatorId = data.creator?.id || data.createdBy; // Usar createdBy como fallback
-
-        let creatorName = "Usuário Desconhecido";
-        let creatorAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"; // Default Gravatar
-        let creatorCommercialName: string | undefined = undefined; // Novo campo para commercialName
-        let creatorThemeColor: string | undefined = undefined; // Novo campo para themeColor
-
-        if (creatorId) {
-          const userDocRef = doc(db, "users", creatorId);
-          const userDocSnap = await getDoc(userDocRef);
-          if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            creatorName = userData.name || userData.displayName || "Usuário";
-            creatorAvatarUrl = userData.avatarUrl || "https://www.gravatar.com/avatar/?d=mp";
-            creatorCommercialName = userData.commercialName || undefined; // Obter commercialName
-            creatorThemeColor = userData.themeColor || undefined; // Obter themeColor
-          }
-        }
+    const fetchPodium = async () => {
+      try {
+        // Assumindo que 'likes' é um bom indicador para o pódio por enquanto.
+        // Para 'engagement' perfeito (likes + votes), precisaríamos de um campo salvo no DB.
+        const q = query(collection(db, "polls"), orderBy("likes", "desc"), limit(3));
+        const snapshot = await getDocs(q);
+        const polls = await Promise.all(snapshot.docs.map(processPollData));
         
-        // Garantir que as opções tenham um 'id' para consistência, se não estiverem presentes no DB
-        const optionsWithIds = data.options.map((opt: PollOption) => ({ // Adicionar : PollOption
-          ...opt,
-          id: opt.id || Math.random().toString(36).substring(7)
+        // Atribuir ranks
+        const rankedPolls = polls.map((poll, index) => ({
+          ...poll,
+          rank: index + 1
         }));
-
-        // Garantir que createdAt seja sempre um objeto Timestamp
-        let pollCreatedAt = data.createdAt;
-        if (pollCreatedAt && typeof pollCreatedAt.toDate !== 'function') {
-          // Se for um objeto literal, converta para Timestamp
-          pollCreatedAt = new Timestamp(pollCreatedAt.seconds, pollCreatedAt.nanoseconds);
-        } else if (!pollCreatedAt) {
-          // Se não existir, use o timestamp atual como fallback
-          pollCreatedAt = Timestamp.now();
-        }
-
-        return {
-          id: docSnap.id, // Usar docSnap.id
-          ...data,
-          options: optionsWithIds, // Usar as opções com IDs garantidos
-          creator: {
-            id: creatorId,
-            name: creatorName,
-            avatarUrl: creatorAvatarUrl,
-            commercialName: creatorCommercialName, // Adicionar commercialName
-            themeColor: creatorThemeColor, // Adicionar themeColor
-          },
-          isCommercial: data.isCommercial || false,
-          createdAt: pollCreatedAt, // Usar o Timestamp garantido
-        } as Poll;
-      });
-
-      let fetchedPolls = await Promise.all(fetchedPollsPromises); // Esperar por todas as promessas
-
-      // Calcular engajamento e atribuir ranks
-      fetchedPolls = fetchedPolls
-        .map(poll => {
-          const totalVotes = poll.options.reduce((sum, opt) => sum + opt.votes, 0);
-          const engagement = (poll.likes || 0) + totalVotes;
-          return { ...poll, engagement };
-        })
-        .sort((a, b) => (b.engagement || 0) - (a.engagement || 0)); // Ordenar por engajamento decrescente
-
-      // Atribuir ranks aos top 3
-      const rankedPolls = fetchedPolls.map((poll, index) => {
-        if (index === 0) return { ...poll, rank: 1 }; // Ouro
-        if (index === 1) return { ...poll, rank: 2 }; // Prata
-        if (index === 2) return { ...poll, rank: 3 }; // Bronze
-        return poll;
-      });
-
-      setPolls(rankedPolls);
-      console.log("Enquetes carregadas e ranqueadas:", rankedPolls); // Log para depuração
-      setLoadingPolls(false);
-    }, (error) => {
-      console.error("Erro ao carregar enquetes:", error);
-      setLoadingPolls(false);
-    });
-
-    return () => unsubscribe(); // Limpar o listener quando o componente for desmontado
+        setPodiumPolls(rankedPolls);
+      } catch (error) {
+        console.error("Erro ao carregar pódio:", error);
+      }
+    };
+    fetchPodium();
   }, []);
 
-  const publicPolls = useMemo(() => {
-    return polls.filter(poll => !poll.isCommercial);
-  }, [polls]);
+  // Buscar Enquetes Iniciais (Paginadas)
+  const fetchInitialPolls = useCallback(async () => {
+    setLoadingPolls(true);
+    try {
+      // Busca Públicas
+      const qPublic = query(
+        collection(db, "polls"), 
+        where("isCommercial", "==", false),
+        orderBy("createdAt", "desc"),
+        limit(8)
+      );
+      
+      // Busca Comerciais
+      const qCommercial = query(
+        collection(db, "polls"),
+        where("isCommercial", "==", true),
+        orderBy("createdAt", "desc"),
+        limit(8)
+      );
 
-  const commercialPolls = useMemo(() => {
-    return polls.filter(poll => poll.isCommercial);
-  }, [polls]);
+      const [publicSnap, commercialSnap] = await Promise.all([getDocs(qPublic), getDocs(qCommercial)]);
 
+      const processedPublic = await Promise.all(publicSnap.docs.map(processPollData));
+      const processedCommercial = await Promise.all(commercialSnap.docs.map(processPollData));
+
+      setPublicPolls(processedPublic);
+      setCommercialPolls(processedCommercial);
+
+      setLastPublicDoc(publicSnap.docs[publicSnap.docs.length - 1] || null);
+      setLastCommercialDoc(commercialSnap.docs[commercialSnap.docs.length - 1] || null);
+
+      if (publicSnap.docs.length < 8) setHasMorePublic(false);
+      if (commercialSnap.docs.length < 8) setHasMoreCommercial(false);
+
+    } catch (error) {
+      console.error("Erro ao carregar enquetes iniciais:", error);
+    } finally {
+      setLoadingPolls(false);
+    }
+  }, []);
+
+  // Carregar Mais Públicas
+  const loadMorePublic = async () => {
+    if (!lastPublicDoc || loadingMorePublic) return;
+    setLoadingMorePublic(true);
+    try {
+      const q = query(
+        collection(db, "polls"),
+        where("isCommercial", "==", false),
+        orderBy("createdAt", "desc"),
+        startAfter(lastPublicDoc),
+        limit(8)
+      );
+      const snapshot = await getDocs(q);
+      const newPolls = await Promise.all(snapshot.docs.map(processPollData));
+      
+      setPublicPolls(prev => [...prev, ...newPolls]);
+      setLastPublicDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+      if (snapshot.docs.length < 8) setHasMorePublic(false);
+    } catch (error) {
+      console.error("Erro ao carregar mais públicas:", error);
+    } finally {
+      setLoadingMorePublic(false);
+    }
+  };
+
+  // Carregar Mais Comerciais
+  const loadMoreCommercial = async () => {
+    if (!lastCommercialDoc || loadingMoreCommercial) return;
+    setLoadingMoreCommercial(true);
+    try {
+      const q = query(
+        collection(db, "polls"),
+        where("isCommercial", "==", true),
+        orderBy("createdAt", "desc"),
+        startAfter(lastCommercialDoc),
+        limit(8)
+      );
+      const snapshot = await getDocs(q);
+      const newPolls = await Promise.all(snapshot.docs.map(processPollData));
+      
+      setCommercialPolls(prev => [...prev, ...newPolls]);
+      setLastCommercialDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+      if (snapshot.docs.length < 8) setHasMoreCommercial(false);
+    } catch (error) {
+      console.error("Erro ao carregar mais comerciais:", error);
+    } finally {
+      setLoadingMoreCommercial(false);
+    }
+  };
+
+  useEffect(() => {
+    setIsClient(true);
+    fetchInitialPolls();
+  }, [fetchInitialPolls]);
+
+  // Filtros (Nota: Paginação implementada apenas para 'recent' por enquanto)
   const filteredPublicPolls = useMemo(() => {
-    let sortedPolls = [...publicPolls];
-    if (activeFilter === "recent") {
-      sortedPolls.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-    } else if (activeFilter === "trending") {
-      sortedPolls.sort((a, b) => {
+    let currentList = [...publicPolls];
+    if (activeFilter === 'mine') {
+      currentList = currentList.filter(p => user && p.creator.id === user.uid);
+    }
+    // Para 'trending', idealmente precisaria de nova busca no servidor. Mantendo client-side sorting do que já foi carregado por enquanto.
+    if (activeFilter === 'trending') {
+       currentList.sort((a, b) => {
         const votesA = a.options.reduce((sum, option) => sum + option.votes, 0);
         const votesB = b.options.reduce((sum, option) => sum + option.votes, 0);
         return votesB - votesA;
       });
-    } else if (activeFilter === "mine") {
-      sortedPolls = sortedPolls.filter(poll => user && poll.creator.id === user.uid);
     }
-    return sortedPolls;
+    return currentList;
   }, [publicPolls, activeFilter, user]);
 
-  const podiumPolls = useMemo(() => {
-    // Filtrar as enquetes com rank 1, 2 e 3 e ordená-las
-    const filteredPodium = polls // Alterado de filteredPublicPolls para polls
-      .filter(poll => poll.rank && (poll.rank >= 1 && poll.rank <= 3))
-      .sort((a, b) => (a.rank || 0) - (b.rank || 0))
-      .slice(0, 3); // Garantir que apenas os top 3 sejam selecionados
-    console.log("Podium Polls:", filteredPodium); // Log para depuração
-    return filteredPodium;
-  }, [polls]); // Alterado de filteredPublicPolls para polls
-
-  const otherPublicPolls = useMemo(() => {
-    // Filtrar as enquetes públicas que não estão no pódio
-    const podiumIds = new Set(podiumPolls.map(poll => poll.id));
-    return filteredPublicPolls.filter(poll => !podiumIds.has(poll.id));
-  }, [filteredPublicPolls, podiumPolls]);
-
   const filteredCommercialPolls = useMemo(() => {
-    let sortedPolls = [...commercialPolls];
-    if (activeFilter === "recent") {
-      sortedPolls.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-    } else if (activeFilter === "trending") {
-      sortedPolls.sort((a, b) => {
+    let currentList = [...commercialPolls];
+    if (activeFilter === 'mine') {
+      currentList = currentList.filter(p => user && p.creator.id === user.uid);
+    }
+    if (activeFilter === 'trending') {
+       currentList.sort((a, b) => {
         const votesA = a.options.reduce((sum, option) => sum + option.votes, 0);
         const votesB = b.options.reduce((sum, option) => sum + option.votes, 0);
         return votesB - votesA;
       });
-    } else if (activeFilter === "mine") {
-      sortedPolls = sortedPolls.filter(poll => user && poll.creator.id === user.uid);
     }
-    return sortedPolls;
+    return currentList;
   }, [commercialPolls, activeFilter, user]);
+
 
   // Efeito para detectar cliques fora do formulário de enquete
   useEffect(() => {
@@ -209,7 +277,7 @@ export default function Home() {
       return;
     }
 
-    const pollToUpdate = polls.find(p => p.id === pollId);
+    const pollToUpdate = publicPolls.find(p => p.id === pollId) || commercialPolls.find(p => p.id === pollId) || podiumPolls.find(p => p.id === pollId);
     if (!pollToUpdate) {
       console.error("handleVote (na página) - Enquete não encontrada:", pollId);
       return;
@@ -232,18 +300,17 @@ export default function Home() {
       ? [...(pollToUpdate.votedBy || []), user.uid]
       : pollToUpdate.votedBy;
 
-    // Otimista: Atualiza a UI imediatamente
-    setPolls((prevPolls) =>
-      prevPolls.map((poll) =>
-        poll.id === pollId
-          ? {
-              ...poll,
-              options: updatedOptionsForOptimisticUI,
-              votedBy: updatedVotedByForOptimisticUI,
-            }
-          : poll
-      )
+    // Helper function to update poll in a list
+    const updatePollInList = (list: Poll[]) => list.map(poll => 
+      poll.id === pollId 
+        ? { ...poll, options: updatedOptionsForOptimisticUI, votedBy: updatedVotedByForOptimisticUI } 
+        : poll
     );
+
+    // Otimista: Atualiza a UI imediatamente nas listas onde a enquete existe
+    if (publicPolls.some(p => p.id === pollId)) setPublicPolls(prev => updatePollInList(prev));
+    if (commercialPolls.some(p => p.id === pollId)) setCommercialPolls(prev => updatePollInList(prev));
+    if (podiumPolls.some(p => p.id === pollId)) setPodiumPolls(prev => updatePollInList(prev));
 
     try {
       const pollRef = doc(db, "polls", pollId);
@@ -272,7 +339,7 @@ export default function Home() {
       console.error("Erro ao votar:", error);
       alert("Erro ao registrar voto. Tente novamente.");
       // Reverter a UI se o voto falhar
-      setPolls((prevPolls) =>
+      const updateState = (prevPolls: Poll[]) =>
         prevPolls.map((poll) =>
           poll.id === pollId
             ? {
@@ -282,14 +349,15 @@ export default function Home() {
                     ? { ...option, votes: option.votes - 1 }
                     : option
                 ),
-                // Remover user.uid de votedBy se a reversão for para enquete comercial
-                votedBy: poll.isCommercial && user ? (poll.votedBy || []).filter(uid => uid !== user.uid) : poll.votedBy,
+                votedBy: user ? (poll.votedBy || []).filter(uid => uid !== user.uid) : poll.votedBy,
               }
             : poll
-        )
-      );
+        );
+      
+      setPublicPolls(updateState);
+      setCommercialPolls(updateState);
     }
-  }, [user, polls, setPolls]); // Adicionar dependências para useCallback
+  }, [user, publicPolls, commercialPolls]); // Atualizado dependências
 
   const handleDeletePoll = async (pollId: string) => {
     if (!user) {
@@ -297,7 +365,9 @@ export default function Home() {
       return;
     }
 
-    const pollToDelete = polls.find(p => p.id === pollId);
+    // Procura nas duas listas
+    const pollToDelete = publicPolls.find(p => p.id === pollId) || commercialPolls.find(p => p.id === pollId);
+    
     // Permitir exclusão se for o criador OU um usuário mestre
     if (!pollToDelete || (pollToDelete.creator.id !== user.uid && !isMasterUser)) {
       alert("Você não tem permissão para excluir esta enquete.");
@@ -306,6 +376,11 @@ export default function Home() {
 
     try {
       await deleteDoc(doc(db, "polls", pollId));
+      
+      // Remove da lista local
+      setPublicPolls(prev => prev.filter(p => p.id !== pollId));
+      setCommercialPolls(prev => prev.filter(p => p.id !== pollId));
+
       setDeleteFeedbackMessage("Enquete excluída com sucesso!");
       setDeleteFeedbackType("success");
       setTimeout(() => setDeleteFeedbackMessage(null), 3000);
@@ -317,7 +392,6 @@ export default function Home() {
     }
   };
 
-  const router = useRouter(); // Inicializar o router
 
   return (
     <main className="min-h-screen w-full flex flex-col items-center px-4 py-24 dark:bg-zinc-900 pt-20">
@@ -430,21 +504,34 @@ export default function Home() {
                 <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mb-6 text-center">Enquetes Públicas</h2>
                 {loadingPolls ? (
                   <p className="text-zinc-600 dark:text-zinc-400 text-center">Carregando enquetes públicas...</p>
-                ) : otherPublicPolls.length === 0 ? (
+                ) : filteredPublicPolls.length === 0 ? (
                   <p className="text-zinc-600 dark:text-zinc-400 text-center">Nenhuma outra enquete pública encontrada.</p>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {otherPublicPolls.slice(0, 8).map((poll) => (
-                      <PollCard
-                        key={poll.id}
-                        poll={poll}
-                        onVote={handleVote}
-                        onDelete={handleDeletePoll}
-                        companySlug={poll.isCommercial && poll.creator.commercialName ? slugify(poll.creator.commercialName) : slugify(poll.creator.name)} // Usar commercialName para enquetes comerciais
-                        enableCompanyLink={poll.isCommercial} // Habilitar link apenas para enquetes comerciais
-                      />
-                    ))}
-                  </div>
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {filteredPublicPolls.map((poll) => ( // Removido slice e otherPublicPolls
+                        <PollCard
+                          key={poll.id}
+                          poll={poll}
+                          onVote={handleVote}
+                          onDelete={handleDeletePoll}
+                          companySlug={poll.isCommercial && poll.creator.commercialName ? slugify(poll.creator.commercialName) : slugify(poll.creator.name)} // Usar commercialName para enquetes comerciais
+                          enableCompanyLink={poll.isCommercial} // Habilitar link apenas para enquetes comerciais
+                        />
+                      ))}
+                    </div>
+                    {activeFilter === 'recent' && hasMorePublic && (
+                      <div className="flex justify-center mt-6">
+                        <button
+                          onClick={loadMorePublic}
+                          disabled={loadingMorePublic}
+                          className="px-6 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-white rounded-full hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors disabled:opacity-50"
+                        >
+                          {loadingMorePublic ? "Carregando..." : "Carregar Mais"}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -456,19 +543,32 @@ export default function Home() {
                 ) : filteredCommercialPolls.length === 0 ? (
                   <p className="text-zinc-600 dark:text-zinc-400 text-center">Nenhuma enquete comercial encontrada.</p>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filteredCommercialPolls.slice(0, 8).map((poll) => (
-                      <PollCard
-                        key={poll.id}
-                        poll={poll}
-                        onVote={handleVote}
-                        onDelete={handleDeletePoll}
-                        companySlug={poll.isCommercial && poll.creator.commercialName ? slugify(poll.creator.commercialName) : slugify(poll.creator.name)} // Usar commercialName para enquetes comerciais
-                        enableCompanyLink={poll.isCommercial} // Habilitar link apenas para enquetes comerciais
-                        companyThemeColor={poll.isCommercial ? poll.creator.themeColor : undefined} // Passar themeColor apenas para enquetes comerciais
-                      />
-                    ))}
-                  </div>
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {filteredCommercialPolls.map((poll) => ( // Removido slice
+                        <PollCard
+                          key={poll.id}
+                          poll={poll}
+                          onVote={handleVote}
+                          onDelete={handleDeletePoll}
+                          companySlug={poll.isCommercial && poll.creator.commercialName ? slugify(poll.creator.commercialName) : slugify(poll.creator.name)} // Usar commercialName para enquetes comerciais
+                          enableCompanyLink={poll.isCommercial} // Habilitar link apenas para enquetes comerciais
+                          companyThemeColor={poll.isCommercial ? poll.creator.themeColor : undefined} // Passar themeColor apenas para enquetes comerciais
+                        />
+                      ))}
+                    </div>
+                    {activeFilter === 'recent' && hasMoreCommercial && (
+                      <div className="flex justify-center mt-6">
+                        <button
+                          onClick={loadMoreCommercial}
+                          disabled={loadingMoreCommercial}
+                          className="px-6 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-white rounded-full hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors disabled:opacity-50"
+                        >
+                          {loadingMoreCommercial ? "Carregando..." : "Carregar Mais"}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>

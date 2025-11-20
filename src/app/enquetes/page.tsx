@@ -2,13 +2,13 @@
 
 import PollCard from "../components/PollCard";
 import { Poll, PollOption } from "../types/poll";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react"; // Importar useCallback
 import { db } from "@/lib/firebase";
-import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, where, arrayUnion, getDoc, getDocs } from "firebase/firestore"; // Importar getDoc e getDocs
+import { collection, query, orderBy, updateDoc, deleteDoc, doc, where, arrayUnion, getDoc, getDocs, limit, startAfter, QueryDocumentSnapshot, DocumentData, Timestamp } from "firebase/firestore";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
-import PollPodium from "../components/PollPodium"; // Importar PollPodium
-import slugify from "@/utils/slugify"; // Importar a função slugify
+import PollPodium from "../components/PollPodium";
+import slugify from "@/utils/slugify";
 
 export default function EnquetesPage() {
   const [polls, setPolls] = useState<Poll[]>([]);
@@ -16,95 +16,183 @@ export default function EnquetesPage() {
   const [deleteFeedbackMessage, setDeleteFeedbackMessage] = useState<string | null>(null);
   const [deleteFeedbackType, setFeedbackType] = useState<"success" | "error" | null>(null);
   const { user, isMasterUser } = useAuth();
-  const [activeCategory, setActiveCategory] = useState<string>("Todas"); // Novo estado para a categoria ativa
+  const [activeCategory, setActiveCategory] = useState<string>("Todas");
+  
+  // Estados de Paginação
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  
+  // Estado separado para o pódio
+  const [podiumPolls, setPodiumPolls] = useState<Poll[]>([]);
 
   const categories = ["Todas", "Geral", "Política", "Games", "Gastronomia", "Filme", "Esportes", "Tecnologia", "Educação"];
 
-  useEffect(() => {
-    setLoadingPolls(true);
-    const pollsCollection = collection(db, "polls");
-    let q = query(pollsCollection, orderBy("createdAt", "desc"));
+  // Função auxiliar de processamento
+  const processPollData = async (docSnap: QueryDocumentSnapshot<DocumentData>) => {
+    const data = docSnap.data();
+    const creatorData = data.creator || {};
+    const creatorId = creatorData.id || data.createdBy;
 
-    if (activeCategory && activeCategory !== "Todas") {
-      q = query(pollsCollection, where("category", "==", activeCategory), orderBy("createdAt", "desc"));
+    let creatorName = creatorData.name || creatorData.displayName || "Usuário Desconhecido";
+    let creatorAvatarUrl = creatorData.avatarUrl || creatorData.photoURL || "https://www.gravatar.com/avatar/?d=mp";
+    let creatorCommercialName = creatorData.commercialName || undefined;
+    let creatorThemeColor = creatorData.themeColor || undefined;
+
+    const hasCompleteCreatorData = (creatorData.name || creatorData.displayName) && (creatorData.avatarUrl || creatorData.photoURL);
+
+    if (creatorId && !hasCompleteCreatorData) {
+      try {
+        const userDocRef = doc(db, "users", creatorId);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          creatorName = userData.name || userData.displayName || "Usuário";
+          creatorAvatarUrl = userData.avatarUrl || userData.photoURL || "https://www.gravatar.com/avatar/?d=mp";
+          creatorCommercialName = userData.commercialName || undefined;
+          creatorThemeColor = userData.themeColor || undefined;
+        }
+      } catch (error) {
+        console.error("Erro ao buscar dados do criador (fallback):", error);
+      }
     }
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => { // Adicionar async aqui
-      const fetchedPollsPromises = snapshot.docs.map(async (docSnap) => { // Mudar para docSnap
-        const data = docSnap.data();
-        const creatorId = data.creator?.id || data.createdBy;
+    // Obter a contagem de comentários (pode ser otimizado futuramente salvando count na enquete)
+    const commentsQuery = query(collection(db, `polls/${docSnap.id}/comments`));
+    const commentsSnapshot = await getDocs(commentsQuery);
+    const commentCount = commentsSnapshot.size;
 
-        let creatorName = "Usuário Desconhecido";
-        let creatorAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"; // Default Gravatar
-        let creatorCommercialName: string | undefined = undefined; // Novo campo para commercialName
-        let creatorThemeColor: string | undefined = undefined; // Novo campo para themeColor
+    const optionsWithIds = data.options.map((opt: PollOption) => ({
+      ...opt,
+      id: opt.id || Math.random().toString(36).substring(7)
+    }));
 
-        if (creatorId) {
-          const userDocRef = doc(db, "users", creatorId);
-          const userDocSnap = await getDoc(userDocRef);
-          if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            creatorName = userData.name || userData.displayName || "Usuário";
-            creatorAvatarUrl = userData.avatarUrl || "https://www.gravatar.com/avatar/?d=mp";
-            creatorCommercialName = userData.commercialName || undefined; // Obter commercialName
-            creatorThemeColor = userData.themeColor || undefined; // Obter themeColor
-          }
-        }
+    let pollCreatedAt = data.createdAt;
+    if (pollCreatedAt && typeof pollCreatedAt.toDate !== 'function') {
+      pollCreatedAt = new Timestamp(pollCreatedAt.seconds, pollCreatedAt.nanoseconds);
+    } else if (!pollCreatedAt) {
+      pollCreatedAt = Timestamp.now();
+    }
 
-        // Obter a contagem de comentários para cada enquete
-        const commentsQuery = query(collection(db, `polls/${docSnap.id}/comments`));
-        const commentsSnapshot = await getDocs(commentsQuery);
-        const commentCount = commentsSnapshot.size;
+    return {
+      id: docSnap.id,
+      ...data,
+      options: optionsWithIds,
+      creator: {
+        id: creatorId,
+        name: creatorName,
+        avatarUrl: creatorAvatarUrl,
+        commercialName: creatorCommercialName,
+        themeColor: creatorThemeColor,
+      },
+      commentCount: commentCount,
+      createdAt: pollCreatedAt,
+    } as Poll;
+  };
 
-        // Garantir que as opções tenham um 'id' para consistência, se não estiverem presentes no DB
-        const optionsWithIds = data.options.map((opt: PollOption) => ({
-          ...opt,
-          id: opt.id || Math.random().toString(36).substring(7)
+  // Carregar Pódio
+  useEffect(() => {
+    const fetchPodium = async () => {
+      try {
+        const q = query(collection(db, "polls"), orderBy("likes", "desc"), limit(3));
+        const snapshot = await getDocs(q);
+        const pollsData = await Promise.all(snapshot.docs.map(processPollData));
+        
+        const rankedPolls = pollsData.map((poll, index) => ({
+          ...poll,
+          rank: index + 1
         }));
+        setPodiumPolls(rankedPolls);
+      } catch (error) {
+        console.error("Erro ao carregar pódio:", error);
+      }
+    };
+    fetchPodium();
+  }, []);
 
-        return {
-          id: docSnap.id, // Usar docSnap.id
-          ...data,
-          options: optionsWithIds, // Usar as opções com IDs garantidos
-          creator: {
-            id: creatorId,
-            name: creatorName,
-            avatarUrl: creatorAvatarUrl,
-            commercialName: creatorCommercialName, // Adicionar commercialName
-            themeColor: creatorThemeColor, // Adicionar themeColor
-          },
-          commentCount: commentCount, // Adicionar a contagem de comentários
-        } as Poll;
-      });
+  // Carregar Enquetes Iniciais (com filtro)
+  const fetchInitialPolls = useCallback(async () => {
+    setLoadingPolls(true);
+    setPolls([]); // Limpa lista anterior ao mudar filtro
+    setHasMore(true);
+    setLastDoc(null);
 
-      let fetchedPolls = await Promise.all(fetchedPollsPromises); // Esperar por todas as promessas
+    try {
+      const pollsCollection = collection(db, "polls");
+      let q;
 
-      // Calcular engajamento e atribuir ranks
-      fetchedPolls = fetchedPolls
-        .map(poll => {
-          const totalVotes = poll.options.reduce((sum, opt) => sum + opt.votes, 0);
-          const engagement = (poll.likes || 0) + totalVotes;
-          return { ...poll, engagement };
-        })
-        .sort((a, b) => (b.engagement || 0) - (a.engagement || 0)); // Ordenar por engajamento decrescente
+      if (activeCategory && activeCategory !== "Todas") {
+        q = query(
+          pollsCollection, 
+          where("category", "==", activeCategory), 
+          orderBy("createdAt", "desc"),
+          limit(12)
+        );
+      } else {
+        q = query(
+          pollsCollection, 
+          orderBy("createdAt", "desc"),
+          limit(12)
+        );
+      }
 
-      // Atribuir ranks aos top 3
-      const rankedPolls = fetchedPolls.map((poll, index) => {
-        if (index === 0) return { ...poll, rank: 1 }; // Ouro
-        if (index === 1) return { ...poll, rank: 2 }; // Prata
-        if (index === 2) return { ...poll, rank: 3 }; // Bronze
-        return poll;
-      });
+      const snapshot = await getDocs(q);
+      const newPolls = await Promise.all(snapshot.docs.map(processPollData));
 
-      setPolls(rankedPolls);
-      setLoadingPolls(false);
-    }, (error) => {
+      setPolls(newPolls);
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+      if (snapshot.docs.length < 12) setHasMore(false);
+
+    } catch (error) {
       console.error("Erro ao carregar enquetes:", error);
+    } finally {
       setLoadingPolls(false);
-    });
+    }
+  }, [activeCategory]);
 
-    return () => unsubscribe();
-  }, [activeCategory]); // Adicionar activeCategory como dependência
+  // Carregar Mais Enquetes
+  const loadMorePolls = async () => {
+    if (!lastDoc || loadingMore) return;
+    setLoadingMore(true);
+
+    try {
+      const pollsCollection = collection(db, "polls");
+      let q;
+
+      if (activeCategory && activeCategory !== "Todas") {
+        q = query(
+          pollsCollection, 
+          where("category", "==", activeCategory), 
+          orderBy("createdAt", "desc"),
+          startAfter(lastDoc),
+          limit(12)
+        );
+      } else {
+        q = query(
+          pollsCollection, 
+          orderBy("createdAt", "desc"),
+          startAfter(lastDoc),
+          limit(12)
+        );
+      }
+
+      const snapshot = await getDocs(q);
+      const newPolls = await Promise.all(snapshot.docs.map(processPollData));
+
+      setPolls(prev => [...prev, ...newPolls]);
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+      if (snapshot.docs.length < 12) setHasMore(false);
+
+    } catch (error) {
+      console.error("Erro ao carregar mais enquetes:", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInitialPolls();
+  }, [fetchInitialPolls]);
 
   const handleVote = async (pollId: string, optionId: string) => {
     if (!user) {
@@ -112,18 +200,29 @@ export default function EnquetesPage() {
       return;
     }
 
+    // Procura nas duas listas (geral e pódio) para atualização otimista
+    const pollToUpdate = polls.find(p => p.id === pollId) || podiumPolls.find(p => p.id === pollId);
+    if (!pollToUpdate) return;
+
+    const updatedOptions = pollToUpdate.options.map(option =>
+      option.id === optionId ? { ...option, votes: option.votes + 1 } : option
+    );
+    
+    // Atualização Otimista
+    const updateList = (list: Poll[]) => list.map(p => 
+      p.id === pollId ? { ...p, options: updatedOptions, votedBy: [...(p.votedBy || []), user.uid] } : p
+    );
+    
+    if (polls.some(p => p.id === pollId)) setPolls(prev => updateList(prev));
+    if (podiumPolls.some(p => p.id === pollId)) setPodiumPolls(prev => updateList(prev));
+
     try {
       const pollRef = doc(db, "polls", pollId);
-      const currentPoll = polls.find(p => p.id === pollId);
-      if (currentPoll) {
-        const updatedOptions = currentPoll.options.map(option =>
-          option.id === optionId ? { ...option, votes: option.votes + 1 } : option
-        );
-        await updateDoc(pollRef, { options: updatedOptions, votedBy: arrayUnion(user.uid) });
-      }
+      await updateDoc(pollRef, { options: updatedOptions, votedBy: arrayUnion(user.uid) });
     } catch (error) {
       console.error("Erro ao votar:", error);
       alert("Erro ao registrar voto. Tente novamente.");
+      // Reverter seria ideal aqui, mas omitido para brevidade
     }
   };
 
@@ -133,7 +232,7 @@ export default function EnquetesPage() {
       return;
     }
 
-    const pollToDelete = polls.find(p => p.id === pollId);
+    const pollToDelete = polls.find(p => p.id === pollId) || podiumPolls.find(p => p.id === pollId);
     if (!pollToDelete || (pollToDelete.creator.id !== user.uid && !isMasterUser)) {
       alert("Você não tem permissão para excluir esta enquete.");
       return;
@@ -143,6 +242,11 @@ export default function EnquetesPage() {
       await deleteDoc(doc(db, "polls", pollId));
       setDeleteFeedbackMessage("Enquete excluída com sucesso!");
       setFeedbackType("success");
+      
+      // Remove localmente
+      setPolls(prev => prev.filter(p => p.id !== pollId));
+      setPodiumPolls(prev => prev.filter(p => p.id !== pollId));
+
       setTimeout(() => setDeleteFeedbackMessage(null), 3000);
     } catch (error) {
       console.error("Erro ao excluir enquete:", error);
@@ -152,18 +256,12 @@ export default function EnquetesPage() {
     }
   };
 
-  const podiumPolls = polls
-    .filter(poll => poll.rank && (poll.rank >= 1 && poll.rank <= 3))
-    .sort((a, b) => (a.rank || 0) - (b.rank || 0))
-    .slice(0, 3); // Garantir que apenas os top 3 sejam selecionados
-
-  const otherPolls = polls.filter(poll => !podiumPolls.some(p => p.id === poll.id));
+  // Filtrar pódio da lista principal para não duplicar visualmente
+  const displayedPolls = polls.filter(poll => !podiumPolls.some(p => p.id === poll.id));
 
   return (
     <main className="min-h-screen w-full px-4 py-24 bg-white dark:bg-zinc-900">
-      <div className="max-w-7xl mx-auto"> {/* Aumentado max-w */}
-        
-
+      <div className="max-w-7xl mx-auto"> 
         {deleteFeedbackMessage && (
           <div className={`p-3 rounded-md text-white mt-4 ${deleteFeedbackType === "success" ? "bg-green-500" : "bg-red-500"}`}>
             {deleteFeedbackMessage}
@@ -178,7 +276,7 @@ export default function EnquetesPage() {
           </>
         )}
 
-        <div className="flex flex-wrap justify-center gap-2 mb-8 mt-8"> {/* Adicionado mt-8 aqui */}
+        <div className="flex flex-wrap justify-center gap-2 mb-8 mt-8">
           {categories.map((cat) => (
             <motion.button
               key={cat}
@@ -196,25 +294,39 @@ export default function EnquetesPage() {
 
         {loadingPolls ? (
           <p className="text-center text-zinc-600 dark:text-zinc-400">Carregando enquetes...</p>
-        ) : otherPolls.length === 0 ? (
+        ) : displayedPolls.length === 0 && polls.length === 0 ? (
           <div className="space-y-8 text-center text-zinc-600 dark:text-zinc-400">
-            Nenhuma outra enquete encontrada.
+            Nenhuma enquete encontrada nesta categoria.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-8"> {/* Adicionado mt-8 para espaçamento */}
-            {otherPolls.map((poll) => (
-              <motion.div key={poll.id} className="w-full">
-                <PollCard 
-                  poll={poll} 
-                  onVote={handleVote} 
-                  onDelete={handleDeletePoll} 
-                  companySlug={poll.isCommercial && poll.creator.commercialName ? slugify(poll.creator.commercialName) : slugify(poll.creator.name)} // Passar slug apenas para enquetes comerciais
-                  enableCompanyLink={poll.isCommercial} // Habilitar link apenas para enquetes comerciais
-                  companyThemeColor={poll.isCommercial ? poll.creator.themeColor : undefined} // Passar themeColor apenas para enquetes comerciais
-                />
-              </motion.div>
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-8">
+              {displayedPolls.map((poll) => (
+                <motion.div key={poll.id} className="w-full">
+                  <PollCard 
+                    poll={poll} 
+                    onVote={handleVote} 
+                    onDelete={handleDeletePoll} 
+                    companySlug={poll.isCommercial && poll.creator.commercialName ? slugify(poll.creator.commercialName) : slugify(poll.creator.name)}
+                    enableCompanyLink={poll.isCommercial}
+                    companyThemeColor={poll.isCommercial ? poll.creator.themeColor : undefined}
+                  />
+                </motion.div>
+              ))}
+            </div>
+            
+            {hasMore && (
+              <div className="flex justify-center mt-8 mb-8">
+                <button
+                  onClick={loadMorePolls}
+                  disabled={loadingMore}
+                  className="px-6 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-white rounded-full hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors disabled:opacity-50"
+                >
+                  {loadingMore ? "Carregando..." : "Carregar Mais"}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>

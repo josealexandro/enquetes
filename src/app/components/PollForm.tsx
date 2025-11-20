@@ -135,6 +135,8 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
           name: user.displayName || user.email || "Usuário Logado",
           avatarUrl: user.photoURL || "https://www.gravatar.com/avatar/?d=mp", // Fallback para Gravatar
           id: user.uid,
+          ...(user.commercialName && { commercialName: user.commercialName }), // Adicionar commercialName se existir
+          ...(user.themeColor && { themeColor: user.themeColor }), // Adicionar themeColor se existir
         },
         createdAt: serverTimestamp(),
         isCommercial: isCommercial,

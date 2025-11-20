@@ -1,18 +1,13 @@
-"use client";
 
+import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Poppins, Inter, Permanent_Marker } from "next/font/google"; // Adicionado Permanent_Marker
 import "./globals.css";
 
-import { config, library } from '@fortawesome/fontawesome-svg-core';
-
-config.autoAddCss = false;
-
+// FontAwesome config removed as it is handled per component or in client wrapper if needed globally
 import '@fortawesome/fontawesome-svg-core/styles.css';
-import { faFacebookF, faTwitter, faLinkedinIn, faGithub } from '@fortawesome/free-brands-svg-icons';
-import { faEnvelope, faSun, faMoon } from '@fortawesome/free-solid-svg-icons';
-
-library.add(faFacebookF, faTwitter, faLinkedinIn, faGithub, faEnvelope, faSun, faMoon);
+import { config } from '@fortawesome/fontawesome-svg-core';
+config.autoAddCss = false;
 
 import ClientProvidersWrapper from "./components/ClientProvidersWrapper"; // Importar o novo ClientProvidersWrapper
 
@@ -44,6 +39,11 @@ const permanentMarker = Permanent_Marker({
   weight: ["400"], // Permanent Marker geralmente tem apenas um peso
   variable: "--font-permanent-marker",
 });
+
+export const metadata: Metadata = {
+  title: "Poll App - Crie e Compartilhe Enquetes",
+  description: "Crie enquetes personalizadas e compartilhe com seus amigos.",
+};
 
 export default function RootLayout({
   children,

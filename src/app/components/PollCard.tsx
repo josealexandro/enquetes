@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo, lazy, Suspense } from "react";
 import { Poll, Comment } from "../types/poll";
 import Image from "next/image";
 import CommentComponent from "./Comment";
@@ -9,14 +9,17 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShareNodes, faHeart, faHeartCrack } from '@fortawesome/free-solid-svg-icons';
 import { motion } from "framer-motion";
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc, arrayUnion, arrayRemove, FieldValue, increment } from "firebase/firestore"; // Importar funções do Firestore e arrayUnion/arrayRemove
+import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc, arrayUnion, arrayRemove, FieldValue, increment, limit } from "firebase/firestore"; // Importar funções do Firestore e arrayUnion/arrayRemove
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
-import AuthPromptCard from "./Auth/AuthPromptCard"; // Importar AuthPromptCard
 import { useAuthModal } from "@/app/context/AuthModalContext"; // Importar useAuthModal
 import HeartAnimation from "@/components/HeartAnimation"; // Importar o componente de animação
 import { useRef } from "react"; // Importar useRef
 import { useRouter } from 'next/navigation'; // Importar useRouter
 import { getContrastTextColor } from "@/utils/colorUtils"; // Importar a função utilitária
+
+// Lazy load de componentes não críticos para a renderização inicial
+const AuthPromptCard = lazy(() => import("./Auth/AuthPromptCard"));
+const QRCodeModal = lazy(() => import("./QRCodeModal"));
 
 interface PollCardProps {
   poll: Poll;
@@ -31,7 +34,7 @@ interface PollCardProps {
   companyThemeColor?: string; // Novo prop: Cor do tema da empresa
 }
 
-export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorClass, borderColor, companySlug, enableCompanyLink, companyThemeColor }: PollCardProps) {
+function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorClass, borderColor, companySlug, enableCompanyLink, companyThemeColor }: PollCardProps) {
   const [votedOptionId, setVotedOptionId] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [isClient, setIsClient] = useState(false);
@@ -43,13 +46,23 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
   const { openLoginModal, openSignupModal } = useAuthModal(); // Usar o contexto para abrir modais
   const [showHeartAnimation, setShowHeartAnimation] = useState(false);
   const [heartAnimationPosition, setHeartAnimationPosition] = useState<{ x: number; y: number } | null>(null);
+  const [showQRCodeModal, setShowQRCodeModal] = useState(false); // Estado para controlar o modal de QR Code
   const pollCardRef = useRef<HTMLDivElement>(null); // Referência para o card da enquete
   const router = useRouter(); // Usar o useRouter para navegação
 
-  console.log("PollCard renderizado.");
-  console.log("User:", user);
-  console.log("Poll:", poll);
-  console.log("Is Master User:", isMasterUser);
+  // Estados locais para Optimistic UI de Likes/Dislikes
+  const [likes, setLikes] = useState(poll.likes || 0);
+  const [dislikes, setDislikes] = useState(poll.dislikes || 0);
+  const [likedBy, setLikedBy] = useState<string[]>(poll.likedBy || []);
+  const [dislikedBy, setDislikedBy] = useState<string[]>(poll.dislikedBy || []);
+
+  // Sincronizar estados locais se a prop poll mudar (ex: atualização do pai)
+  useEffect(() => {
+    setLikes(poll.likes || 0);
+    setDislikes(poll.dislikes || 0);
+    setLikedBy(poll.likedBy || []);
+    setDislikedBy(poll.dislikedBy || []);
+  }, [poll.likes, poll.dislikes, poll.likedBy, poll.dislikedBy]);
 
   // Efeito para carregar o estado do voto do localStorage
   useEffect(() => {
@@ -69,22 +82,33 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
 
   // useEffect para carregar comentários do Firestore em tempo real
   useEffect(() => {
-    const commentsCollectionRef = collection(db, "polls", poll.id, "comments");
-    const q = query(commentsCollectionRef, orderBy("timestamp", "asc"));
+    let unsubscribe = () => {};
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedComments = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Comment[];
-      setComments(fetchedComments);
-    }, (error) => {
-      console.error("Erro ao carregar comentários:", error);
-    });
+    if (isExpanded) {
+      const commentsCollectionRef = collection(db, "polls", poll.id, "comments");
+      const q = query(commentsCollectionRef, orderBy("timestamp", "desc"), limit(20)); // Alterado para desc e limitado a 20
 
-    setIsClient(true); // Manter isso para outras funcionalidades que dependem do cliente
+      unsubscribe = onSnapshot(q, (snapshot) => {
+        const fetchedComments = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Comment[];
+        // Inverter a ordem para exibir os mais antigos primeiro (se desejar manter a ordem cronológica visual)
+        // ou manter desc para ver os novos no topo. Geralmente em chats/feeds, o mais novo fica no topo ou fundo.
+        // Aqui, como estava 'asc' antes, vou reverter o array para manter a lógica visual de "antigos -> novos"
+        // mas garantindo que pegamos apenas os 20 ÚLTIMOS postados.
+        setComments(fetchedComments.reverse()); 
+      }, (error) => {
+        console.error("Erro ao carregar comentários:", error);
+      });
+    }
+
     return () => unsubscribe();
-  }, [poll.id]);
+  }, [poll.id, isExpanded]);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Gerar o link de compartilhamento condicionalmente
   const pollShareLink = 
@@ -100,6 +124,11 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
 
   const shareOnWhatsApp = () => {
     window.open(`https://wa.me/?text=${encodeURIComponent(poll.title + "\n" + pollShareLink)}`, "_blank");
+    setShowShareMenu(false);
+  };
+
+  const handleGenerateQRCode = () => {
+    setShowQRCodeModal(true);
     setShowShareMenu(false);
   };
 
@@ -123,73 +152,106 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
 
   const handleLike = async (event?: React.MouseEvent) => {
     if (!user) {
-      setShowAuthPrompt(true); // Mostrar o card de prompt de autenticação
+      setShowAuthPrompt(true);
       return;
     }
 
     const pollRef = doc(db, "polls", poll.id);
-    const hasLiked = poll.likedBy?.includes(user.uid);
-    const hasDisliked = poll.dislikedBy?.includes(user.uid);
+    const hasLiked = likedBy.includes(user.uid);
+    const hasDisliked = dislikedBy.includes(user.uid);
+
+    // Optimistic Update
+    if (hasLiked) {
+      setLikes(prev => prev - 1);
+      setLikedBy(prev => prev.filter(id => id !== user.uid));
+    } else {
+      setLikes(prev => prev + 1);
+      setLikedBy(prev => [...prev, user.uid]);
+      if (hasDisliked) {
+        setDislikes(prev => prev - 1);
+        setDislikedBy(prev => prev.filter(id => id !== user.uid));
+      }
+    }
+
+    // Animação
+    if (!hasLiked && event) {
+        const rect = pollCardRef.current?.getBoundingClientRect();
+        if (rect) {
+          setHeartAnimationPosition({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+          setShowHeartAnimation(true);
+        }
+    }
 
     try {
       if (hasLiked) {
-        // Se já curtiu, descurtir
         await updateDoc(pollRef, {
           likes: increment(-1),
           likedBy: arrayRemove(user.uid),
         });
       } else {
-        // Se não curtiu, curtir
-        const updateData: { likes: number | FieldValue; likedBy: string[] | FieldValue; dislikes?: number | FieldValue; dislikedBy?: string[] | FieldValue; } = {
+        const updateData: any = {
           likes: increment(1),
           likedBy: arrayUnion(user.uid),
         };
         if (hasDisliked) {
-          // Se descurtiu, remover descurtida ao curtir
           updateData.dislikes = increment(-1);
           updateData.dislikedBy = arrayRemove(user.uid);
         }
         await updateDoc(pollRef, updateData);
-        // Disparar a animação de coração se o like for um novo like
-        if (!hasLiked && event) {
-          const rect = pollCardRef.current?.getBoundingClientRect();
-          if (rect) {
-            setHeartAnimationPosition({ x: event.clientX - rect.left, y: event.clientY - rect.top });
-            setShowHeartAnimation(true);
-          }
-        }
       }
     } catch (error) {
       console.error("Erro ao curtir/descurtir enquete:", error);
+      // Revert Optimistic Update on error
+      if (hasLiked) {
+        setLikes(prev => prev + 1);
+        setLikedBy(prev => [...prev, user.uid]);
+      } else {
+        setLikes(prev => prev - 1);
+        setLikedBy(prev => prev.filter(id => id !== user.uid));
+        if (hasDisliked) {
+            setDislikes(prev => prev + 1);
+            setDislikedBy(prev => [...prev, user.uid]);
+        }
+      }
       alert("Erro ao curtir/descurtir enquete. Tente novamente.");
     }
   };
 
   const handleDislike = async () => {
     if (!user) {
-      setShowAuthPrompt(true); // Mostrar o card de prompt de autenticação
+      setShowAuthPrompt(true);
       return;
     }
 
     const pollRef = doc(db, "polls", poll.id);
-    const hasLiked = poll.likedBy?.includes(user.uid);
-    const hasDisliked = poll.dislikedBy?.includes(user.uid);
+    const hasLiked = likedBy.includes(user.uid);
+    const hasDisliked = dislikedBy.includes(user.uid);
+
+    // Optimistic Update
+    if (hasDisliked) {
+        setDislikes(prev => prev - 1);
+        setDislikedBy(prev => prev.filter(id => id !== user.uid));
+    } else {
+        setDislikes(prev => prev + 1);
+        setDislikedBy(prev => [...prev, user.uid]);
+        if (hasLiked) {
+            setLikes(prev => prev - 1);
+            setLikedBy(prev => prev.filter(id => id !== user.uid));
+        }
+    }
 
     try {
       if (hasDisliked) {
-        // Se já descurtiu, remover descurtida
         await updateDoc(pollRef, {
           dislikes: increment(-1),
           dislikedBy: arrayRemove(user.uid),
         });
       } else {
-        // Se não descurtiu, descurtir
-        const updateData: { dislikes: number | FieldValue; dislikedBy: string[] | FieldValue; likes?: number | FieldValue; likedBy?: string[] | FieldValue; } = {
+        const updateData: any = {
           dislikes: increment(1),
           dislikedBy: arrayUnion(user.uid),
         };
         if (hasLiked) {
-          // Se curtiu, remover curtida ao descurtir
           updateData.likes = increment(-1);
           updateData.likedBy = arrayRemove(user.uid);
         }
@@ -197,6 +259,18 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
       }
     } catch (error) {
       console.error("Erro ao curtir/descurtir enquete:", error);
+      // Revert Optimistic Update
+      if (hasDisliked) {
+        setDislikes(prev => prev + 1);
+        setDislikedBy(prev => [...prev, user.uid]);
+      } else {
+        setDislikes(prev => prev - 1);
+        setDislikedBy(prev => prev.filter(id => id !== user.uid));
+        if (hasLiked) {
+            setLikes(prev => prev + 1);
+            setLikedBy(prev => [...prev, user.uid]);
+        }
+      }
       alert("Erro ao curtir/descurtir enquete. Tente novamente.");
     }
   };
@@ -222,9 +296,15 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
       return;
     }
 
+    // Determinar o nome do autor: Se for conta comercial e tiver nome comercial, use-o.
+    // Caso contrário, use displayName ou email.
+    const authorName = (user.accountType === 'commercial' && user.commercialName)
+      ? user.commercialName
+      : (user.displayName || user.email || "Usuário Logado");
+
     const baseComment = {
       pollId: poll.id,
-      author: user.displayName || user.email || "Usuário Logado", // Usar displayName, fallback para email ou "Usuário Logado"
+      author: authorName, // Usar o nome determinado acima
       authorId: user.uid,
       authorEmail: user.email,
       text,
@@ -296,7 +376,7 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
 
   return (
     <div
-      className={`rounded-lg transition-all duration-300 p-6 mb-6 transform hover:-translate-y-1 cursor-pointer w-[90%] mx-auto relative
+      className={`rounded-lg transition-all duration-300 p-6 mb-6 transform hover:-translate-y-1 cursor-pointer w-[90%] mx-auto relative ${showShareMenu ? "z-20" : ""}
         ${isExpanded
           ? poll.rank
             ? `bg-zinc-700 dark:bg-zinc-800 border-2 ${borderColor} shadow-md` // Ranked, expanded: dark background with colored border
@@ -406,6 +486,12 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
                 Compartilhar no WhatsApp
               </button>
               <button
+                onClick={handleGenerateQRCode}
+                className="block w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-600"
+              >
+                Gerar QR Code
+              </button>
+              <button
                 onClick={shareGeneric}
                 className="block w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-600"
               >
@@ -418,27 +504,27 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
         <button
           onClick={(e) => handleLike(e)}
           className={`p-2 rounded-full transition-colors duration-200 ${
-            user && poll.likedBy?.includes(user.uid)
+            user && likedBy.includes(user.uid)
               ? "text-red-500 hover:text-red-600 bg-red-100 dark:bg-red-900"
               : "text-zinc-300 hover:text-red-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
           }`}
           aria-label="Curtir Enquete"
         >
           <FontAwesomeIcon icon={faHeart} size="lg" />
-          <span className="ml-1 text-sm">{poll.likedBy?.length || 0}</span>
+          <span className="ml-1 text-sm">{likes}</span>
         </button>
 
         <button
           onClick={handleDislike}
           className={`p-2 rounded-full transition-colors duration-200 ${
-            user && poll.dislikedBy?.includes(user.uid)
+            user && dislikedBy.includes(user.uid)
               ? "text-indigo-500 hover:text-indigo-600 bg-indigo-100 dark:bg-indigo-900"
               : "text-zinc-300 hover:text-indigo-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
           }`}
           aria-label="Descurtir Enquete"
         >
           <FontAwesomeIcon icon={faHeartCrack} size="lg" />
-          <span className="ml-1 text-sm">{poll.dislikedBy?.length || 0}</span>
+          <span className="ml-1 text-sm">{dislikes}</span>
         </button>
         {(user?.uid === poll.creator.id || isMasterUser) && (
           <button
@@ -523,19 +609,33 @@ export default function PollCard({ poll, onVote, onDelete, onCardClick, rankColo
         </>
       )}
       {showAuthPrompt && (
-        <AuthPromptCard
-          message="Você precisa estar logado para votar."
-          onClose={() => setShowAuthPrompt(false)}
-          onLoginClick={() => {
-            setShowAuthPrompt(false);
-            openLoginModal();
-          }}
-          onSignupClick={() => {
-            setShowAuthPrompt(false);
-            openSignupModal();
-          }}
-        />
+        <Suspense fallback={null}>
+          <AuthPromptCard
+            message="Você precisa estar logado para votar."
+            onClose={() => setShowAuthPrompt(false)}
+            onLoginClick={() => {
+              setShowAuthPrompt(false);
+              openLoginModal();
+            }}
+            onSignupClick={() => {
+              setShowAuthPrompt(false);
+              openSignupModal();
+            }}
+          />
+        </Suspense>
+      )}
+      {showQRCodeModal && (
+        <Suspense fallback={null}>
+          <QRCodeModal
+            isOpen={showQRCodeModal}
+            onClose={() => setShowQRCodeModal(false)}
+            url={pollShareLink}
+            title={poll.title}
+          />
+        </Suspense>
       )}
     </div>
   );
 }
+
+export default memo(PollCard);
