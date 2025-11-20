@@ -456,11 +456,16 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
         )}
       </div>
 
-      <h2 className={`text-2xl font-semibold max-w-full break-words overflow-hidden mb-4 line-clamp-2 
-        ${(poll.isCommercial && companyThemeColor && !poll.rank)
-          ? getContrastTextColor(companyThemeColor) // Use a função para cor do tema para o título
-          : (isExpanded ? "text-white" : textColorClass)}
-      `}> {/* Aplicar textColorClass */}
+      <h2
+        className={`text-2xl font-semibold max-w-full break-words overflow-hidden mb-4 ${
+          isExpanded ? "line-clamp-none" : "line-clamp-2"
+        } ${
+          (poll.isCommercial && companyThemeColor && !poll.rank)
+            ? getContrastTextColor(companyThemeColor) // Use a função para cor do tema para o título
+            : (isExpanded ? "text-white" : textColorClass)
+        }`}
+        title={poll.title}
+      > {/* Aplicar textColorClass */}
         {poll.title}
       </h2>
 
@@ -557,8 +562,10 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
               const percent = (currentTotalVotes && currentTotalVotes > 0) ? Math.round((option.votes / currentTotalVotes) * 100) : 0;
 
               return (
-                <li key={option.id}>
-                  <div className="flex justify-between items-center mb-1" onClick={(_e) => _e.stopPropagation()}> {/* Impede a propagação do clique */} 
+                <li key={option.id} className="space-y-2">
+                  <div
+                    className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3 w-full"
+                    onClick={(_e) => _e.stopPropagation()}> {/* Impede a propagação do clique */}
                     <motion.button
                       whileHover={{ scale: 1.02, x: 5 }}
                       whileTap={{ scale: 0.98 }}
@@ -566,7 +573,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
                         handleVoteClick(option.id); 
                       }}
                       disabled={!!votedOptionId} // Desabilitar se já votou localmente
-                      className={`text-left font-medium transition-colors duration-200
+                      className={`flex-1 w-full text-left font-medium transition-colors duration-200 break-words break-all whitespace-normal leading-snug
                         ${votedOptionId === option.id
                           ? "text-blue-600 dark:text-blue-400"
                           : votedOptionId
@@ -582,7 +589,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
                     >
                       {option.text}
                     </motion.button>
-                    <span key={option.votes} className={`text-sm animate-pulse-once
+                    <span key={option.votes} className={`text-sm animate-pulse-once shrink-0 text-left sm:text-right w-full sm:w-auto
                       ${poll.rank
                         ? "text-white" // If ranked, force white text for vote count
                         : (poll.isCommercial && companyThemeColor)
