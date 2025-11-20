@@ -9,7 +9,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShareNodes, faHeart, faHeartCrack } from '@fortawesome/free-solid-svg-icons';
 import { motion } from "framer-motion";
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc, arrayUnion, arrayRemove, FieldValue, increment, limit } from "firebase/firestore"; // Importar funções do Firestore e arrayUnion/arrayRemove
+import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc, arrayUnion, arrayRemove, increment, limit } from "firebase/firestore"; // Importar funções do Firestore e arrayUnion/arrayRemove
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 import { useAuthModal } from "@/app/context/AuthModalContext"; // Importar useAuthModal
 import HeartAnimation from "@/components/HeartAnimation"; // Importar o componente de animação
@@ -189,7 +189,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
           likedBy: arrayRemove(user.uid),
         });
       } else {
-        const updateData: any = {
+        const updateData: Record<string, any> = {
           likes: increment(1),
           likedBy: arrayUnion(user.uid),
         };
@@ -247,7 +247,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
           dislikedBy: arrayRemove(user.uid),
         });
       } else {
-        const updateData: any = {
+        const updateData: Record<string, any> = {
           dislikes: increment(1),
           dislikedBy: arrayUnion(user.uid),
         };

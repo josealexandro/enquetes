@@ -10,7 +10,7 @@ import { useAuth } from "./context/AuthContext";
 import { motion } from "framer-motion";
 import { AnimatePresence } from "framer-motion"; // Importar AnimatePresence
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, getDoc, Timestamp, limit, startAfter, getDocs, where, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
+import { collection, query, orderBy, updateDoc, deleteDoc, doc, getDoc, Timestamp, limit, startAfter, getDocs, where, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import { useRouter } from 'next/navigation';
 import PollPodium from "./components/PollPodium";
 import slugify from "@/utils/slugify";
