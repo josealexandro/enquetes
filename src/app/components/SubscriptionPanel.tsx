@@ -105,21 +105,44 @@ const formatBRL = (valueInCents: number) =>
     minimumFractionDigits: 2,
   });
 
-const toDateSafe = (value: any): Date | null => {
+type FirestoreTimestampLike =
+  | Timestamp
+  | Date
+  | {
+      seconds: number;
+      nanoseconds: number;
+      toDate?: () => Date;
+    };
+
+const toDateSafe = (value: unknown): Date | null => {
   if (!value) return null;
   if (value instanceof Date) return value;
-  if (typeof value.toDate === "function") return value.toDate();
+  if (value instanceof Timestamp) return value.toDate();
   if (
     typeof value === "object" &&
-    typeof value.seconds === "number" &&
-    typeof value.nanoseconds === "number"
+    value !== null &&
+    "toDate" in value &&
+    typeof (value as { toDate?: unknown }).toDate === "function"
   ) {
-    return new Timestamp(value.seconds, value.nanoseconds).toDate();
+    return (value as { toDate: () => Date }).toDate();
+  }
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "seconds" in value &&
+    "nanoseconds" in value &&
+    typeof (value as { seconds: unknown }).seconds === "number" &&
+    typeof (value as { nanoseconds: unknown }).nanoseconds === "number"
+  ) {
+    const v = value as { seconds: number; nanoseconds: number };
+    return new Timestamp(v.seconds, v.nanoseconds).toDate();
   }
   return null;
 };
 
-const formatDate = (timestamp?: Subscription["currentPeriodEnd"] | any) => {
+const formatDate = (
+  timestamp?: FirestoreTimestampLike | null
+) => {
   const date = toDateSafe(timestamp);
   if (!date) return "—";
   return Intl.DateTimeFormat("pt-BR", {
@@ -160,7 +183,9 @@ const renderPlanLimits = (limits: PlanLimits) => (
   </dl>
 );
 
-const formatShortDate = (timestamp?: Subscription["currentPeriodEnd"] | any) => {
+const formatShortDate = (
+  timestamp?: FirestoreTimestampLike | null
+) => {
   const date = toDateSafe(timestamp);
   if (!date) return "—";
   return Intl.DateTimeFormat("pt-BR", {
@@ -194,13 +219,18 @@ const renderPaymentRow = (payment: Payment) => {
   );
 };
 
+interface PagarmeCheckoutData extends Record<string, unknown> {}
+
+type PagarmeCheckoutSuccess = (data: PagarmeCheckoutData) => void;
+type PagarmeCheckoutError = (err: unknown) => void;
+
 declare global {
   interface Window {
     PagarMeCheckout?: {
       Checkout: new (options: {
         encryption_key: string;
-        success: (data: any) => void;
-        error: (err: any) => void;
+        success: PagarmeCheckoutSuccess;
+        error: PagarmeCheckoutError;
         close: () => void;
       }) => {
         open: (config: {
@@ -314,7 +344,7 @@ const SubscriptionPanel = ({
     return new Promise<void>((resolve, reject) => {
       const checkout = new window.PagarMeCheckout!.Checkout({
         encryption_key: encryptionKey,
-        success: async (data: any) => {
+        success: async (data: PagarmeCheckoutData) => {
           try {
             const res = await fetch("/api/pagarme/checkout", {
               method: "POST",
@@ -344,7 +374,7 @@ const SubscriptionPanel = ({
             reject(err);
           }
         },
-        error: (err: any) => {
+        error: (err: unknown) => {
           console.error("Erro no Pagar.me Checkout:", err);
           reject(
             new Error(

@@ -35,9 +35,17 @@ export interface PagarmeTransaction {
   [key: string]: unknown;
 }
 
+export interface PagarmeCheckoutData {
+  card_hash?: string;
+  token?: string;
+  payment_method?: string;
+  customer?: unknown;
+  [key: string]: unknown;
+}
+
 export interface CreateTransactionFromCheckoutInput {
   amount: number;
-  checkoutData: any;
+  checkoutData: PagarmeCheckoutData;
   metadata?: Record<string, string | number | boolean | null>;
 }
 
