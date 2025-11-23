@@ -68,7 +68,7 @@ Uma plataforma moderna e interativa para criação, compartilhamento e votação
     ```
 
 3.  **Configure as Variáveis de Ambiente:**
-    Crie um arquivo `.env.local` na raiz do projeto com as credenciais do seu projeto Firebase:
+    Crie um arquivo `.env.local` na raiz do projeto com as credenciais do seu projeto Firebase e do gateway de pagamento (Pagar.me):
 
     ```env
     NEXT_PUBLIC_FIREBASE_API_KEY=sua_api_key
@@ -78,6 +78,10 @@ Uma plataforma moderna e interativa para criação, compartilhamento e votação
     NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=seu_sender_id
     NEXT_PUBLIC_FIREBASE_APP_ID=seu_app_id
     NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=seu_measurement_id
+
+    PAGARME_API_BASE=https://api.pagar.me/core/v5
+    PAGARME_API_KEY=sua_chave_privada
+    PAGARME_ENCRYPTION_KEY=sua_chave_de_criptografia
     ```
 
 4.  **Execute o servidor de desenvolvimento:**

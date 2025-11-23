@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from 'next/navigation';
 import { useAuth } from "../context/AuthContext";
 import DashboardComponent from "../components/Dashboard";
+import SubscriptionPanel from "../components/SubscriptionPanel";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { collection, query, orderBy, onSnapshot, getDocs, where } from "firebase/firestore"; // Importar funcionalidades do Firestore
@@ -17,6 +18,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [polls, setPolls] = useState<Poll[]>([]); // Estado para armazenar as enquetes
+  const [activeSection, setActiveSection] = useState<"polls" | "subscription">("polls");
 
   useEffect(() => {
     if (!loading && (!user || user.accountType !== 'commercial')) {
@@ -127,9 +129,15 @@ export default function DashboardPage() {
               </li>
             )}
             <li className="mb-2">
-              <a href="#" className="flex items-center p-2 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setActiveSection("subscription")}
+                className={`flex items-center p-2 rounded-lg w-full text-left ${
+                  activeSection === "subscription" ? "bg-gray-700" : "hover:bg-gray-700"
+                }`}
+              >
                 <span className="mr-2">💳</span> Assinatura
-              </a>
+              </button>
             </li>
             <li className="mb-2">
               <a href="#" className="flex items-center p-2 rounded-lg">
@@ -137,9 +145,15 @@ export default function DashboardPage() {
               </a>
             </li>
             <li className="mb-2">
-              <Link href="/dashboard" className="flex items-center p-2 rounded-lg bg-gray-700">
+              <button
+                type="button"
+                onClick={() => setActiveSection("polls")}
+                className={`flex items-center p-2 rounded-lg w-full text-left ${
+                  activeSection === "polls" ? "bg-gray-700" : "hover:bg-gray-700"
+                }`}
+              >
                 <span className="mr-2">📝</span> Minhas Enquetes
-              </Link>
+              </button>
             </li>
           </ul>
         </nav>
@@ -147,7 +161,14 @@ export default function DashboardPage() {
       
       {/* Main Content */}
       <main className="flex-1 p-8 overflow-y-auto md:ml-64">
-        <DashboardComponent polls={polls} user={user!} /> {/* Passar as enquetes como prop, user garantido como não nulo */}
+        {activeSection === "polls" ? (
+          <DashboardComponent polls={polls} user={user!} />
+        ) : (
+          <SubscriptionPanel
+            companyId={user!.uid}
+            companyName={user!.displayName || user!.email || "Empresa"}
+          />
+        )}
       </main>
     </div>
   );
