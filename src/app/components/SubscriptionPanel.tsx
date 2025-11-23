@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Timestamp } from "firebase/firestore";
+import type { PagarmeCheckoutData } from "@/app/services/pagarmeService";
 import { useSubscriptionData } from "@/app/hooks/useSubscriptionData";
 import {
   Plan,
@@ -218,8 +219,6 @@ const renderPaymentRow = (payment: Payment) => {
     </tr>
   );
 };
-
-interface PagarmeCheckoutData extends Record<string, unknown> {}
 
 type PagarmeCheckoutSuccess = (data: PagarmeCheckoutData) => void;
 type PagarmeCheckoutError = (err: unknown) => void;

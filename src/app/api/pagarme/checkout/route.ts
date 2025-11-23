@@ -7,6 +7,7 @@ import {
 import {
   createTransactionFromCheckout,
   mapPagarmeStatusToPaymentStatus,
+  type PagarmeCheckoutData,
 } from "@/app/services/pagarmeService";
 import { PaymentStatus } from "@/app/types/subscription";
 
@@ -16,7 +17,7 @@ interface CheckoutRequestBody {
   companyId: string;
   companyName: string;
   subscriptionId?: string;
-  checkoutData: any;
+  checkoutData: PagarmeCheckoutData;
 }
 
 export async function POST(request: NextRequest) {
