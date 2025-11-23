@@ -231,11 +231,11 @@ export async function logSubscriptionChange(input: LogSubscriptionChangeInput) {
     subscriptionId: input.subscriptionId,
     actorId: input.actorId,
     actorName: input.actorName,
-    fromPlan: input.fromPlan ?? null,
-    toPlan: input.toPlan ?? null,
-    fromStatus: input.fromStatus ?? null,
-    toStatus: input.toStatus ?? null,
-    notes: input.notes ?? null,
+    fromPlan: input.fromPlan,
+    toPlan: input.toPlan,
+    fromStatus: input.fromStatus,
+    toStatus: input.toStatus,
+    notes: input.notes,
     createdAt: Timestamp.now(),
   } satisfies SubscriptionAudit;
 
