@@ -3,9 +3,9 @@ import { switchSubscriptionPlan } from "@/app/services/subscriptionService";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { subscriptionId: string } }
+  { params }: { params: Promise<{ subscriptionId: string }> }
 ) {
-  const { subscriptionId } = params;
+  const { subscriptionId } = await params;
 
   try {
     const body = await request.json();
