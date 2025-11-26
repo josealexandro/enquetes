@@ -6,7 +6,8 @@ export const DEFAULT_PLANS: Plan[] = [
     slug: "basic",
     name: "Basic",
     description: "Ideal para comerciantes que estão começando a coletar feedback.",
-    price: 5990, // R$ 59,90
+    // Valor reduzido temporariamente para testes de pagamento (R$ 1,00)
+    price: 100, // R$ 1,00
     currency: "BRL",
     billingPeriod: "monthly",
     trialDays: 7,

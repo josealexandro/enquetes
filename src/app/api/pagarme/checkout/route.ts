@@ -37,8 +37,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { amount, planId, companyId, companyName, subscriptionId, checkoutData } =
-      body;
+    const {
+      amount,
+      planId,
+      companyId,
+      companyName,
+      subscriptionId,
+      checkoutData,
+    } = body;
 
     // 1) Cria transação no Pagar.me (quando configurado)
     const { transaction, skipped } = await createTransactionFromCheckout({
@@ -49,6 +55,13 @@ export async function POST(request: NextRequest) {
         companyId,
         companyName,
       },
+    });
+
+    console.log("[PAGARME_CHECKOUT] Resultado da criação de transação:", {
+      skipped,
+      status: transaction?.status,
+      id: transaction?.id,
+      metadata: (transaction as any)?.metadata,
     });
 
     const externalStatus = transaction?.status ?? "processing";

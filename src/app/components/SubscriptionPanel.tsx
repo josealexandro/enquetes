@@ -254,9 +254,8 @@ const SubscriptionPanel = ({
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
   const [checkoutReady, setCheckoutReady] = useState(false);
 
-  const encryptionKey =
-    process.env.NEXT_PUBLIC_PAGARME_ENCRYPTION_KEY ||
-    process.env.PAGARME_ENCRYPTION_KEY;
+  // Chave pública usada no Checkout do Pagar.me (NUNCA use sk_ aqui!)
+  const encryptionKey = process.env.NEXT_PUBLIC_PAGARME_PUBLIC_KEY;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -374,7 +373,15 @@ const SubscriptionPanel = ({
           }
         },
         error: (err: unknown) => {
-          console.error("Erro no Pagar.me Checkout:", err);
+          // Logamos o erro completo para facilitar o diagnóstico
+          try {
+            console.error(
+              "Erro no Pagar.me Checkout (detalhado):",
+              typeof err === "string" ? err : JSON.stringify(err, null, 2)
+            );
+          } catch {
+            console.error("Erro no Pagar.me Checkout:", err);
+          }
           reject(
             new Error(
               "Pagamento não foi concluído no gateway. Tente novamente."
