@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       skipped,
       status: transaction?.status,
       id: transaction?.id,
-      metadata: (transaction as any)?.metadata,
+      metadata: transaction?.metadata,
     });
 
     const externalStatus = transaction?.status ?? "processing";

@@ -28,6 +28,7 @@ export interface PagarmeTransaction {
   status: PagarmeTransactionStatus;
   amount: number;
   payment_method?: string;
+  metadata?: Record<string, unknown>;
   boleto_url?: string;
   boleto_barcode?: string;
   pix_qr_code?: string;

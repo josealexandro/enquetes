@@ -6,6 +6,7 @@ import {
 import {
   mapPagarmeStatusToPaymentStatus,
   type PagarmeTransaction,
+  type PagarmeTransactionStatus,
 } from "@/app/services/pagarmeService";
 import type { SubscriptionStatus } from "@/app/types/subscription";
 
@@ -34,17 +35,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const asAny = body as any;
+    type WebhookRoot = {
+      object?: string;
+      data?: { object?: PagarmeTransaction };
+      transaction?: PagarmeTransaction;
+      [key: string]: unknown;
+    };
+
+    const root = body as WebhookRoot;
 
     // Tenta localizar o objeto de transação em diferentes formatos de payload
-    const tx: PagarmeTransaction | undefined =
-      asAny?.object === "transaction"
-        ? (asAny as PagarmeTransaction)
-        : asAny?.data?.object
-        ? (asAny.data.object as PagarmeTransaction)
-        : asAny?.transaction
-        ? (asAny.transaction as PagarmeTransaction)
-        : undefined;
+    let tx: PagarmeTransaction | undefined;
+    if (root.object === "transaction") {
+      // Alguns webhooks enviam a transação diretamente no payload raiz
+      tx = root as unknown as PagarmeTransaction;
+    } else if (root.data?.object) {
+      // Outros formatos colocam a transação em data.object
+      tx = root.data.object;
+    } else if (root.transaction) {
+      // E em alguns casos vem em "transaction"
+      tx = root.transaction;
+    }
 
     if (!tx) {
       console.warn(
@@ -57,8 +68,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const txWithCurrentStatus = tx as PagarmeTransaction & {
+      current_status?: PagarmeTransactionStatus;
+    };
     const externalStatus =
-      (tx as any).current_status ?? (tx as any).status ?? "processing";
+      txWithCurrentStatus.current_status ??
+      txWithCurrentStatus.status ??
+      "processing";
     const paymentStatus = mapPagarmeStatusToPaymentStatus(externalStatus);
 
     // Só reagimos a estados finais relevantes
