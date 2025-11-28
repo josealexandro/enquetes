@@ -37,34 +37,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const url = `${PAGARME_API_BASE.replace(/\/$/, "")}/payment_links`;
+    // Utilizando a API Core V5 para criar uma Order fechada (closed: false)
+    // Isso gera uma URL de checkout se configurado corretamente,
+    // ou podemos usar a API de Orders para criar um pedido e pegar o "checkouts_url" se a conta tiver essa feature.
+    // No entanto, a forma mais comum na V5 para "link de pagamento" style é criar um pedido com `closed: false`.
+    
+    const url = `${PAGARME_API_BASE.replace(/\/$/, "")}/orders`;
 
     const payload = {
-      name: `Assinatura ${companyName} - ${planId}`,
-      payment_settings: {
-        // Para simplificar a validação, por enquanto aceitamos apenas cartão.
-        accepted_payment_methods: ["credit_card"],
-        credit_card_settings: {
-          operation_type: "auth_and_capture",
-          // A API exige alguma configuração de parcelamento/brand_installments.
-          // Aqui configuramos apenas 1x sem juros.
-          installments: [
-            {
-              number: 1,
-              total: amount,
-            },
-          ],
-        },
+      customer: {
+        // Dados fictícios mínimos ou reais se tivermos
+        name: companyName || "Cliente",
+        email: "cliente@email.com", // Idealmente viria do request
       },
-      cart_settings: {
-        items: [
-          {
-            code: planId,
-            name: `Plano ${planId}`,
-            amount,
-            default_quantity: 1,
-          },
-        ],
+      items: [
+        {
+          amount: amount,
+          description: `Assinatura ${companyName} - ${planId}`,
+          quantity: 1,
+          code: planId,
+        },
+      ],
+      closed: false, // Importante para permitir pagamento posterior via link
+      payment_method: "checkout", // Indica que queremos usar o checkout hospedado
+      checkout: {
+        expires_in: 120, // Expira em 120 minutos (exemplo)
+        billing_address_editable: true,
+        customer_editable: true,
+        accepted_payment_methods: ["credit_card", "pix", "boleto"],
+        success_url: "https://seusite.com/sucesso", // Idealmente configurável
+        skip_checkout_success_page: false,
       },
       metadata: {
         planId,
@@ -111,14 +113,25 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       console.error("[PAGARME_PAYMENTLINK] Erro ao criar payment link:", json);
+      const detail =
+        json?.message ||
+        json?.errors?.[0]?.message ||
+        JSON.stringify(json) ||
+        "Erro desconhecido no gateway";
       return NextResponse.json(
-        { message: "Erro ao criar link de pagamento no gateway." },
-        { status: 500 }
+        { message: `Erro no gateway: ${detail}` },
+        { status: response.status }
       );
     }
 
     return NextResponse.json(
-      { url: json.url as string, id: json.id as string },
+      { 
+        // Na API de Orders, a URL de checkout geralmente vem em "checkouts[0].payment_url" ou similar
+        // Precisamos verificar a estrutura de resposta da V5 para Orders com checkout.
+        // Geralmente é response.checkouts[0].payment_url
+        url: json.checkouts?.[0]?.payment_url || json.checkouts?.[0]?.pay_url || "", 
+        id: json.id as string 
+      },
       { status: 200 }
     );
   } catch (error) {

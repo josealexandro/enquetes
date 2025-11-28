@@ -44,17 +44,39 @@ export async function POST(request: NextRequest) {
 
     const root = body as WebhookRoot;
 
-    // Tenta localizar o objeto de transação em diferentes formatos de payload
+    // Tenta localizar o objeto de transação ou order em diferentes formatos de payload
     let tx: PagarmeTransaction | undefined;
-    if (root.object === "transaction") {
-      // Alguns webhooks enviam a transação diretamente no payload raiz
-      tx = root as unknown as PagarmeTransaction;
-    } else if (root.data?.object) {
-      // Outros formatos colocam a transação em data.object
-      tx = root.data.object;
-    } else if (root.transaction) {
-      // E em alguns casos vem em "transaction"
-      tx = root.transaction;
+    let orderStatus: string | undefined;
+
+    // Formato V5 padrão para Orders/Charges: type define o evento, data contém o objeto
+    if (root.type && root.data) {
+      const eventType = root.type as string; // ex: "order.paid", "charge.paid"
+      
+      // Se for evento de Order
+      if (eventType.startsWith("order.") && (root.data as any).charges) {
+        // Pega a primeira charge válida para determinar status
+        const charges = (root.data as any).charges as any[];
+        if (charges && charges.length > 0) {
+           tx = charges[0]; // Usa a primeira charge como referência de transação
+        }
+        // Status da order
+        orderStatus = (root.data as any).status;
+      } 
+      // Se for evento de Charge direto
+      else if (eventType.startsWith("charge.")) {
+        tx = root.data as unknown as PagarmeTransaction;
+      }
+    }
+
+    // Fallback para formatos antigos ou diretos (V4 style ou hooks simples)
+    if (!tx) {
+      if (root.object === "transaction") {
+        tx = root as unknown as PagarmeTransaction;
+      } else if (root.data?.object) {
+        tx = root.data.object;
+      } else if (root.transaction) {
+        tx = root.transaction;
+      }
     }
 
     if (!tx) {
@@ -71,17 +93,22 @@ export async function POST(request: NextRequest) {
     const txWithCurrentStatus = tx as PagarmeTransaction & {
       current_status?: PagarmeTransactionStatus;
     };
+    // Determinar status final
     const externalStatus =
+      orderStatus ?? // Se temos status da Order, ele tem prioridade
       txWithCurrentStatus.current_status ??
       txWithCurrentStatus.status ??
       "processing";
+      
     const paymentStatus = mapPagarmeStatusToPaymentStatus(externalStatus);
 
     // Só reagimos a estados finais relevantes
     let newSubscriptionStatus: SubscriptionStatus | null = null;
-    if (paymentStatus === "PAID") {
+    
+    // Se for PAID ou se a Order estiver "paid", ativamos
+    if (paymentStatus === "PAID" || externalStatus === "paid") {
       newSubscriptionStatus = "ACTIVE";
-    } else if (paymentStatus === "FAILED") {
+    } else if (paymentStatus === "FAILED" || externalStatus === "failed" || externalStatus === "canceled") {
       // Em caso de falha, marcamos como PAST_DUE para facilitar o reprocessamento
       newSubscriptionStatus = "PAST_DUE";
     }
