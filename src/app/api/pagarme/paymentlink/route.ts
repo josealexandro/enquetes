@@ -88,16 +88,25 @@ export async function POST(request: NextRequest) {
 
     let json;
     try {
-      json = await response.json();
+      // Clonamos a resposta para tentar ler como JSON primeiro
+      // Se falhar, tentamos ler o texto original (do clone ou da original se não lido)
+      const responseClone = response.clone();
+      try {
+        json = await response.json();
+      } catch {
+        // Se não for JSON, tentamos ler como texto do clone para logar
+        const text = await responseClone.text();
+        console.error(
+          "[PAGARME_PAYMENTLINK] Falha ao ler JSON de resposta. Corpo bruto:",
+          text
+        );
+        throw new Error(
+           `Resposta inválida do Pagar.me (Status ${response.status}). Corpo não é JSON.`
+        );
+      }
     } catch (err) {
-      const text = await response.text();
-      console.error(
-        "[PAGARME_PAYMENTLINK] Falha ao ler JSON de resposta:",
-        text
-      );
-      throw new Error(
-        `Resposta inválida do Pagar.me (Status ${response.status}). Verifique logs.`
-      );
+      // Re-lançamos o erro para ser pego pelo catch externo
+      throw err;
     }
 
     if (!response.ok) {
