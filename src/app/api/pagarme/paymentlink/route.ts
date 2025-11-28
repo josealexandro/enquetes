@@ -37,10 +37,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const url = `${PAGARME_API_BASE.replace(/\/$/, "")}/paymentlinks`;
+    const url = `${PAGARME_API_BASE.replace(/\/$/, "")}/payment_links`;
 
     const payload = {
-      type: "order",
       name: `Assinatura ${companyName} - ${planId}`,
       payment_settings: {
         // Para simplificar a validação, por enquanto aceitamos apenas cartão.
@@ -87,7 +86,19 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(payload),
     });
 
-    const json = await response.json();
+    let json;
+    try {
+      json = await response.json();
+    } catch (err) {
+      const text = await response.text();
+      console.error(
+        "[PAGARME_PAYMENTLINK] Falha ao ler JSON de resposta:",
+        text
+      );
+      throw new Error(
+        `Resposta inválida do Pagar.me (Status ${response.status}). Verifique logs.`
+      );
+    }
 
     if (!response.ok) {
       console.error("[PAGARME_PAYMENTLINK] Erro ao criar payment link:", json);
@@ -103,8 +114,10 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("[PAGARME_PAYMENTLINK_POST]", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro desconhecido";
     return NextResponse.json(
-      { message: "Erro inesperado ao criar link de pagamento." },
+      { message: `Erro inesperado ao criar link de pagamento: ${errorMessage}` },
       { status: 500 }
     );
   }
