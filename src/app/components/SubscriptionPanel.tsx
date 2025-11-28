@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Timestamp } from "firebase/firestore";
 import { useSubscriptionData } from "@/app/hooks/useSubscriptionData";
 import {
@@ -223,7 +223,7 @@ const SubscriptionPanel = ({
   companyId,
   companyName,
 }: SubscriptionPanelProps) => {
-  const { plans, subscription, payments, loading, error, refetch } =
+  const { plans, subscription, payments, loading, error } =
     useSubscriptionData(companyId, { enabled: !!companyId });
 
   const [alert, setAlert] = useState<AlertState | null>(null);

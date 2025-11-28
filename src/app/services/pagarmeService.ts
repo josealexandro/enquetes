@@ -185,7 +185,7 @@ export async function createTransactionFromCheckout(
       const area_code = phoneDigits.slice(0, 2);
       const number = phoneDigits.slice(2);
       // estrutura mínima esperada pelo Core v5
-      (customerPayload as any).phones = {
+      customerPayload["phones"] = {
         mobile_phone: {
           country_code: "55",
           area_code,
