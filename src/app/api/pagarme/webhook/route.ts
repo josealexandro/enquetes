@@ -53,14 +53,15 @@ export async function POST(request: NextRequest) {
       const eventType = root.type as string; // ex: "order.paid", "charge.paid"
       
       // Se for evento de Order
-      if (eventType.startsWith("order.") && (root.data as any).charges) {
+      const data = root.data as Record<string, unknown>;
+      if (eventType.startsWith("order.") && Array.isArray(data.charges)) {
         // Pega a primeira charge válida para determinar status
-        const charges = (root.data as any).charges as any[];
+        const charges = data.charges as PagarmeTransaction[];
         if (charges && charges.length > 0) {
            tx = charges[0]; // Usa a primeira charge como referência de transação
         }
         // Status da order
-        orderStatus = (root.data as any).status;
+        orderStatus = data.status as string;
       } 
       // Se for evento de Charge direto
       else if (eventType.startsWith("charge.")) {
