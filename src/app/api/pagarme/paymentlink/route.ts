@@ -11,21 +11,6 @@ if (!PAGARME_API_KEY) {
   );
 }
 
-// LOGS DE DEBUG PARA AUTENTICAÇÃO
-console.log("[DEBUG] PAGARME_API_KEY existe:", !!PAGARME_API_KEY);
-if (PAGARME_API_KEY) {
-  console.log("[DEBUG] PAGARME_API_KEY Length:", PAGARME_API_KEY.length);
-  console.log(
-    "[DEBUG] PAGARME_API_KEY Start:",
-    PAGARME_API_KEY.substring(0, 4)
-  );
-  console.log(
-    "[DEBUG] PAGARME_API_KEY End:",
-    PAGARME_API_KEY.substring(PAGARME_API_KEY.length - 4)
-  );
-}
-// FIM DOS LOGS DE DEBUG
-
 interface CreatePaymentLinkBody {
   amount: number; // em centavos
   planId: string;
