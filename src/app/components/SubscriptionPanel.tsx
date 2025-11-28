@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Timestamp } from "firebase/firestore";
-import type { PagarmeCheckoutData } from "@/app/services/pagarmeService";
 import { useSubscriptionData } from "@/app/hooks/useSubscriptionData";
 import {
   Plan,
@@ -220,29 +219,6 @@ const renderPaymentRow = (payment: Payment) => {
   );
 };
 
-type PagarmeCheckoutSuccess = (data: PagarmeCheckoutData) => void;
-type PagarmeCheckoutError = (err: unknown) => void;
-
-declare global {
-  interface Window {
-    PagarMeCheckout?: {
-      Checkout: new (options: {
-        encryption_key: string;
-        success: PagarmeCheckoutSuccess;
-        error: PagarmeCheckoutError;
-        close: () => void;
-      }) => {
-        open: (config: {
-          amount: number;
-          createToken: "true" | "false";
-          customerData: "true" | "false";
-          paymentMethods?: string;
-        }) => void;
-      };
-    };
-  }
-}
-
 const SubscriptionPanel = ({
   companyId,
   companyName,
@@ -252,28 +228,6 @@ const SubscriptionPanel = ({
 
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
-  const [checkoutReady, setCheckoutReady] = useState(false);
-
-  // Chave pública usada no Checkout do Pagar.me (NUNCA use sk_ aqui!)
-  const encryptionKey = process.env.NEXT_PUBLIC_PAGARME_PUBLIC_KEY;
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.PagarMeCheckout) {
-      setCheckoutReady(true);
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = "https://assets.pagar.me/checkout/checkout.js";
-    script.async = true;
-    script.onload = () => setCheckoutReady(true);
-    script.onerror = () => {
-      console.error("Erro ao carregar o script do Pagar.me Checkout.");
-      setCheckoutReady(false);
-    };
-    document.body.appendChild(script);
-  }, []);
 
   const currentStatus =
     subscription?.status && statusStyles[subscription.status]
@@ -327,81 +281,33 @@ const SubscriptionPanel = ({
   };
 
   const startCheckoutFlow = async (plan: Plan) => {
-    if (
-      typeof window === "undefined" ||
-      !window.PagarMeCheckout ||
-      !encryptionKey
-    ) {
-      // Fallback para o fluxo antigo caso o checkout não esteja disponível
-      await createOrSwitchSubscription(plan);
-      return;
+    const res = await fetch("/api/pagarme/paymentlink", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        amount: plan.price,
+        planId: plan.id,
+        companyId,
+        companyName,
+      }),
+    });
+
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      throw new Error(
+        json?.message ||
+          "Não foi possível iniciar o checkout. Tente novamente."
+      );
     }
 
-    const amount = plan.price;
+    const data = (await res.json()) as { url: string };
 
-    return new Promise<void>((resolve, reject) => {
-      const checkout = new window.PagarMeCheckout!.Checkout({
-        encryption_key: encryptionKey,
-        success: async (data: PagarmeCheckoutData) => {
-          try {
-            const res = await fetch("/api/pagarme/checkout", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                amount,
-                planId: plan.id,
-                companyId,
-                companyName,
-                subscriptionId: subscription?.id,
-                checkoutData: data,
-              }),
-            });
-
-            if (!res.ok) {
-              const json = await res.json().catch(() => null);
-              throw new Error(
-                json?.message ||
-                  "Não foi possível processar o pagamento. Tente novamente."
-              );
-            }
-
-            resolve();
-          } catch (err) {
-            reject(err);
-          }
-        },
-        error: (err: unknown) => {
-          // Logamos o erro completo para facilitar o diagnóstico
-          try {
-            console.error(
-              "Erro no Pagar.me Checkout (detalhado):",
-              typeof err === "string" ? err : JSON.stringify(err, null, 2)
-            );
-          } catch {
-            console.error("Erro no Pagar.me Checkout:", err);
-          }
-          reject(
-            new Error(
-              "Pagamento não foi concluído no gateway. Tente novamente."
-            )
-          );
-        },
-        close: () => {
-          // Se o usuário apenas fechar o modal, consideramos como cancelado.
-          if (!processingPlanId) return;
-          setProcessingPlanId(null);
-        },
-      });
-
-      checkout.open({
-        amount,
-        createToken: "true",
-        customerData: "true",
-        paymentMethods: "credit_card,boleto,pix",
-      });
-    });
+    // Redireciona para o checkout hospedado do Pagar.me
+    if (typeof window !== "undefined") {
+      window.location.href = data.url;
+    }
   };
 
   const handlePlanSelection = async (plan: Plan) => {
@@ -411,20 +317,15 @@ const SubscriptionPanel = ({
     setAlert(null);
 
     try {
-      if (checkoutReady && encryptionKey) {
-        await startCheckoutFlow(plan);
-      } else {
-        await createOrSwitchSubscription(plan);
-      }
+      // Mantemos a criação/alteração da assinatura internamente
+      await createOrSwitchSubscription(plan);
+      await startCheckoutFlow(plan);
 
       setAlert({
         type: "success",
-        message: checkoutReady && encryptionKey
-          ? "Pagamento iniciado! Atualizaremos o plano após confirmação do gateway."
-          : "Solicitação enviada! Em instantes você verá o status atualizado.",
+        message:
+          "Redirecionando para o checkout seguro do Pagar.me. Após a confirmação, atualizaremos o plano.",
       });
-
-      await refetch();
     } catch (err) {
       console.error("Erro ao selecionar plano:", err);
       setAlert({
