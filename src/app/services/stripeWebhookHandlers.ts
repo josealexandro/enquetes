@@ -11,7 +11,7 @@ import {
 import { PaymentStatus } from "@/app/types/subscription";
 
 export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
-  const { metadata, amount_total, subscription: stripeSubscriptionId } = session; // Removendo customer_details
+  const { metadata, amount_total } = session; // Removendo stripeSubscriptionId
 
   if (!metadata || !metadata.planId || !metadata.companyId || !metadata.companyName) {
     console.error("Metadata da sessão de checkout incompleto:", metadata);
@@ -64,7 +64,8 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
 }
 
 export async function handleInvoicePaid(invoice: Stripe.Invoice) {
-  const { subscription: stripeSubscriptionId, customer: stripeCustomerId, total, status, id: invoiceId } = invoice;
+  const { customer: stripeCustomerId, total, status, id: invoiceId } = invoice;
+  const stripeSubscriptionId = invoice.subscription; // Acessar a propriedade subscription corretamente
 
   if (!stripeSubscriptionId || typeof stripeSubscriptionId !== 'string') {
     console.warn("Invoice paid event sem stripeSubscriptionId válido:", invoiceId);
