@@ -65,6 +65,7 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
 
 export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const { customer: stripeCustomerId, total, status, id: invoiceId } = invoice;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stripeSubscriptionId = (invoice as any).subscription; // Usando 'any' para acessar a propriedade 'subscription'
 
   if (!stripeSubscriptionId || typeof stripeSubscriptionId !== 'string') {
