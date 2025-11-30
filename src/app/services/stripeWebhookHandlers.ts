@@ -65,7 +65,7 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
 
 export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const { customer: stripeCustomerId, total, status, id: invoiceId } = invoice;
-  const stripeSubscriptionId = invoice.subscription; // Acessar a propriedade subscription corretamente
+  const stripeSubscriptionId = (invoice as any).subscription; // Usando 'any' para acessar a propriedade 'subscription'
 
   if (!stripeSubscriptionId || typeof stripeSubscriptionId !== 'string') {
     console.warn("Invoice paid event sem stripeSubscriptionId válido:", invoiceId);
