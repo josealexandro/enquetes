@@ -21,9 +21,10 @@ export async function POST(req: NextRequest) {
 
   try {
     event = stripe.webhooks.constructEvent(rawBody, signature!, webhookSecret);
-  } catch (err: any) {
-    console.error(`Webhook Error: ${err.message}`);
-    return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
+  } catch (err: unknown) { // Alterado de 'any' para 'unknown'
+    const errorMessage = err instanceof Error ? err.message : "Erro desconhecido";
+    console.error(`Webhook Error: ${errorMessage}`);
+    return new NextResponse(`Webhook Error: ${errorMessage}`, { status: 400 });
   }
 
   // Processando eventos

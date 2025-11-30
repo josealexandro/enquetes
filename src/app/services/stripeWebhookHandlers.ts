@@ -1,17 +1,18 @@
 import Stripe from "stripe";
-import { Timestamp } from "firebase/firestore";
+// Removendo importação de Timestamp (não utilizada)
 import {
   createSubscription,
   getSubscriptionByCompany,
   recordPayment,
   updateSubscriptionStatus,
   switchSubscriptionPlan,
-  getPlanById,
+  // Removendo getPlanById (não utilizada neste arquivo)
 } from "@/app/services/subscriptionService";
 import { PaymentStatus } from "@/app/types/subscription";
 
 export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
-  const { metadata, amount_total, customer_details, subscription: stripeSubscriptionId } = session;
+  // Removendo stripeSubscriptionId e customerEmail da desestruturação e newSubscriptionId da atribuição
+  const { metadata, amount_total, customer_details } = session;
 
   if (!metadata || !metadata.planId || !metadata.companyId || !metadata.companyName) {
     console.error("Metadata da sessão de checkout incompleto:", metadata);
@@ -20,12 +21,12 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
 
   const { planId, companyId, companyName } = metadata;
   const amount = amount_total ?? 0;
-  const customerEmail = customer_details?.email || "";
+  // const customerEmail = customer_details?.email || ""; // Não utilizada atualmente
 
   let subscription = await getSubscriptionByCompany(companyId);
 
   if (!subscription) {
-    const newSubscriptionId = await createSubscription({
+    await createSubscription({
       companyId,
       companyName,
       planId,
@@ -115,7 +116,8 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
 }
 
 export async function handleCustomerSubscriptionUpdated(stripeSubscription: Stripe.Subscription) {
-  const { id: stripeSubscriptionId, status, current_period_end, current_period_start, cancel_at_period_end, metadata } = stripeSubscription;
+  // Removendo cancel_at_period_end e newStatus da desestruturação e atribuição se não utilizadas
+  const { id: stripeSubscriptionId, status, current_period_end, current_period_start, metadata } = stripeSubscription; // Removido cancel_at_period_end e newStatus
 
   if (!metadata || !metadata.companyId) {
     console.warn("Metadata da assinatura Stripe incompleto para atualização:", stripeSubscriptionId);
@@ -130,19 +132,7 @@ export async function handleCustomerSubscriptionUpdated(stripeSubscription: Stri
     return;
   }
 
-  let newStatus: PaymentStatus = "PENDING"; // Default
-  switch (status) {
-    case "active":
-      newStatus = "PAID"; // Subscription ativa significa pagamento em dia
-      break;
-    case "past_due":
-      newStatus = "FAILED"; // Em atraso, considerar falha de pagamento
-      break;
-    case "canceled":
-      newStatus = "REFUNDED"; // Cancelada, pode significar reembolso ou fim do ciclo
-      break;
-    // Adicionar outros status relevantes do Stripe
-  }
+  // newStatus foi movido para dentro da função mapStripeSubscriptionStatusToSubscriptionStatus, é usado lá
 
   await updateSubscriptionStatus(subscription.id, mapStripeSubscriptionStatusToSubscriptionStatus(status), {
     actorId: "stripe_webhook",
@@ -155,7 +145,7 @@ export async function handleCustomerSubscriptionUpdated(stripeSubscription: Stri
     subscriptionId: subscription.id,
     currentPeriodStart: new Date(current_period_start * 1000),
     currentPeriodEnd: new Date(current_period_end * 1000),
-    cancelAtPeriodEnd,
+    cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end, // Usando direto do objeto original
   });
 
   console.log("Assinatura Stripe atualizada no Firestore:", stripeSubscriptionId);
