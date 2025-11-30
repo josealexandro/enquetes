@@ -11,8 +11,7 @@ import {
 import { PaymentStatus } from "@/app/types/subscription";
 
 export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
-  // Removendo stripeSubscriptionId e customerEmail da desestruturação e newSubscriptionId da atribuição
-  const { metadata, amount_total, customer_details } = session;
+  const { metadata, amount_total, subscription: stripeSubscriptionId } = session; // Removendo customer_details
 
   if (!metadata || !metadata.planId || !metadata.companyId || !metadata.companyName) {
     console.error("Metadata da sessão de checkout incompleto:", metadata);
