@@ -71,6 +71,62 @@ export async function getSubscriptionByCompany(companyId: string) {
   return snapshot.docs[0].data() as Subscription;
 }
 
+export async function handleStripeCheckoutSessionCompleted(
+  checkoutSession: Stripe.Checkout.Session
+) {
+  const { metadata, amount_total, customer_details, subscription: stripeSubscriptionId } = checkoutSession;
+
+  if (!metadata || !metadata.planId || !metadata.companyId || !metadata.companyName) {
+    throw new Error("Metadata da sessão de checkout incompleto.");
+  }
+
+  const { planId, companyId, companyName } = metadata;
+  const amount = amount_total ?? 0; // amount_total em centavos
+  const customerEmail = customer_details?.email || "";
+
+  let subscription = await getSubscriptionByCompany(companyId);
+
+  if (!subscription) {
+    // Se não há assinatura, cria uma nova
+    const newSubscriptionId = await createSubscription({
+      companyId,
+      companyName,
+      planId,
+      paymentMethod: "stripe",
+      status: "ACTIVE",
+    });
+    subscription = (await getSubscriptionByCompany(companyId))!;
+  } else {
+    // Se já existe, atualiza o plano e status
+    await updateSubscriptionStatus(subscription.id, "ACTIVE", {
+      actorId: "stripe_webhook",
+      actorName: "Stripe Webhook",
+      notes: `Plano atualizado via Checkout Session ${checkoutSession.id}`,
+    });
+    // Também pode atualizar o planId se for uma troca de plano
+    await switchSubscriptionPlan({
+      subscriptionId: subscription.id,
+      newPlanId: planId,
+      actorId: "stripe_webhook",
+      actorName: "Stripe Webhook",
+    });
+  }
+
+  // Registra o pagamento
+  await recordPayment({
+    subscriptionId: subscription.id,
+    invoiceId: checkoutSession.id, // Ou o ID da invoice gerada pelo Stripe, se disponível
+    amount: amount,
+    status: "PAID",
+    gateway: "stripe",
+    dueDate: new Date(), // Usar a data atual ou data da fatura Stripe
+    paidAt: new Date(),
+    rawPayload: checkoutSession as unknown as Record<string, unknown>,
+  });
+
+  console.log("Assinatura e pagamento processados via Stripe Checkout Session:", checkoutSession.id);
+}
+
 export async function getPlanBySlug(slug: PlanSlug) {
   try {
     const slugQuery = query(plansCollection, where("slug", "==", slug), limit(1));
@@ -83,6 +139,18 @@ export async function getPlanBySlug(slug: PlanSlug) {
   }
 
   return findPlanSeedBySlug(slug) ?? null;
+}
+
+export async function getPlanById(id: string): Promise<Plan | null> {
+  try {
+    const planDoc = await getDoc(doc(plansCollection, id));
+    if (planDoc.exists()) {
+      return planDoc.data() as Plan;
+    }
+  } catch (error) {
+    console.error("getPlanById fallback to DEFAULT_PLANS:", error);
+  }
+  return findPlanSeedById(id) ?? null;
 }
 
 export interface CreateSubscriptionInput {
@@ -321,5 +389,38 @@ export async function listPaymentsBySubscription(subscriptionId: string) {
 
   // Ordena em memória por data de vencimento, mais recente primeiro.
   return items.sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis());
+}
+
+export interface UpdateSubscriptionPeriodAndCancellationInput {
+  subscriptionId: string;
+  currentPeriodStart: Date;
+  currentPeriodEnd: Date;
+  cancelAtPeriodEnd: boolean;
+}
+
+export async function updateSubscriptionPeriodAndCancellation(input: UpdateSubscriptionPeriodAndCancellationInput) {
+  const subscriptionRef = doc(subscriptionsCollection, input.subscriptionId);
+  const subscriptionSnap = await getDoc(subscriptionRef);
+
+  if (!subscriptionSnap.exists()) {
+    throw new Error("Assinatura não encontrada para atualizar período/cancelamento.");
+  }
+
+  await setDoc(
+    subscriptionRef,
+    {
+      currentPeriodStart: Timestamp.fromDate(input.currentPeriodStart),
+      currentPeriodEnd: Timestamp.fromDate(input.currentPeriodEnd),
+      cancelAtPeriodEnd: input.cancelAtPeriodEnd,
+    },
+    { merge: true }
+  );
+
+  await logSubscriptionChange({
+    subscriptionId: input.subscriptionId,
+    actorId: "stripe_webhook",
+    actorName: "Stripe Webhook",
+    notes: "Período e status de cancelamento da assinatura atualizados via webhook Stripe.",
+  });
 }
 

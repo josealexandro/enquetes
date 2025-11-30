@@ -281,16 +281,17 @@ const SubscriptionPanel = ({
   };
 
   const startCheckoutFlow = async (plan: Plan) => {
-    const res = await fetch("/api/pagarme/paymentlink", {
+    const res = await fetch("/api/stripe/checkout", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        amount: plan.price,
         planId: plan.id,
         companyId,
         companyName,
+        successUrl: window.location.origin + "/dashboard?payment=success", // Redireciona para o dashboard com status de sucesso
+        cancelUrl: window.location.origin + "/dashboard?payment=cancelled", // Redireciona para o dashboard com status de cancelamento
       }),
     });
 
@@ -298,14 +299,14 @@ const SubscriptionPanel = ({
       const json = await res.json().catch(() => null);
       throw new Error(
         json?.message ||
-          "Não foi possível iniciar o checkout. Tente novamente."
+          "Não foi possível iniciar o checkout do Stripe. Tente novamente."
       );
     }
 
     const data = (await res.json()) as { url: string };
 
-    // Redireciona para o checkout hospedado do Pagar.me
-    if (typeof window !== "undefined") {
+    // Redireciona para o checkout hospedado do Stripe
+    if (typeof window !== "undefined" && data.url) {
       window.location.href = data.url;
     }
   };
