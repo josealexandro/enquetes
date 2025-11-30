@@ -6,9 +6,18 @@ import {
   recordPayment,
   updateSubscriptionStatus,
   switchSubscriptionPlan,
+  getPlanById,
+  updateSubscriptionPeriodAndCancellation,
   // Removendo getPlanById (não utilizada neste arquivo)
 } from "@/app/services/subscriptionService";
-import { PaymentStatus } from "@/app/types/subscription";
+import { PaymentStatus, SubscriptionStatus } from "@/app/types/subscription"; // Importando SubscriptionStatus
+
+// Interface estendida para lidar com propriedades que podem não estar na tipagem padrão do Stripe
+interface StripeSubscriptionExtended extends Stripe.Subscription {
+  current_period_end?: number;
+  current_period_start?: number;
+  // Removido cancel_at_period_end, pois já existe em Stripe.Subscription
+}
 
 export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   const { metadata, amount_total } = session; // Removendo stripeSubscriptionId
@@ -117,8 +126,12 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
 }
 
 export async function handleCustomerSubscriptionUpdated(stripeSubscription: Stripe.Subscription) {
-  // Removendo cancel_at_period_end e newStatus da desestruturação e atribuição se não utilizadas
-  const { id: stripeSubscriptionId, status, current_period_end, current_period_start, metadata } = stripeSubscription; // Removido cancel_at_period_end e newStatus
+  // Usando a interface estendida para acessar as propriedades
+  const sub = stripeSubscription as StripeSubscriptionExtended;
+  const { id: stripeSubscriptionId, status, metadata } = sub;
+  const currentPeriodEnd = sub.current_period_end;
+  const currentPeriodStart = sub.current_period_start;
+  const cancelAtPeriodEnd = sub.cancel_at_period_end; 
 
   if (!metadata || !metadata.companyId) {
     console.warn("Metadata da assinatura Stripe incompleto para atualização:", stripeSubscriptionId);
@@ -141,29 +154,35 @@ export async function handleCustomerSubscriptionUpdated(stripeSubscription: Stri
     notes: `Status da assinatura Stripe atualizado para: ${status}`,
   });
 
+  if (typeof currentPeriodStart === 'undefined' || typeof currentPeriodEnd === 'undefined') {
+    console.warn("Datas de período (start/end) são indefinidas para a assinatura Stripe:", stripeSubscriptionId);
+    return;
+  }
+
   // Atualizar datas de período e cancel_at_period_end
   await updateSubscriptionPeriodAndCancellation({
     subscriptionId: subscription.id,
-    currentPeriodStart: new Date(current_period_start * 1000),
-    currentPeriodEnd: new Date(current_period_end * 1000),
-    cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end, // Usando direto do objeto original
+    currentPeriodStart: new Date(currentPeriodStart * 1000),
+    currentPeriodEnd: new Date(currentPeriodEnd * 1000),
+    cancelAtPeriodEnd: cancelAtPeriodEnd,
   });
 
   console.log("Assinatura Stripe atualizada no Firestore:", stripeSubscriptionId);
 }
 
 // Helper para mapear status do Stripe para o seu sistema
-function mapStripeSubscriptionStatusToSubscriptionStatus(stripeStatus: Stripe.Subscription.Status): PaymentStatus {
+function mapStripeSubscriptionStatusToSubscriptionStatus(stripeStatus: Stripe.Subscription.Status): SubscriptionStatus { // Alterado tipo de retorno para SubscriptionStatus
   switch (stripeStatus) {
     case "active":
-      return "PAID";
+      return "ACTIVE"; // Mapeado para ACTIVE
     case "past_due":
-      return "FAILED"; // Ou outro status que indique pagamento em atraso
+      return "PAST_DUE"; // Mapeado para PAST_DUE
     case "canceled":
-      return "REFUNDED"; // Ou CANCELED
-    // ... mapear outros status conforme necessário
+      return "CANCELED"; // Mapeado para CANCELED
+    case "trialing":
+      return "TRIALING"; // Adicionado trialing
     default:
-      return "PENDING";
+      return "AWAITING_CONFIRMATION"; // Default, pode ser ajustado
   }
 }
 
