@@ -7,6 +7,8 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 // import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Importar Firebase Storage
 import { v4 as uuidv4 } from "uuid"; // Importar uuidv4
 import { useAuth } from "@/app/context/AuthContext";
+import { getPollsLimitForCompany, countPollsCreatedInCurrentPeriod } from "@/app/services/subscriptionService"; // Importar funções de limite
+import { useRouter } from "next/navigation";
 
 interface PollFormProps {
   onPollCreated?: () => void; // New prop for callback
@@ -19,9 +21,11 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
   const [category, setCategory] = useState("Geral"); // Novo estado para a categoria, com valor padrão
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "error" | null>(null);
+  const [isBuyingPoll, setIsBuyingPoll] = useState(false); // Novo estado para controlar o loading da compra
   // const [imageFile, setImageFile] = useState<File | null>(null); // Estado para o arquivo de imagem
   // const [uploadingImage, setUploadingImage] = useState(false); // Estado para o status do upload da imagem
-  const { user } = useAuth();
+  const { user, updateUserDocument } = useAuth();
+  const router = useRouter();
 
   const categories = ["Geral", "Política", "Games", "Gastronomia", "Filme", "Esportes", "Tecnologia", "Educação", "Música"];
 
@@ -64,6 +68,44 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
   //   setFeedbackMessage(null); // Limpa o feedback anterior se o usuário tentar novamente
   // };
 
+  const handleBuySinglePoll = async () => {
+    if (!user?.uid || !user?.displayName) {
+      setFeedbackMessage("Usuário não autenticado para comprar enquete.");
+      setFeedbackType("error");
+      return;
+    }
+
+    setIsBuyingPoll(true);
+    setFeedbackMessage(null); // Limpar mensagem anterior
+
+    try {
+      const response = await fetch("/api/stripe/single-poll-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: user.uid,
+          companyName: user.displayName, // Ou outro nome relevante
+          successUrl: window.location.origin + "/dashboard?payment=success", // Redirecionar para o dashboard após sucesso
+          cancelUrl: window.location.origin + "/dashboard?payment=cancelled", // Redirecionar para o dashboard após cancelamento
+          priceId: process.env.NEXT_PUBLIC_STRIPE_SINGLE_POLL_PRICE_ID, // Você precisará definir esta variável de ambiente
+        }),
+      });
+
+      const data = await response.json();
+      if (data.url) {
+        router.push(data.url);
+      } else {
+        throw new Error("URL de checkout não recebida.");
+      }
+    } catch (error) {
+      console.error("Erro ao iniciar checkout de enquete avulsa:", error);
+      setFeedbackMessage("Erro ao iniciar o processo de compra de enquete.");
+      setFeedbackType("error");
+    } finally {
+      setIsBuyingPoll(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => { // Tornar handleSubmit assíncrono
     e.preventDefault();
 
@@ -103,6 +145,26 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
       return;
     }
 
+    // Lógica para verificar o limite de enquetes por mês e créditos avulsos
+    if (user.uid) {
+      const pollsLimit = await getPollsLimitForCompany(user.uid);
+      const pollsCreated = await countPollsCreatedInCurrentPeriod(user.uid);
+      const hasExtraCredit = (user.extraPollsAvailable && user.extraPollsAvailable > 0) || false;
+
+      if (pollsLimit !== null && pollsCreated >= pollsLimit && !hasExtraCredit) {
+        setFeedbackMessage("Você atingiu o limite de enquetes para o seu plano neste mês. Compre um crédito avulso para postar mais enquetes.");
+        setFeedbackType("error");
+        return;
+      }
+
+      // Se atingiu o limite, mas tem créditos avulsos, usa um crédito
+      if (pollsLimit !== null && pollsCreated >= pollsLimit && hasExtraCredit && user.uid) {
+        await updateUserDocument(user.uid, { extraPollsAvailable: user.extraPollsAvailable! - 1 });
+        setFeedbackMessage("Crédito de enquete avulsa utilizado com sucesso!");
+        setFeedbackType("success");
+      }
+    }
+
     // let imageUrl: string | undefined = undefined; // Inicializa imageUrl como undefined
 
     // if (isCommercial && imageFile) {
@@ -122,6 +184,7 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
     //     return; // Interrompe o envio da enquete se o upload da imagem falhar
     //   } finally {
     //     setUploadingImage(false); // Finaliza o estado de upload, seja com sucesso ou erro
+    //     // Continue com o restante da lógica de criação da enquete
     //   }
     // }
 
@@ -176,6 +239,19 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
         }`}>
           {feedbackMessage}
         </div>
+      )}
+
+      {feedbackType === "error" && feedbackMessage?.includes("limite") && !user?.extraPollsAvailable && (
+        <motion.button
+          type="button"
+          onClick={handleBuySinglePoll}
+          className="w-full px-4 py-2 rounded bg-yellow-500 text-white font-poppins font-bold shadow-md hover:scale-105 transition-transform duration-300 mt-4"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          disabled={isBuyingPoll}
+        >
+          {isBuyingPoll ? "Processando..." : "Comprar 1 Enquete Avulsa (R$1,99)"}
+        </motion.button>
       )}
 
       {/* {isCommercial && (

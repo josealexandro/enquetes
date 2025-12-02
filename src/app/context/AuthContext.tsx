@@ -36,6 +36,7 @@ export interface AuthContextType {
     instagramUrl?: string | null; // Novo campo para URL do Instagram (antigo twitterUrl)
     twitterUrl?: string | null; // Novo campo para URL do Twitter (antigo linkedinUrl)
     themeColor?: string | null; // Adicionar themeColor
+    extraPollsAvailable?: number; // Novo campo para créditos de enquete avulsas
   }) | null; // O tipo de usuário agora é o User do Firebase
   firebaseAuthUser: User | null; // Novo campo para o objeto User original do Firebase Auth
   loading: boolean;
@@ -47,6 +48,7 @@ export interface AuthContextType {
     avatarFile?: File | null
   ) => Promise<void>;
   logout: () => Promise<void>;
+  updateUserDocument: (uid: string, data: { [key: string]: any }) => Promise<void>; // Nova função
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -68,6 +70,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     instagramUrl?: string | null; // Mapear para instagramUrl
     twitterUrl?: string | null; // Mapear para twitterUrl
     themeColor?: string | null; // Adicionar themeColor
+    extraPollsAvailable?: number; // Novo campo para créditos de enquete avulsas
   }) | null>(null);
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<User | null>(null); // Novo estado
   const [loading, setLoading] = useState(true);
@@ -99,6 +102,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           instagramUrl: (userData?.instagramUrl as string | null) || null, // Mapear para instagramUrl
           twitterUrl: (userData?.twitterUrl as string | null) || null, // Mapear para twitterUrl
           themeColor: (userData?.themeColor as string | null) || null, // Adicionar themeColor do Firestore
+          extraPollsAvailable: (userData?.extraPollsAvailable as number) || 0, // Carregar créditos de enquete
         };
         setUser(customUser);
 
@@ -113,6 +117,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     return () => unsubscribe();
   }, []);
+
+  // Nova função para atualizar o documento do usuário
+  const updateUserDocument = async (uid: string, data: { [key: string]: any }) => {
+    const userRef = doc(db, "users", uid);
+    await setDoc(userRef, data, { merge: true });
+    // Atualizar o estado local do usuário após a atualização do Firestore
+    setUser(prevUser => {
+      if (!prevUser) return null;
+      return { ...prevUser, ...data };
+    });
+  };
 
   const login = async (email: string, password: string) => {
     setLoading(true);
@@ -149,6 +164,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         ...(commercialName && { commercialName: commercialName }), // Adicionar commercialName condicionalmente
         createdAt: serverTimestamp(), // Adicionar timestamp de criação
         themeColor: null, // Inicialmente nulo, pois não há um campo para tema na interface de cadastro
+        extraPollsAvailable: 0, // Inicialmente 0, pois não há um campo para créditos na interface de cadastro
       };
 
       // Salvar o displayName e accountType no Firestore
@@ -193,7 +209,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isMasterUser, login, signup, logout, firebaseAuthUser }}>
+    <AuthContext.Provider value={{ user, loading, isMasterUser, login, signup, logout, firebaseAuthUser, updateUserDocument }}>
       {children}
     </AuthContext.Provider>
   );

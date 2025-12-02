@@ -9,6 +9,8 @@ import {
   setDoc,
   Timestamp,
   where,
+  updateDoc,
+  increment,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DEFAULT_PLANS } from "@/app/data/planSeeds";
@@ -333,6 +335,55 @@ export async function listPaymentsBySubscription(subscriptionId: string) {
 
   // Ordena em memória por data de vencimento, mais recente primeiro.
   return items.sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis());
+}
+
+export async function getPollsLimitForCompany(companyId: string): Promise<number | null> {
+  const subscription = await getSubscriptionByCompany(companyId);
+  if (!subscription || subscription.status !== "ACTIVE") {
+    return 2; // Limite de 2 enquetes para contas públicas/sem assinatura ativa
+  }
+  return subscription.planSnapshot.limits.pollsPerMonth;
+}
+
+export async function countPollsCreatedInCurrentPeriod(companyId: string): Promise<number> {
+  const subscription = await getSubscriptionByCompany(companyId);
+
+  let periodStart: Timestamp;
+  let periodEnd: Timestamp;
+
+  if (!subscription || subscription.status !== "ACTIVE") {
+    // Para contas públicas ou com assinatura inativa: contar enquetes no mês corrente
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    periodStart = Timestamp.fromDate(startOfMonth);
+    periodEnd = Timestamp.fromDate(endOfMonth);
+  } else {
+    // Para contas com assinatura ativa: usar o período da assinatura
+    if (!subscription.currentPeriodStart || !subscription.currentPeriodEnd) {
+      console.warn("Assinatura ativa sem datas de período definidas. Retornando 0 enquetes.", companyId);
+      return 0; // Fallback seguro
+    }
+    periodStart = subscription.currentPeriodStart;
+    periodEnd = subscription.currentPeriodEnd;
+  }
+
+  const pollsCollection = collection(db, "polls");
+  const pollsQuery = query(
+    pollsCollection,
+    where("creator.id", "==", companyId),
+    where("createdAt", ">=", periodStart),
+    where("createdAt", "<=", periodEnd)
+  );
+
+  const snapshot = await getDocs(pollsQuery);
+  return snapshot.size;
+}
+
+export async function addPollCreditToCompany(companyId: string, amount: number = 1) {
+  const userRef = doc(db, "users", companyId);
+  await updateDoc(userRef, { extraPollsAvailable: increment(amount) });
+  console.log(`Adicionado ${amount} crédito(s) de enquete para a empresa ${companyId}.`);
 }
 
 export interface UpdateSubscriptionPeriodAndCancellationInput {

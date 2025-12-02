@@ -8,6 +8,7 @@ import {
   switchSubscriptionPlan,
   getPlanById,
   updateSubscriptionPeriodAndCancellation,
+  addPollCreditToCompany,
   // Removendo getPlanById (não utilizada neste arquivo)
 } from "@/app/services/subscriptionService";
 import { PaymentStatus, SubscriptionStatus } from "@/app/types/subscription"; // Importando SubscriptionStatus
@@ -22,15 +23,30 @@ interface StripeSubscriptionExtended extends Stripe.Subscription {
 export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   const { metadata, amount_total } = session; // Removendo stripeSubscriptionId
 
-  if (!metadata || !metadata.planId || !metadata.companyId || !metadata.companyName) {
+  if (!metadata || !metadata.companyId || !metadata.companyName) {
     console.error("Metadata da sessão de checkout incompleto:", metadata);
     throw new Error("Metadata da sessão de checkout incompleto.");
   }
 
-  const { planId, companyId, companyName } = metadata;
+  const { companyId, companyName } = metadata;
   const amount = amount_total ?? 0;
-  // const customerEmail = customer_details?.email || ""; // Não utilizada atualmente
 
+  // Lógica para pagamentos avulsos (crédito de enquete)
+  if (metadata.type === "single_poll_credit") {
+    await addPollCreditToCompany(companyId);
+    // Opcional: registrar o pagamento como um pagamento avulso separado, se necessário
+    console.log(`Crédito de enquete avulsa adicionado para a empresa ${companyId} via Checkout Session ${session.id}`);
+    return; // Finaliza o processamento para este tipo de evento
+  }
+
+  // Lógica existente para assinaturas
+  if (!metadata.planId) { // Agora, planId é esperado apenas para assinaturas
+    console.error("Metadata da sessão de checkout de assinatura incompleto: planId ausente.", metadata);
+    throw new Error("Metadata da sessão de checkout de assinatura incompleto.");
+  }
+
+  const { planId } = metadata; // Obtem planId aqui, pois ele é específico para assinaturas
+  
   let subscription = await getSubscriptionByCompany(companyId);
 
   if (!subscription) {
