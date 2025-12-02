@@ -21,6 +21,7 @@ interface UserDataToSave {
   commercialName?: string | null; // Adicionar commercialName
   createdAt: Timestamp | FieldValue; // serverTimestamp é um tipo complexo, mas por enquanto 'any' é aceitável aqui se for apenas para o tipo do FireStore
   themeColor?: string | null; // Adicionar themeColor
+  extraPollsAvailable?: number; // Adicionar créditos de enquete avulsas
 }
 
 export interface AuthContextType {
