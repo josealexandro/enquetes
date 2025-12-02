@@ -7,7 +7,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 // import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Importar Firebase Storage
 import { v4 as uuidv4 } from "uuid"; // Importar uuidv4
 import { useAuth } from "@/app/context/AuthContext";
-import { getPollsLimitForCompany, countPollsCreatedInCurrentPeriod } from "@/app/services/subscriptionService"; // Importar funções de limite
+import { getPollsLimitForCompany, countPollsCreatedInCurrentPeriod, recordPollCreation } from "@/app/services/subscriptionService"; // Importar funções de limite e registro
 import { useRouter } from "next/navigation";
 
 interface PollFormProps {
@@ -190,7 +190,7 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
 
     try {
       const pollsCollectionRef = collection(db, "polls");
-      await addDoc(pollsCollectionRef, {
+      const newPollRef = await addDoc(pollsCollectionRef, {
         title: trimmedTitle,
         options: filteredOptions.map(optionText => ({ id: uuidv4(), text: optionText, votes: 0 })),
         category: category,
@@ -206,6 +206,11 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
         commentCount: 0, // Inicializar commentCount com 0
         // ...(imageUrl && { imageUrl }), // Adiciona imageUrl apenas se existir
       });
+
+      // Registrar a criação da enquete
+      if (user.uid) {
+        await recordPollCreation(user.uid, newPollRef.id);
+      }
 
       setFeedbackMessage("Enquete criada com sucesso!");
       setFeedbackType("success");

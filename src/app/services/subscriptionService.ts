@@ -11,6 +11,8 @@ import {
   where,
   updateDoc,
   increment,
+  addDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DEFAULT_PLANS } from "@/app/data/planSeeds";
@@ -368,10 +370,10 @@ export async function countPollsCreatedInCurrentPeriod(companyId: string): Promi
     periodEnd = subscription.currentPeriodEnd;
   }
 
-  const pollsCollection = collection(db, "polls");
+  const pollsCollection = collection(db, "poll_creation_logs"); // Mudar para a nova coleção de logs
   const pollsQuery = query(
     pollsCollection,
-    where("creator.id", "==", companyId),
+    where("userId", "==", companyId), // Usar userId em vez de creator.id
     where("createdAt", ">=", periodStart),
     where("createdAt", "<=", periodEnd)
   );
@@ -384,6 +386,15 @@ export async function addPollCreditToCompany(companyId: string, amount: number =
   const userRef = doc(db, "users", companyId);
   await updateDoc(userRef, { extraPollsAvailable: increment(amount) });
   console.log(`Adicionado ${amount} crédito(s) de enquete para a empresa ${companyId}.`);
+}
+
+export async function recordPollCreation(userId: string, pollId: string) {
+  const pollCreationLogsCollection = collection(db, "poll_creation_logs");
+  await addDoc(pollCreationLogsCollection, {
+    userId: userId,
+    pollId: pollId,
+    createdAt: serverTimestamp(),
+  });
 }
 
 export interface UpdateSubscriptionPeriodAndCancellationInput {
