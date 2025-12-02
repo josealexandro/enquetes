@@ -6,12 +6,11 @@ import {
   recordPayment,
   updateSubscriptionStatus,
   switchSubscriptionPlan,
-  getPlanById,
   updateSubscriptionPeriodAndCancellation,
   addPollCreditToCompany,
   // Removendo getPlanById (não utilizada neste arquivo)
 } from "@/app/services/subscriptionService";
-import { PaymentStatus, SubscriptionStatus } from "@/app/types/subscription"; // Importando SubscriptionStatus
+import { SubscriptionStatus } from "@/app/types/subscription"; // Importando SubscriptionStatus
 
 // Interface estendida para lidar com propriedades que podem não estar na tipagem padrão do Stripe
 interface StripeSubscriptionExtended extends Stripe.Subscription {

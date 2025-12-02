@@ -48,7 +48,7 @@ export interface AuthContextType {
     avatarFile?: File | null
   ) => Promise<void>;
   logout: () => Promise<void>;
-  updateUserDocument: (uid: string, data: { [key: string]: any }) => Promise<void>; // Nova função
+  updateUserDocument: (uid: string, data: Record<string, unknown>) => Promise<void>; // Nova função
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -119,7 +119,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   // Nova função para atualizar o documento do usuário
-  const updateUserDocument = async (uid: string, data: { [key: string]: any }) => {
+  const updateUserDocument = async (uid: string, data: Record<string, unknown>) => {
     const userRef = doc(db, "users", uid);
     await setDoc(userRef, data, { merge: true });
     // Atualizar o estado local do usuário após a atualização do Firestore
