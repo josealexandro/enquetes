@@ -27,6 +27,9 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
   const { user, updateUserDocument } = useAuth();
   const router = useRouter();
 
+  // Adicionar aqui a declaração de extraPollsCount
+  const extraPollsCount = user?.extraPollsAvailable || 0; 
+
   const categories = ["Geral", "Política", "Games", "Gastronomia", "Filme", "Esportes", "Tecnologia", "Educação", "Música"];
 
   // const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
@@ -150,6 +153,7 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
       const pollsLimit = await getPollsLimitForCompany(user.uid);
       const pollsCreated = await countPollsCreatedInCurrentPeriod(user.uid);
       const hasExtraCredit = (user.extraPollsAvailable && user.extraPollsAvailable > 0) || false;
+      const extraPollsCount = user.extraPollsAvailable || 0; // Obter a contagem real
 
       if (pollsLimit !== null && pollsCreated >= pollsLimit && !hasExtraCredit) {
         setFeedbackMessage("Você atingiu o limite de enquetes para o seu plano neste mês. Compre um crédito avulso para postar mais enquetes.");
@@ -160,7 +164,7 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
       // Se atingiu o limite, mas tem créditos avulsos, usa um crédito
       if (pollsLimit !== null && pollsCreated >= pollsLimit && hasExtraCredit && user.uid) {
         await updateUserDocument(user.uid, { extraPollsAvailable: user.extraPollsAvailable! - 1 });
-        setFeedbackMessage("Crédito de enquete avulsa utilizado com sucesso! Você pode criar sua enquete agora.");
+        setFeedbackMessage(`Crédito de enquete avulsa utilizado com sucesso! Você tem ${extraPollsCount - 1} créditos restantes. Você pode criar sua enquete agora.`);
         setFeedbackType("success");
         // Não dar return aqui para permitir a criação da enquete
       }
@@ -247,7 +251,7 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
         </div>
       )}
 
-      {feedbackType === "error" && feedbackMessage?.includes("limite") && !user?.extraPollsAvailable && (
+      {feedbackType === "error" && feedbackMessage?.includes("limite") && extraPollsCount === 0 && (
         <motion.button
           type="button"
           onClick={handleBuySinglePoll}
@@ -256,8 +260,14 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
           whileTap={{ scale: 0.98 }}
           disabled={isBuyingPoll}
         >
-          {isBuyingPoll ? "Processando..." : "Comprar 1 Enquete Avulsa (R$1,99)"}
+          {isBuyingPoll ? "Processando..." : `Comprar 1 Enquete Avulsa (${process.env.NEXT_PUBLIC_STRIPE_SINGLE_POLL_PRICE_DISPLAY_VALUE || 'R$ ?.?'})`}
         </motion.button>
+      )}
+
+      {extraPollsCount > 0 && (
+        <div className="p-3 rounded-md bg-blue-500 text-white">
+          Você possui {extraPollsCount} créditos de enquete avulsa disponíveis.
+        </div>
       )}
 
       {/* {isCommercial && (

@@ -178,7 +178,7 @@ export async function updateSubscriptionStatus(
 
   if (!subscriptionSnap.exists()) {
     throw new Error("Assinatura não encontrada.");
-  }
+  } 
 
   await setDoc(
     subscriptionRef,
@@ -339,12 +339,29 @@ export async function listPaymentsBySubscription(subscriptionId: string) {
   return items.sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis());
 }
 
-export async function getPollsLimitForCompany(companyId: string): Promise<number | null> {
+export async function getPollsLimitForCompany(companyId: string): Promise<number> {
   const subscription = await getSubscriptionByCompany(companyId);
+  
+  // Obter créditos avulsos do documento do usuário
+  const userRef = doc(db, "users", companyId);
+  const userSnap = await getDoc(userRef);
+  const extraPolls = userSnap.exists() ? (userSnap.data()?.extraPollsAvailable ?? 0) : 0;
+
+  // Sem assinatura ativa → limite fixo (2) + avulsos
   if (!subscription || subscription.status !== "ACTIVE") {
-    return 2; // Limite de 2 enquetes para contas públicas/sem assinatura ativa
+    return 2 + extraPolls; 
   }
-  return subscription.planSnapshot.limits.pollsPerMonth;
+
+  // Com assinatura ativa → limite do plano + avulsos
+  return subscription.planSnapshot.limits.pollsPerMonth + extraPolls;
+}
+
+export async function consumePollCredit(companyId: string) {
+  const userRef = doc(db, "users", companyId);
+  await updateDoc(userRef, {
+    extraPollsAvailable: increment(-1)
+  });
+  console.log(`Crédito de enquete consumido para o usuário ${companyId}.`);
 }
 
 export async function countPollsCreatedInCurrentPeriod(companyId: string): Promise<number> {
