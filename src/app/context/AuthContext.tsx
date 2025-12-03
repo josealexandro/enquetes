@@ -50,6 +50,7 @@ export interface AuthContextType {
   ) => Promise<void>;
   logout: () => Promise<void>;
   updateUserDocument: (uid: string, data: Record<string, unknown>) => Promise<void>; // Nova função
+  refreshUserData: () => Promise<void>; // Nova função para atualizar dados do usuário
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -133,11 +134,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const updateUserDocument = async (uid: string, data: Record<string, unknown>) => {
     const userRef = doc(db, "users", uid);
     await setDoc(userRef, data, { merge: true });
-    // Atualizar o estado local do usuário após a atualização do Firestore
-    setUser(prevUser => {
-      if (!prevUser) return null;
-      return { ...prevUser, ...data };
-    });
+    // Não atualizamos o estado local aqui, pois o onSnapshot cuidará disso
+  };
+
+  const refreshUserData = async () => {
+    if (firebaseAuthUser) {
+      setLoading(true);
+      try {
+        const userDocRef = doc(db, "users", firebaseAuthUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        const userData = userDoc.exists() ? userDoc.data() : null;
+
+        const customUser = {
+          ...firebaseAuthUser,
+          displayName: firebaseAuthUser.displayName || null,
+          accountType: (userData?.accountType as 'personal' | 'commercial') || 'personal',
+          commercialName: (userData?.commercialName as string | null) || null,
+          avatarUrl: firebaseAuthUser.photoURL || null,
+          aboutUs: (userData?.aboutUs as string | null) || null,
+          contactEmail: (userData?.contactEmail as string | null) || null,
+          address: (userData?.address as string | null) || null,
+          facebookUrl: (userData?.facebookUrl as string | null) || null,
+          instagramUrl: (userData?.instagramUrl as string | null) || null,
+          twitterUrl: (userData?.twitterUrl as string | null) || null,
+          themeColor: (userData?.themeColor as string | null) || null,
+          extraPollsAvailable: (userData?.extraPollsAvailable as number) || 0,
+        };
+        setUser(customUser);
+      } catch (error) {
+        console.error("Erro ao recarregar dados do usuário:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   const login = async (email: string, password: string) => {
@@ -220,7 +249,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isMasterUser, login, signup, logout, firebaseAuthUser, updateUserDocument }}>
+    <AuthContext.Provider value={{ user, loading, isMasterUser, login, signup, logout, firebaseAuthUser, updateUserDocument, refreshUserData }}>
       {children}
     </AuthContext.Provider>
   );

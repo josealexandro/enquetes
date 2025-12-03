@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation'; // Importar useSearchParams
 import { useAuth } from "../context/AuthContext";
 import DashboardComponent from "../components/Dashboard";
 import SubscriptionPanel from "../components/SubscriptionPanel";
@@ -14,8 +14,9 @@ import { Poll } from "../types/poll"; // Importar a interface Poll
 import slugify from "@/utils/slugify"; // Importar a função slugify
 
 export default function DashboardPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, refreshUserData } = useAuth(); // Obter refreshUserData
   const router = useRouter();
+  const searchParams = useSearchParams(); // Inicializar useSearchParams
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [polls, setPolls] = useState<Poll[]>([]); // Estado para armazenar as enquetes
   const [activeSection, setActiveSection] = useState<"polls" | "subscription">("polls");
@@ -29,10 +30,21 @@ export default function DashboardPage() {
   // Adicionado useEffect para logar o href gerado
   useEffect(() => {
     if (user?.accountType === 'commercial' && user?.commercialName) {
-      console.log("commercialName:", user.commercialName);
-      console.log("Generated href for public page:", `/empresa/${slugify(user.commercialName)}`);
+      // console.log("commercialName:", user.commercialName);
+      // console.log("Generated href for public page:", `/empresa/${slugify(user.commercialName)}`);
     }
   }, [user]); // Dependência do usuário para logar quando o usuário mudar
+
+  // Novo useEffect para recarregar dados do usuário após pagamento Stripe
+  useEffect(() => {
+    const paymentStatus = searchParams.get('payment');
+    if (paymentStatus === 'success') {
+      // console.log("Pagamento Stripe bem-sucedido, recarregando dados do usuário...");
+      refreshUserData(); // Chamar a função para recarregar os dados
+      // Opcional: remover o parâmetro 'payment' da URL para evitar recargas repetidas
+      // router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [searchParams, refreshUserData]); // Depende de searchParams e refreshUserData
 
   // Hook para buscar as enquetes
   useEffect(() => {

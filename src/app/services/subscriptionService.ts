@@ -385,7 +385,6 @@ export async function countPollsCreatedInCurrentPeriod(companyId: string): Promi
 export async function addPollCreditToCompany(companyId: string, amount: number = 1) {
   const userRef = doc(db, "users", companyId);
   await updateDoc(userRef, { extraPollsAvailable: increment(amount) });
-  console.log(`Adicionado ${amount} crédito(s) de enquete para a empresa ${companyId}.`);
 }
 
 export async function recordPollCreation(userId: string, pollId: string) {
