@@ -151,6 +151,11 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
       const pollsCreated = await countPollsCreatedInCurrentPeriod(user.uid);
       const hasExtraCredit = (user.extraPollsAvailable && user.extraPollsAvailable > 0) || false;
 
+      console.log("PollForm - Polls Limit:", pollsLimit);
+      console.log("PollForm - Polls Created This Period:", pollsCreated);
+      console.log("PollForm - User Extra Polls Available:", user.extraPollsAvailable);
+      console.log("PollForm - Has Extra Credit:", hasExtraCredit);
+
       if (pollsLimit !== null && pollsCreated >= pollsLimit && !hasExtraCredit) {
         setFeedbackMessage("Você atingiu o limite de enquetes para o seu plano neste mês. Compre um crédito avulso para postar mais enquetes.");
         setFeedbackType("error");
@@ -159,9 +164,12 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
 
       // Se atingiu o limite, mas tem créditos avulsos, usa um crédito
       if (pollsLimit !== null && pollsCreated >= pollsLimit && hasExtraCredit && user.uid) {
+        console.log("PollForm - Consumindo crédito avulso. Créditos antes:", user.extraPollsAvailable);
         await updateUserDocument(user.uid, { extraPollsAvailable: user.extraPollsAvailable! - 1 });
-        setFeedbackMessage("Crédito de enquete avulsa utilizado com sucesso!");
+        console.log("PollForm - Créditos depois (requer recarga da página para refletir no user do AuthContext):");
+        setFeedbackMessage("Crédito de enquete avulsa utilizado com sucesso! Você pode criar sua enquete agora.");
         setFeedbackType("success");
+        // Não dar return aqui para permitir a criação da enquete
       }
     }
 
