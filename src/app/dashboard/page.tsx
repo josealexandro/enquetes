@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react"; // Importar Suspense
 import Link from "next/link";
-import { useRouter, useSearchParams } from 'next/navigation'; // Importar useSearchParams
+import { useRouter } from 'next/navigation'; // Remover useSearchParams daqui
 import { useAuth } from "../context/AuthContext";
 import DashboardComponent from "../components/Dashboard";
 import SubscriptionPanel from "../components/SubscriptionPanel";
@@ -12,11 +12,12 @@ import { collection, query, orderBy, onSnapshot, getDocs, where } from "firebase
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
 import { Poll } from "../types/poll"; // Importar a interface Poll
 import slugify from "@/utils/slugify"; // Importar a função slugify
+import DashboardPaymentHandler from "../components/DashboardPaymentHandler"; // Importar o novo componente
 
 export default function DashboardPage() {
-  const { user, loading, refreshUserData } = useAuth(); // Obter refreshUserData
+  const { user, loading } = useAuth(); // Remover refreshUserData daqui
   const router = useRouter();
-  const searchParams = useSearchParams(); // Inicializar useSearchParams
+  // const searchParams = useSearchParams(); // Remover inicialização de useSearchParams
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [polls, setPolls] = useState<Poll[]>([]); // Estado para armazenar as enquetes
   const [activeSection, setActiveSection] = useState<"polls" | "subscription">("polls");
@@ -35,16 +36,16 @@ export default function DashboardPage() {
     }
   }, [user]); // Dependência do usuário para logar quando o usuário mudar
 
-  // Novo useEffect para recarregar dados do usuário após pagamento Stripe
-  useEffect(() => {
-    const paymentStatus = searchParams.get('payment');
-    if (paymentStatus === 'success') {
-      // console.log("Pagamento Stripe bem-sucedido, recarregando dados do usuário...");
-      refreshUserData(); // Chamar a função para recarregar os dados
-      // Opcional: remover o parâmetro 'payment' da URL para evitar recargas repetidas
-      // router.replace(router.pathname, undefined, { shallow: true });
-    }
-  }, [searchParams, refreshUserData]); // Depende de searchParams e refreshUserData
+  // REMOVIDO: Novo useEffect para recarregar dados do usuário após pagamento Stripe
+  // useEffect(() => {
+  //   const paymentStatus = searchParams.get('payment');
+  //   if (paymentStatus === 'success') {
+  //     // console.log("Pagamento Stripe bem-sucedido, recarregando dados do usuário...");
+  //     refreshUserData(); // Chamar a função para recarregar os dados
+  //     // Opcional: remover o parâmetro 'payment' da URL para evitar recargas repetidas
+  //     // router.replace(router.pathname, undefined, { shallow: true });
+  //   }
+  // }, [searchParams, refreshUserData]); // Depende de searchParams e refreshUserData
 
   // Hook para buscar as enquetes
   useEffect(() => {
@@ -84,6 +85,9 @@ export default function DashboardPage() {
 
   return (
     <div className="flex h-screen bg-gray-900 text-white">
+      <Suspense fallback={null}> {/* Suspense Boundary para DashboardPaymentHandler */}
+        <DashboardPaymentHandler />
+      </Suspense>
       {/* Botão para abrir/fechar a sidebar em mobile */}
       <button
         className="md:hidden fixed top-4 left-4 z-50 p-2 text-white focus:outline-none"
