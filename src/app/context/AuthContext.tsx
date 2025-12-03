@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { auth } from "@/lib/firebase"; // Importar a instância de autenticação do Firebase
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore para buscar roles
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Importar funções do Firebase Storage
-import { doc, getDoc, setDoc, serverTimestamp, Timestamp, FieldValue } from "firebase/firestore"; // Importar doc, getDoc, setDoc e serverTimestamp do Firestore
+import { doc, getDoc, setDoc, serverTimestamp, Timestamp, FieldValue, onSnapshot } from "firebase/firestore"; // Importar doc, getDoc, setDoc, onSnapshot e serverTimestamp do Firestore
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -79,44 +79,54 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      let unsubscribeFirestore: (() => void) | undefined;
+
       if (firebaseUser) {
-        // Verificar se o usuário é mestre
-        // const masterUserRef = doc(db, "masterUsers", firebaseUser.uid);
-        // const masterUserDoc = await getDoc(masterUserRef);
-
-        // Buscar displayName e accountType do Firestore
+        // Listener para mudanças no documento do usuário no Firestore
         const userDocRef = doc(db, "users", firebaseUser.uid);
-        const userDoc = await getDoc(userDocRef);
-        const userData = userDoc.exists() ? userDoc.data() : null;
+        unsubscribeFirestore = onSnapshot(userDocRef, (docSnap) => {
+          const userData = docSnap.exists() ? docSnap.data() : null;
 
-        setFirebaseAuthUser(firebaseUser); // Armazenar o objeto User original
-        const customUser = {
-          ...firebaseUser,
-          displayName: firebaseUser.displayName || null, // Usar displayName direto do firebaseUser por enquanto
-          accountType: (userData?.accountType as 'personal' | 'commercial') || 'personal', // Adicionar accountType do Firestore
-          commercialName: (userData?.commercialName as string | null) || null, // Adicionar commercialName do Firestore
-          avatarUrl: firebaseUser.photoURL || null, // Adicionar avatarUrl
-          aboutUs: (userData?.aboutUs as string | null) || null, // Adicionar campo "Sobre Nós"
-          contactEmail: (userData?.contactEmail as string | null) || null, // Adicionar campo para email de contato
-          address: (userData?.address as string | null) || null, // Adicionar campo para endereço
-          facebookUrl: (userData?.facebookUrl as string | null) || null, // Adicionar campo para URL do Facebook
-          instagramUrl: (userData?.instagramUrl as string | null) || null, // Mapear para instagramUrl
-          twitterUrl: (userData?.twitterUrl as string | null) || null, // Mapear para twitterUrl
-          themeColor: (userData?.themeColor as string | null) || null, // Adicionar themeColor do Firestore
-          extraPollsAvailable: (userData?.extraPollsAvailable as number) || 0, // Carregar créditos de enquete
-        };
-        setUser(customUser);
-
-        setIsMasterUser(false); // Definir como false temporariamente
+          setFirebaseAuthUser(firebaseUser); // Armazenar o objeto User original
+          const customUser = {
+            ...firebaseUser,
+            displayName: firebaseUser.displayName || null,
+            accountType: (userData?.accountType as 'personal' | 'commercial') || 'personal',
+            commercialName: (userData?.commercialName as string | null) || null,
+            avatarUrl: firebaseUser.photoURL || null,
+            aboutUs: (userData?.aboutUs as string | null) || null,
+            contactEmail: (userData?.contactEmail as string | null) || null,
+            address: (userData?.address as string | null) || null,
+            facebookUrl: (userData?.facebookUrl as string | null) || null,
+            instagramUrl: (userData?.instagramUrl as string | null) || null,
+            twitterUrl: (userData?.twitterUrl as string | null) || null,
+            themeColor: (userData?.themeColor as string | null) || null,
+            extraPollsAvailable: (userData?.extraPollsAvailable as number) || 0,
+          };
+          setUser(customUser);
+          setIsMasterUser(false); // Definir como false temporariamente
+        }, (error) => {
+          console.error("Erro ao escutar mudanças no documento do usuário:", error);
+        });
       } else {
+        // Se não houver firebaseUser, limpa tudo
         setUser(null);
-        setFirebaseAuthUser(null); // Limpar também o firebaseAuthUser
+        setFirebaseAuthUser(null);
         setIsMasterUser(false);
       }
       setLoading(false);
+      
+      // Retorna a função de unsubscribe combinada
+      return () => {
+        unsubscribe(); // Unsubscribe do auth
+        if (unsubscribeFirestore) {
+          unsubscribeFirestore(); // Unsubscribe do Firestore, se estiver ativo
+        }
+      };
     });
 
-    return () => unsubscribe();
+    // O useEffect deve retornar a função de limpeza diretamente do onAuthStateChanged
+    return unsubscribe;
   }, []);
 
   // Nova função para atualizar o documento do usuário
