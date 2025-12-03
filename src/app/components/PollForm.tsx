@@ -144,7 +144,7 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
       setFeedbackType("error");
       return;
     }
-
+    
     // Lógica para verificar o limite de enquetes por mês e créditos avulsos
     if (user.uid) {
       const pollsLimit = await getPollsLimitForCompany(user.uid);
@@ -156,7 +156,7 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
         setFeedbackType("error");
         return;
       }
-
+      //meu
       // Se atingiu o limite, mas tem créditos avulsos, usa um crédito
       if (pollsLimit !== null && pollsCreated >= pollsLimit && hasExtraCredit && user.uid) {
         await updateUserDocument(user.uid, { extraPollsAvailable: user.extraPollsAvailable! - 1 });
