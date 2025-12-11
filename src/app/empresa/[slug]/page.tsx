@@ -37,6 +37,7 @@ export interface CompanyData {
   instagramUrl?: string; // Antigo twitterUrl
   twitterUrl?: string; // Antigo linkedinUrl
   themeColor?: string; // Novo campo para a cor do tema da empresa
+  bannerURL?: string; // Novo campo para a URL da imagem do banner da empresa
 }
 
 // Alterado para usar a interface Poll completa
@@ -64,6 +65,7 @@ const getCompanyData = async (slug: string): Promise<CompanyData | null> => {
           instagramUrl: data.instagramUrl || undefined, // Mapeia diretamente para instagramUrl
           twitterUrl: data.twitterUrl || undefined,   // Mapeia diretamente para twitterUrl
           themeColor: data.themeColor || undefined, // Obter themeColor
+          bannerURL: data.bannerURL || undefined, // NOVO: Obter bannerURL
         };
       }
     });
@@ -247,8 +249,14 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
   return (
     // Removido: <CompanyFooterProvider> {/* Envolver o componente com o Provider */} // Remover o Provider
     <div className="w-full max-w-screen-xl mx-auto px-4 py-8 md:py-12 lg:py-16"> {/* Removido cor de fundo e sombra */}
-      <div className="flex flex-col items-center justify-center bg-gradient-to-r from-purple-500 to-indigo-600 rounded-b-lg p-6 mb-6 shadow-lg"> {/* Banner com gradiente */}
-        <div className="flex items-center w-full max-w-4xl">
+      <div
+        className="relative flex flex-col items-center justify-center rounded-b-lg p-6 mb-6 shadow-lg bg-gradient-to-r from-purple-500 to-indigo-600 h-48 md:h-64" // Adicionado relative aqui
+        style={company.bannerURL ? { backgroundImage: `url(${company.bannerURL})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}} // Fundo dinâmico
+      >
+        {company.bannerURL && (
+          <div className="absolute inset-0 bg-black opacity-40 rounded-b-lg"></div>
+        )}
+        <div className="relative flex items-center w-full max-w-4xl z-10"> {/* Adicionado relative e z-10 */}
           {company.photoURL ? (
             <div className="w-24 h-24 rounded-full overflow-hidden shadow-lg border-4 border-white flex-shrink-0"> {/* Contêiner para garantir o formato redondo e corte */}
               <Image

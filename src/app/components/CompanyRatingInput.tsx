@@ -56,6 +56,11 @@ const CompanyRatingInput: React.FC<CompanyRatingInputProps> = ({ companyId, onRa
       return;
     }
 
+    if (user.uid === companyId) {
+      onRatingSubmitted("Ação não permitida: Você não pode avaliar sua própria empresa.", "error");
+      return;
+    }
+
     setLoading(true);
     try {
       const ratingDocRef = doc(db, `users/${companyId}/ratings`, user.uid); // Usar UID do usuário como ID do documento

@@ -107,6 +107,9 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
         <div className={`md:flex items-center space-x-6 ${isMobileMenuOpen ? "flex flex-col absolute top-full left-0 w-full bg-zinc-800 p-4 shadow-md items-center space-y-4" : "hidden"}`}>
           <Link href="/" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
           <Link href="/enquetes" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300" onClick={() => setIsMobileMenuOpen(false)}>Enquetes</Link>
+          {user && user.accountType === 'personal' && (
+            <Link href="/profile" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300" onClick={() => setIsMobileMenuOpen(false)}>Meu Perfil</Link>
+          )}
           {user && user.accountType === 'commercial' && (
             <Link href="/dashboard" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300" onClick={() => setIsMobileMenuOpen(false)}>Dashboard</Link>
           )}

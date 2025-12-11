@@ -24,7 +24,22 @@ export default function Login({ onLoginSuccess, onSwitchToSignup }: LoginProps) 
       await signInWithEmailAndPassword(auth, email, password);
       onLoginSuccess?.();
     } catch (error: unknown) {
-      if (error instanceof Error) {
+      if (error instanceof Error && 'code' in error) { 
+        const firebaseError = error as { code: string; message: string }; 
+        switch (firebaseError.code) {
+          case 'auth/invalid-credential':
+            setError("Email ou senha incorretos.");
+            break;
+          case 'auth/user-disabled':
+            setError("Esta conta foi desabilitada.");
+            break;
+          case 'auth/invalid-email':
+            setError("Formato de email inválido.");
+            break;
+          default:
+            setError("Ocorreu um erro ao fazer login. Tente novamente.");
+        }
+      } else if (error instanceof Error) {
         setError(error.message);
       } else {
         setError("Ocorreu um erro desconhecido.");

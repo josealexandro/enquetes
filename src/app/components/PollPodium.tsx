@@ -91,7 +91,7 @@ export default function PollPodium({ polls, onVote, onDelete, onCardClick }: Pol
           initial={{ y: 100, opacity: 0, scale: 0.8 }}
           animate={{ y: 0, opacity: 1, scale: 1.1 }}
           transition={{ duration: 0.5, delay: 0 }}
-          className="relative z-20 w-full md:w-1/3 flex-shrink-0 md:-translate-y-0"
+          className="relative z-20 w-full md:w-1/3 flex-shrink-0 md:-translate-y-10"
         >
           <PollCard
             poll={pollRank1}

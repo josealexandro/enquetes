@@ -12,6 +12,7 @@ import { Poll } from "../types/poll"; // Importar a interface Poll
 import { v4 as uuidv4 } from "uuid"; // Para gerar IDs únicos para as opções
 import Image from "next/image"; // Importar o componente Image do Next.js
 import slugify from "@/utils/slugify"; // Importar a função slugify
+import QRCode from "react-qr-code"; // Importar QRCode
 // Removido: import { UserInfo, User } from "firebase/auth"; // Removido: UserInfo e User não são necessários aqui
 // Removido: import { AuthContextType } from "../context/AuthContext"; // Removido: AuthContextType não é necessário ser importado diretamente para o tipo CustomUser
 
@@ -37,6 +38,10 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
   const [uploadingImage, setUploadingImage] = useState(false); // Estado para o status do upload da imagem
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "error" | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null); // Novo estado para o arquivo de banner selecionado
+  const [bannerPreviewUrl, setBannerPreviewUrl] = useState<string | null>(null); // Novo estado para a URL de pré-visualização do banner
+  const [showQrCodeModal, setShowQrCodeModal] = useState(false); // Estado para controlar a visibilidade do modal QR Code
+  const [companyPublicPageUrl, setCompanyPublicPageUrl] = useState(""); // Estado para armazenar o URL da página pública da empresa
   // Novos estados para as informações do rodapé
   const [editedAboutUs, setEditedAboutUs] = useState(user.aboutUs || "");
   const [editedContactEmail, setEditedContactEmail] = useState(user.contactEmail || "");
@@ -46,7 +51,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
   const [editedTwitterUrl, setEditedTwitterUrl] = useState(user.twitterUrl || ""); // Antigo editedLinkedinUrl
   const [editedThemeColor, setEditedThemeColor] = useState(user.themeColor || "#6366f1"); // Novo estado para o tema de cor
 
-  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
   const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
   // Gerar o slug da empresa aqui para passar para o PollCard
@@ -56,6 +61,9 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
   useEffect(() => {
     if (user?.photoURL) {
       setImagePreviewUrl(user.photoURL);
+    }
+    if (user?.bannerURL) { // Inicializa a pré-visualização do banner
+      setBannerPreviewUrl(user.bannerURL);
     }
     if (user?.displayName) {
       setEditedCompanyName(user.displayName);
@@ -69,7 +77,15 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     setEditedFacebookUrl(user?.facebookUrl || "");
     setEditedInstagramUrl(user?.instagramUrl || "");
     setEditedTwitterUrl(user?.twitterUrl || "");
-    setEditedThemeColor(user?.themeColor || "#6366f1"); // Inicializa o estado com a cor do tema do usuário
+    if (user?.themeColor) { // Certifica-se de que user e themeColor existem antes de tentar slugify
+      setEditedThemeColor(user.themeColor);
+    }
+    if (user?.commercialName) {
+      const publicPageSlug = slugify(user.commercialName);
+      setCompanyPublicPageUrl(`${window.location.origin}/empresa/${publicPageSlug}`);
+    } else {
+      setCompanyPublicPageUrl(""); // Limpa o URL se não houver nome comercial
+    }
   }, [user]);
 
   // Efeito para contar enquetes ativas e calcular estatísticas quando as enquetes do usuário são atualizadas
@@ -131,7 +147,40 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     }
   };
 
+  const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        setFeedbackMessage("Tipo de arquivo inválido para o banner. Apenas JPG, PNG, GIF e WebP são permitidos.");
+        setFeedbackType("error");
+        setBannerFile(null);
+        setBannerPreviewUrl(user?.bannerURL || null); // Reverte para a imagem de banner atual do usuário
+        return;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        setFeedbackMessage("A imagem do banner é muito grande. O tamanho máximo permitido é 2MB.");
+        setFeedbackType("error");
+        setBannerFile(null);
+        setBannerPreviewUrl(user?.bannerURL || null); // Reverte para a imagem de banner atual do usuário
+        return;
+      }
+      setBannerFile(file);
+      setBannerPreviewUrl(URL.createObjectURL(file)); // Pré-visualização instantânea
+      setFeedbackMessage(null); // Limpa feedback anterior
+    } else {
+      setBannerFile(null);
+      setBannerPreviewUrl(user?.bannerURL || null); // Reverte para a imagem de banner atual do usuário
+    }
+  };
+
   const handleSaveProfile = async () => {
+    if (!user) {
+      console.error("Usuário não disponível ao tentar salvar o perfil.");
+      setFeedbackMessage("Erro: Usuário não autenticado. Faça login novamente.");
+      setFeedbackType("error");
+      setTimeout(() => setFeedbackMessage(null), 3000);
+      return;
+    }
     if (!editedCompanyName.trim() && !imageFile) { // Removida a verificação !user
       setFeedbackMessage("Nome da empresa ou imagem não pode estar vazio.");
       setFeedbackType("error");
@@ -140,21 +189,47 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
 
     if (uploadingImage) return; // Previne múltiplos envios
 
-    let newPhotoURL: string | undefined = user.photoURL || undefined;
+    let newPhotoURL: string | undefined = user!.photoURL || undefined;
     let updateRequired = false;
 
     if (editedCompanyName.trim() !== (user.displayName || "")) {
       updateRequired = true;
     }
 
+    // Verificar se um novo banner foi selecionado
+    if (bannerFile) {
+      updateRequired = true;
+    }
+
     // Verificar se algum dos novos campos de rodapé foi alterado
-    if (editedAboutUs !== (user.aboutUs || "")) updateRequired = true;
-    if (editedContactEmail !== (user.contactEmail || "")) updateRequired = true;
-    if (editedAddress !== (user.address || "")) updateRequired = true;
-    if (editedFacebookUrl !== (user.facebookUrl || "")) updateRequired = true;
-    if (editedInstagramUrl !== (user.instagramUrl || "")) updateRequired = true;
-    if (editedTwitterUrl !== (user.twitterUrl || "")) updateRequired = true;
-    if (editedThemeColor !== (user.themeColor || "#6366f1")) updateRequired = true; // Verificar alteração no themeColor
+    if (editedAboutUs !== (user.aboutUs || "")) {
+      updateRequired = true;
+      updateData.aboutUs = editedAboutUs;
+    }
+    if (editedContactEmail !== (user.contactEmail || "")) {
+      updateRequired = true; 
+      updateData.contactEmail = editedContactEmail;
+    }
+    if (editedAddress !== (user.address || "")) {
+      updateRequired = true; 
+      updateData.address = editedAddress;
+    }
+    if (editedFacebookUrl !== (user.facebookUrl || "")) {
+      updateRequired = true; 
+      updateData.facebookUrl = editedFacebookUrl;
+    }
+    if (editedInstagramUrl !== (user.instagramUrl || "")) {
+      updateRequired = true; 
+      updateData.instagramUrl = editedInstagramUrl;
+    }
+    if (editedTwitterUrl !== (user.twitterUrl || "")) {
+      updateRequired = true; 
+      updateData.twitterUrl = editedTwitterUrl;
+    }
+    if (editedThemeColor !== (user.themeColor || "#6366f1")) {
+      updateRequired = true; 
+      updateData.themeColor = editedThemeColor; // Adicionar themeColor ao updateData
+    }
 
     if (imageFile) {
       setUploadingImage(true);
@@ -173,6 +248,29 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
         setImageFile(null); // Limpa o arquivo selecionado em caso de erro
         setImagePreviewUrl(user.photoURL || null); // Reverte a pré-visualização
         return; // Interrompe o processo se o upload da imagem falhar
+      } finally {
+        setUploadingImage(false);
+      }
+    }
+
+    let newBannerURL: string | undefined = user!.bannerURL || undefined; // Novo: para o URL do banner
+    if (bannerFile) {
+      setUploadingImage(true); // Reutilizando o estado de uploading, pode ser bom ter um para banner
+      try {
+        const storage = getStorage();
+        const bannerRef = ref(storage, `banner_images/${user.uid}-${uuidv4()}-${bannerFile.name}`);
+        await uploadBytes(bannerRef, bannerFile);
+        newBannerURL = await getDownloadURL(bannerRef);
+        setFeedbackMessage("Banner enviado com sucesso!");
+        setFeedbackType("success");
+        updateRequired = true;
+      } catch (error) {
+        console.error("Erro ao fazer upload do banner:", error);
+        setFeedbackMessage("Erro ao fazer upload do banner.");
+        setFeedbackType("error");
+        setBannerFile(null); // Limpa o arquivo selecionado em caso de erro
+        setBannerPreviewUrl(user.bannerURL || null); // Reverte a pré-visualização
+        return; // Interrompe o processo se o upload do banner falhar
       } finally {
         setUploadingImage(false);
       }
@@ -214,20 +312,38 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
         instagramUrl?: string; 
         twitterUrl?: string; 
         themeColor?: string; // Adicionar themeColor
+        bannerURL?: string; // NOVO: Adicionar bannerURL
       } = {
         displayName: editedCompanyName.trim(),
       };
       if (newPhotoURL) {
         updateData.photoURL = newPhotoURL;
       }
+      if (newBannerURL) { // NOVO: Adicionar bannerURL ao updateData
+        updateData.bannerURL = newBannerURL;
+      }
       // Adicionar os novos campos ao updateData se tiverem sido alterados
-      if (editedAboutUs !== (user.aboutUs || "")) updateData.aboutUs = editedAboutUs;
-      if (editedContactEmail !== (user.contactEmail || "")) updateData.contactEmail = editedContactEmail;
-      if (editedAddress !== (user.address || "")) updateData.address = editedAddress;
-      if (editedFacebookUrl !== (user.facebookUrl || "")) updateData.facebookUrl = editedFacebookUrl;
-      if (editedInstagramUrl !== (user.instagramUrl || "")) updateData.instagramUrl = editedInstagramUrl;
-      if (editedTwitterUrl !== (user.twitterUrl || "")) updateData.twitterUrl = editedTwitterUrl;
-      if (editedThemeColor !== (user.themeColor || "#6366f1")) updateData.themeColor = editedThemeColor; // Adicionar themeColor ao updateData
+      if (editedAboutUs !== (user.aboutUs || "")) {
+        updateData.aboutUs = editedAboutUs;
+      }
+      if (editedContactEmail !== (user.contactEmail || "")) {
+        updateData.contactEmail = editedContactEmail;
+      }
+      if (editedAddress !== (user.address || "")) {
+        updateData.address = editedAddress;
+      }
+      if (editedFacebookUrl !== (user.facebookUrl || "")) {
+        updateData.facebookUrl = editedFacebookUrl;
+      }
+      if (editedInstagramUrl !== (user.instagramUrl || "")) {
+        updateData.instagramUrl = editedInstagramUrl;
+      }
+      if (editedTwitterUrl !== (user.twitterUrl || "")) {
+        updateData.twitterUrl = editedTwitterUrl;
+      }
+      if (editedThemeColor !== (user.themeColor || "#6366f1")) {
+        updateData.themeColor = editedThemeColor; // Adicionar themeColor ao updateData
+      }
 
       await updateDoc(userDocRef, updateData);
       setFeedbackMessage("Perfil atualizado com sucesso!");
@@ -326,18 +442,28 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       <h2 className="text-3xl font-bold mb-6">Olá, {user?.displayName || "Empresa"}!</h2>
 
       {/* Plano Comercial */}
-      <div className="bg-gray-800 p-6 rounded-lg shadow-md mb-6 flex justify-between items-center">
-        <div>
-          <h3 className="text-xl font-semibold">Plano Comercial</h3>
-          <p className="text-gray-400">{activePollsCount} enquetes ativas</p>
+        <div className="bg-gray-800 p-6 rounded-lg shadow-md mb-6 flex flex-col md:flex-row justify-between items-center">
+          <div className="mb-4 md:mb-0">
+            <h3 className="text-xl font-semibold">Plano Comercial</h3>
+            <p className="text-gray-400">{activePollsCount} enquetes ativas</p>
+          </div>
+          <div className="flex flex-col md:flex-row gap-4">
+            {user?.accountType === 'commercial' && user?.commercialName && (
+              <button
+                onClick={() => setShowQrCodeModal(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300"
+              >
+                Gerar QR Code da Página Pública
+              </button>
+            )}
+            <button
+              onClick={() => setShowCreatePollModal(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300"
+            >
+              Criar nova enquete comercial
+            </button>
+          </div>
         </div>
-        <button
-          onClick={() => setShowCreatePollModal(true)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300"
-        >
-          Criar nova enquete comercial
-        </button>
-      </div>
 
       {/* Minhas Enquetes */}
       <div className="bg-gray-800 p-6 rounded-lg shadow-md mb-6">
@@ -412,6 +538,32 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                 {feedbackMessage}
               </div>
             )}
+          </div>
+
+          {/* Seção de upload de imagem de banner */}
+          <div className="flex flex-col items-center mb-6">
+            <label htmlFor="banner-image-upload" className="block text-gray-400 mb-2">Alterar Imagem do Banner</label>
+            <input
+              id="banner-image-upload"
+              type="file"
+              accept={ACCEPTED_IMAGE_TYPES.join(", ")}
+              onChange={handleBannerChange}
+              className="w-full max-w-sm px-4 py-2 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
+            />
+            {bannerPreviewUrl && (
+              <div className="mt-4 w-full max-w-sm">
+                <p className="text-gray-400 text-sm mb-2">Pré-visualização do Banner:</p>
+                <Image
+                  src={bannerPreviewUrl}
+                  alt="Pré-visualização do Banner"
+                  width={400} // Ajuste o tamanho conforme necessário
+                  height={150} // Ajuste o tamanho conforme necessário
+                  objectFit="cover"
+                  className="rounded-lg border-2 border-indigo-500"
+                />
+              </div>
+            )}
+            {/* Feedback de erro/sucesso para o banner, se necessário */}
           </div>
 
           {/* Seção de nome da empresa */}
@@ -528,6 +680,38 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
               &times;
             </button>
             <PollForm isCommercial={user?.accountType === 'commercial'} onPollCreated={() => setShowCreatePollModal(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* Modal do QR Code */}
+      {showQrCodeModal && companyPublicPageUrl && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm relative flex flex-col items-center">
+            <button
+              onClick={() => setShowQrCodeModal(false)}
+              className="absolute top-4 right-4 text-gray-800 hover:text-gray-600 text-xl"
+            >
+              &times;
+            </button>
+            <Image
+              src="/logoPrincipal.png"
+              alt="PollApp Logo"
+              width={100} // Ajuste o tamanho conforme necessário
+              height={100} // Ajuste o tamanho conforme necessário
+              className="mb-2"
+            />
+            <div className="p-4 bg-white rounded-lg shadow-inner">
+              <QRCode value={companyPublicPageUrl} size={256} level="H" />
+            </div>
+            <a
+              href={companyPublicPageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 text-indigo-600 hover:text-indigo-800 font-semibold"
+            >
+              Ir para a Página da Empresa
+            </a>
           </div>
         </div>
       )}
