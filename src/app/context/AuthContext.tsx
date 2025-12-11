@@ -38,6 +38,7 @@ export interface AuthContextType {
     twitterUrl?: string | null; // Novo campo para URL do Twitter (antigo linkedinUrl)
     themeColor?: string | null; // Adicionar themeColor
     extraPollsAvailable?: number; // Novo campo para créditos de enquete avulsas
+    bannerURL?: string | null; // Novo campo para URL do banner
   }) | null; // O tipo de usuário agora é o User do Firebase
   firebaseAuthUser: User | null; // Novo campo para o objeto User original do Firebase Auth
   loading: boolean;
@@ -73,6 +74,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     twitterUrl?: string | null; // Mapear para twitterUrl
     themeColor?: string | null; // Adicionar themeColor
     extraPollsAvailable?: number; // Novo campo para créditos de enquete avulsas
+    bannerURL?: string | null; // Novo campo para URL do banner
   }) | null>(null);
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<User | null>(null); // Novo estado
   const [loading, setLoading] = useState(true);
@@ -102,6 +104,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             instagramUrl: (userData?.instagramUrl as string | null) || null,
             twitterUrl: (userData?.twitterUrl as string | null) || null,
             themeColor: (userData?.themeColor as string | null) || null,
+            bannerURL: (userData?.bannerURL as string | null) || null, // Adicionar bannerURL
             extraPollsAvailable: (userData?.extraPollsAvailable as number) || 0,
           };
           setUser(customUser);
