@@ -191,9 +191,22 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
 
     let newPhotoURL: string | undefined = user!.photoURL || undefined;
     let updateRequired = false;
+    const updateData: {
+      displayName?: string;
+      photoURL?: string;
+      aboutUs?: string;
+      contactEmail?: string;
+      address?: string;
+      facebookUrl?: string;
+      instagramUrl?: string;
+      twitterUrl?: string;
+      themeColor?: string;
+      bannerURL?: string;
+    } = {};
 
     if (editedCompanyName.trim() !== (user.displayName || "")) {
       updateRequired = true;
+      updateData.displayName = editedCompanyName.trim();
     }
 
     // Verificar se um novo banner foi selecionado
@@ -302,20 +315,6 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       // 2. Opcional: Atualizar no Firestore se for um usuário comercial
       // user é garantido como não nulo aqui
       const userDocRef = doc(db, "users", user.uid);
-      const updateData: { 
-        displayName: string; 
-        photoURL?: string; 
-        aboutUs?: string; 
-        contactEmail?: string; 
-        address?: string; 
-        facebookUrl?: string; 
-        instagramUrl?: string; 
-        twitterUrl?: string; 
-        themeColor?: string; // Adicionar themeColor
-        bannerURL?: string; // NOVO: Adicionar bannerURL
-      } = {
-        displayName: editedCompanyName.trim(),
-      };
       if (newPhotoURL) {
         updateData.photoURL = newPhotoURL;
       }
