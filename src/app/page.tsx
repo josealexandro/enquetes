@@ -96,18 +96,25 @@ export default function Home() {
     } as Poll;
   };
 
-  // Buscar Pódio (Separado)
+  // Buscar Pódio (Separado) - Apenas enquetes públicas
   useEffect(() => {
     const fetchPodium = async () => {
       try {
-        // Assumindo que 'likes' é um bom indicador para o pódio por enquanto.
-        // Para 'engagement' perfeito (likes + votes), precisaríamos de um campo salvo no DB.
-        const q = query(collection(db, "polls"), orderBy("likes", "desc"), limit(3));
+        // Filtrar apenas enquetes públicas para o pódio
+        const q = query(
+          collection(db, "polls"), 
+          where("isCommercial", "==", false),
+          orderBy("likes", "desc"), 
+          limit(3)
+        );
         const snapshot = await getDocs(q);
         const polls = await Promise.all(snapshot.docs.map(processPollData));
         
+        // Filtrar novamente para garantir que apenas públicas apareçam (caso processPollData não tenha definido o campo)
+        const publicPolls = polls.filter(poll => !poll.isCommercial);
+        
         // Atribuir ranks
-        const rankedPolls = polls.map((poll, index) => ({
+        const rankedPolls = publicPolls.map((poll, index) => ({
           ...poll,
           rank: index + 1
         }));
@@ -144,8 +151,12 @@ export default function Home() {
       const processedPublic = await Promise.all(publicSnap.docs.map(processPollData));
       const processedCommercial = await Promise.all(commercialSnap.docs.map(processPollData));
 
-      setPublicPolls(processedPublic);
-      setCommercialPolls(processedCommercial);
+      // Filtrar novamente para garantir que apenas enquetes públicas/comerciais apareçam nas respectivas listas
+      const filteredPublic = processedPublic.filter(poll => !poll.isCommercial);
+      const filteredCommercial = processedCommercial.filter(poll => poll.isCommercial === true);
+
+      setPublicPolls(filteredPublic);
+      setCommercialPolls(filteredCommercial);
 
       setLastPublicDoc(publicSnap.docs[publicSnap.docs.length - 1] || null);
       setLastCommercialDoc(commercialSnap.docs[commercialSnap.docs.length - 1] || null);
@@ -175,7 +186,10 @@ export default function Home() {
       const snapshot = await getDocs(q);
       const newPolls = await Promise.all(snapshot.docs.map(processPollData));
       
-      setPublicPolls(prev => [...prev, ...newPolls]);
+      // Filtrar novamente para garantir que apenas enquetes públicas apareçam
+      const filteredNewPolls = newPolls.filter(poll => !poll.isCommercial);
+      
+      setPublicPolls(prev => [...prev, ...filteredNewPolls]);
       setLastPublicDoc(snapshot.docs[snapshot.docs.length - 1] || null);
       if (snapshot.docs.length < 8) setHasMorePublic(false);
     } catch (error) {
@@ -200,7 +214,10 @@ export default function Home() {
       const snapshot = await getDocs(q);
       const newPolls = await Promise.all(snapshot.docs.map(processPollData));
       
-      setCommercialPolls(prev => [...prev, ...newPolls]);
+      // Filtrar novamente para garantir que apenas enquetes comerciais apareçam
+      const filteredNewPolls = newPolls.filter(poll => poll.isCommercial === true);
+      
+      setCommercialPolls(prev => [...prev, ...filteredNewPolls]);
       setLastCommercialDoc(snapshot.docs[snapshot.docs.length - 1] || null);
       if (snapshot.docs.length < 8) setHasMoreCommercial(false);
     } catch (error) {
