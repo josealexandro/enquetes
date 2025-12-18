@@ -12,8 +12,19 @@ pmp-debug/
 .DS_Store
 *.pem
 
-# Local env files
+# Local env files (sensitive - contains API keys and secrets)
+.env
+.env.local
 .env*.local
+
+# Firebase configuration (may contain sensitive project IDs)
+firebase.json
+
+# Firestore rules (if you want to keep them private)
+firestore.rules
+
+# Storage rules (if you want to keep them private)
+storage.rules
 
 # Log files
 npm-debug.log*

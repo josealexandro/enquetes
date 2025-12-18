@@ -51,6 +51,13 @@ export default function Signup({ onSwitchToLogin, onSignupSuccessWithAccountType
       return;
     }
 
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      setError("Por favor, insira um e-mail válido.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const finalDisplayName = accountType === 'personal' ? displayName : email; // Usar email como nome para contas comerciais
       const finalAvatarFile = accountType === 'personal' ? avatarFile : null; // Nulo para contas comerciais

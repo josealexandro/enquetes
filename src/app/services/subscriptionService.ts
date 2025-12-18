@@ -38,12 +38,22 @@ const findPlanSeedBySlug = (slug: PlanSlug) =>
   DEFAULT_PLANS.find((plan) => plan.slug === slug);
 
 export async function ensureDefaultPlans() {
-  const tasks = DEFAULT_PLANS.map(async (plan) => {
-    const ref = doc(plansCollection, plan.id);
-    await setDoc(ref, plan, { merge: true });
-  });
+  try {
+    const tasks = DEFAULT_PLANS.map(async (plan) => {
+      try {
+        const ref = doc(plansCollection, plan.id);
+        await setDoc(ref, plan, { merge: true });
+      } catch (error) {
+        console.error(`[ensureDefaultPlans] Erro ao criar plano ${plan.id}:`, error);
+        // Continua com os outros planos mesmo se um falhar
+      }
+    });
 
-  await Promise.all(tasks);
+    await Promise.all(tasks);
+  } catch (error) {
+    console.error("[ensureDefaultPlans] Erro geral:", error);
+    throw error;
+  }
 }
 
 export async function listPlans(): Promise<Plan[]> {

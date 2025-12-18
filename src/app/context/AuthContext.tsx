@@ -217,7 +217,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (avatarFile) {
         const storage = getStorage();
         const avatarRef = ref(storage, `avatars/${firebaseUser.uid}/${avatarFile.name}`);
-        const snapshot = await uploadBytes(avatarRef, avatarFile);
+        // Adicionar metadata com contentType para garantir que as regras funcionem
+        const snapshot = await uploadBytes(avatarRef, avatarFile, {
+          contentType: avatarFile.type || 'image/png'
+        });
         photoURL = await getDownloadURL(snapshot.ref);
       }
 

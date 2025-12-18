@@ -24,6 +24,13 @@ export default function SignupForm({ onSignupSuccess }: SignupFormProps) {
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Por favor, insira um e-mail válido.");
+      setLoading(false);
+      return;
+    }
+
     try {
       await signup(email, password, displayName, 'personal', null);
       onSignupSuccess?.();

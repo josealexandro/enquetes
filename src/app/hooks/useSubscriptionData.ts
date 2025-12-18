@@ -53,14 +53,28 @@ export function useSubscriptionData(
         subscriptionRequest,
       ]);
 
+      // Verificar se a resposta dos planos é OK antes de fazer parse
+      if (!plansResponse.ok) {
+        const errorText = await plansResponse.text();
+        console.error("Erro ao buscar planos:", plansResponse.status, errorText);
+        throw new Error(`Erro ao buscar planos: ${plansResponse.status}`);
+      }
+
       const plansJson = await plansResponse.json();
       setPlans(plansJson.plans ?? []);
 
       let subscriptionData: Subscription | null = null;
       if (subscriptionResponse) {
-        const subscriptionJson = await subscriptionResponse.json();
-        subscriptionData = subscriptionJson.subscription ?? null;
-        setSubscription(subscriptionData);
+        // Verificar se a resposta da assinatura é OK antes de fazer parse
+        if (!subscriptionResponse.ok) {
+          const errorText = await subscriptionResponse.text();
+          console.error("Erro ao buscar assinatura:", subscriptionResponse.status, errorText);
+          // Não lançar erro aqui, apenas logar, pois pode não ter assinatura ainda
+        } else {
+          const subscriptionJson = await subscriptionResponse.json();
+          subscriptionData = subscriptionJson.subscription ?? null;
+          setSubscription(subscriptionData);
+        }
       } else {
         setSubscription(null);
       }

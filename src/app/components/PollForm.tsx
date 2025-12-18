@@ -209,6 +209,10 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
         createdAt: serverTimestamp(),
         isCommercial: isCommercial,
         commentCount: 0, // Inicializar commentCount com 0
+        likes: 0, // Inicializar likes com 0
+        likedBy: [], // Inicializar likedBy como array vazio
+        dislikes: 0, // Inicializar dislikes com 0
+        dislikedBy: [], // Inicializar dislikedBy como array vazio
         // ...(imageUrl && { imageUrl }), // Adiciona imageUrl apenas se existir
       });
 
