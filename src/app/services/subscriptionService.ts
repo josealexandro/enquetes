@@ -26,10 +26,11 @@ import {
   SubscriptionAudit,
 } from "@/app/types/subscription";
 
-const plansCollection = collection(db, "plans");
-const subscriptionsCollection = collection(db, "subscriptions");
-const paymentsCollection = collection(db, "payments");
-const auditCollection = collection(db, "subscription_audit");
+// Helper functions para criar referências de coleção apenas quando necessário
+const getPlansCollection = () => collection(db, "plans");
+const getSubscriptionsCollection = () => collection(db, "subscriptions");
+const getPaymentsCollection = () => collection(db, "payments");
+const getAuditCollection = () => collection(db, "subscription_audit");
 
 const findPlanSeedById = (planId: string) =>
   DEFAULT_PLANS.find((plan) => plan.id === planId);
@@ -41,7 +42,7 @@ export async function ensureDefaultPlans() {
   try {
     const tasks = DEFAULT_PLANS.map(async (plan) => {
       try {
-        const ref = doc(plansCollection, plan.id);
+        const ref = doc(getPlansCollection(), plan.id);
         await setDoc(ref, plan, { merge: true });
       } catch (error) {
         console.error(`[ensureDefaultPlans] Erro ao criar plano ${plan.id}:`, error);
@@ -58,7 +59,7 @@ export async function ensureDefaultPlans() {
 
 export async function listPlans(): Promise<Plan[]> {
   try {
-    const plansQuery = query(plansCollection, orderBy("sortOrder", "asc"));
+    const plansQuery = query(getPlansCollection(), orderBy("sortOrder", "asc"));
     const snapshot = await getDocs(plansQuery);
     if (!snapshot.size) {
       return DEFAULT_PLANS;
@@ -72,7 +73,7 @@ export async function listPlans(): Promise<Plan[]> {
 
 export async function getSubscriptionByCompany(companyId: string) {
   const subscriptionQuery = query(
-    subscriptionsCollection,
+    getSubscriptionsCollection(),
     where("companyId", "==", companyId),
     limit(1)
   );
@@ -87,7 +88,7 @@ export async function getSubscriptionByCompany(companyId: string) {
 
 export async function getPlanBySlug(slug: PlanSlug) {
   try {
-    const slugQuery = query(plansCollection, where("slug", "==", slug), limit(1));
+    const slugQuery = query(getPlansCollection(), where("slug", "==", slug), limit(1));
     const snapshot = await getDocs(slugQuery);
     if (snapshot.docs.length) {
       return snapshot.docs[0].data() as Plan;
@@ -101,7 +102,7 @@ export async function getPlanBySlug(slug: PlanSlug) {
 
 export async function getPlanById(id: string): Promise<Plan | null> {
   try {
-    const planDoc = await getDoc(doc(plansCollection, id));
+    const planDoc = await getDoc(doc(getPlansCollection(), id));
     if (planDoc.exists()) {
       return planDoc.data() as Plan;
     }
@@ -121,7 +122,7 @@ export interface CreateSubscriptionInput {
 }
 
 export async function createSubscription(input: CreateSubscriptionInput) {
-  const planRef = doc(plansCollection, input.planId);
+  const planRef = doc(getPlansCollection(), input.planId);
   const planDoc = await getDoc(planRef);
 
   let planData: Plan | undefined;
@@ -138,7 +139,7 @@ export async function createSubscription(input: CreateSubscriptionInput) {
   const periodLengthInDays = planData.billingPeriod === "monthly" ? 30 : 365;
   const status = input.status ?? (planData.trialDays ? "TRIALING" : "AWAITING_CONFIRMATION");
 
-  const subscriptionRef = doc(subscriptionsCollection);
+  const subscriptionRef = doc(getSubscriptionsCollection());
   const subscriptionData = {
     id: subscriptionRef.id,
     companyId: input.companyId,
@@ -183,7 +184,7 @@ export async function updateSubscriptionStatus(
   status: SubscriptionStatus,
   options?: { notes?: string; actorId?: string; actorName?: string; invoiceId?: string }
 ) {
-  const subscriptionRef = doc(subscriptionsCollection, subscriptionId);
+  const subscriptionRef = doc(getSubscriptionsCollection(), subscriptionId);
   const subscriptionSnap = await getDoc(subscriptionRef);
 
   if (!subscriptionSnap.exists()) {
@@ -219,7 +220,7 @@ export interface RecordPaymentInput {
 }
 
 export async function recordPayment(input: RecordPaymentInput) {
-  const paymentRef = doc(paymentsCollection);
+  const paymentRef = doc(getPaymentsCollection());
   const paymentData = {
     id: paymentRef.id,
     subscriptionId: input.subscriptionId,
@@ -251,7 +252,7 @@ export interface LogSubscriptionChangeInput {
 }
 
 export async function logSubscriptionChange(input: LogSubscriptionChangeInput) {
-  const auditRef = doc(auditCollection);
+  const auditRef = doc(getAuditCollection());
   const auditData = {
     id: auditRef.id,
     subscriptionId: input.subscriptionId,
@@ -276,7 +277,7 @@ export interface SwitchSubscriptionPlanInput {
 }
 
 export async function switchSubscriptionPlan(input: SwitchSubscriptionPlanInput) {
-  const subscriptionRef = doc(subscriptionsCollection, input.subscriptionId);
+  const subscriptionRef = doc(getSubscriptionsCollection(), input.subscriptionId);
   const subscriptionSnap = await getDoc(subscriptionRef);
 
   if (!subscriptionSnap.exists()) {
@@ -285,7 +286,7 @@ export async function switchSubscriptionPlan(input: SwitchSubscriptionPlanInput)
 
   const subscriptionData = subscriptionSnap.data() as Subscription;
 
-  const newPlanRef = doc(plansCollection, input.newPlanId);
+  const newPlanRef = doc(getPlansCollection(), input.newPlanId);
   const planSnap = await getDoc(newPlanRef);
   let planData: Plan | undefined;
   if (!planSnap.exists()) {
@@ -338,7 +339,7 @@ export async function switchSubscriptionPlan(input: SwitchSubscriptionPlanInput)
 export async function listPaymentsBySubscription(subscriptionId: string) {
   // Consulta básica sem "orderBy" extra para evitar necessidade de índice composto.
   const paymentsQuery = query(
-    paymentsCollection,
+    getPaymentsCollection(),
     where("subscriptionId", "==", subscriptionId)
   );
 
@@ -431,7 +432,7 @@ export interface UpdateSubscriptionPeriodAndCancellationInput {
 }
 
 export async function updateSubscriptionPeriodAndCancellation(input: UpdateSubscriptionPeriodAndCancellationInput) {
-  const subscriptionRef = doc(subscriptionsCollection, input.subscriptionId);
+  const subscriptionRef = doc(getSubscriptionsCollection(), input.subscriptionId);
   const subscriptionSnap = await getDoc(subscriptionRef);
 
   if (!subscriptionSnap.exists()) {
