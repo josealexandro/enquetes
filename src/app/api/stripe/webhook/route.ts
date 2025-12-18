@@ -4,13 +4,6 @@ import type Stripe from "stripe"; // Importando apenas os tipos do Stripe
 import { handleCheckoutSessionCompleted, handleInvoicePaid, handleCustomerSubscriptionUpdated } from "@/app/services/stripeWebhookHandlers";
 import stripe from "@/app/services/stripeService"; // Importando a instância configurada
 
-// DESATIVA O BODY PARSER – ESSENCIAL PARA O STRIPE!!
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
 const webhookSecret: string = process.env.STRIPE_WEBHOOK_SECRET!;
 
 export async function POST(req: NextRequest) {
