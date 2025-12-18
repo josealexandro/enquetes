@@ -80,19 +80,33 @@ export default function Home() {
       pollCreatedAt = Timestamp.now();
     }
 
+    // Garantir que isCommercial seja boolean explícito (true ou false, nunca undefined)
+    // IMPORTANTE: Se data.isCommercial for undefined, null, ou qualquer coisa que não seja exatamente true, será false
+    const isCommercial = data.isCommercial === true;
+    
+    // Remover campos que vamos sobrescrever do spread para evitar conflitos
+    // Usar variáveis descartáveis para evitar conflitos de nome
+    const { 
+      isCommercial: _isCommercialFromData, 
+      options: _optionsFromData, 
+      creator: _creatorFromData, 
+      createdAt: _createdAtFromData, 
+      ...restData 
+    } = data;
+    
     return {
       id: docSnap.id,
-      ...data,
-      options: optionsWithIds,
+      ...restData, // Spread primeiro (não contém isCommercial, options, creator, createdAt)
+      options: optionsWithIds, // Sobrescreve qualquer options que possa ter vindo do restData
       creator: {
         id: creatorId,
         name: creatorName,
         avatarUrl: creatorAvatarUrl,
         commercialName: creatorCommercialName,
         themeColor: creatorThemeColor,
-      },
-      isCommercial: data.isCommercial || false,
-      createdAt: pollCreatedAt,
+      }, // Sobrescreve qualquer creator que possa ter vindo do restData
+      isCommercial: isCommercial, // Sempre boolean explícito - definido DEPOIS do spread para garantir prioridade
+      createdAt: pollCreatedAt, // Sobrescreve qualquer createdAt que possa ter vindo do restData
     } as Poll;
   };
 
@@ -110,8 +124,8 @@ export default function Home() {
         const snapshot = await getDocs(q);
         const polls = await Promise.all(snapshot.docs.map(processPollData));
         
-        // Filtrar novamente para garantir que apenas públicas apareçam (caso processPollData não tenha definido o campo)
-        const publicPolls = polls.filter(poll => !poll.isCommercial);
+        // Filtrar novamente para garantir que apenas públicas apareçam (isCommercial === false)
+        const publicPolls = polls.filter(poll => poll.isCommercial === false);
         
         // Atribuir ranks
         const rankedPolls = publicPolls.map((poll, index) => ({
@@ -152,7 +166,9 @@ export default function Home() {
       const processedCommercial = await Promise.all(commercialSnap.docs.map(processPollData));
 
       // Filtrar novamente para garantir que apenas enquetes públicas/comerciais apareçam nas respectivas listas
-      const filteredPublic = processedPublic.filter(poll => !poll.isCommercial);
+      // Filtro rigoroso: apenas enquetes com isCommercial === false (não undefined, não null, não true)
+      const filteredPublic = processedPublic.filter(poll => poll.isCommercial === false);
+      // Filtro rigoroso: apenas enquetes com isCommercial === true (exatamente true)
       const filteredCommercial = processedCommercial.filter(poll => poll.isCommercial === true);
 
       setPublicPolls(filteredPublic);
@@ -186,8 +202,8 @@ export default function Home() {
       const snapshot = await getDocs(q);
       const newPolls = await Promise.all(snapshot.docs.map(processPollData));
       
-      // Filtrar novamente para garantir que apenas enquetes públicas apareçam
-      const filteredNewPolls = newPolls.filter(poll => !poll.isCommercial);
+      // Filtrar novamente para garantir que apenas enquetes públicas apareçam (isCommercial === false)
+      const filteredNewPolls = newPolls.filter(poll => poll.isCommercial === false);
       
       setPublicPolls(prev => [...prev, ...filteredNewPolls]);
       setLastPublicDoc(snapshot.docs[snapshot.docs.length - 1] || null);
@@ -214,7 +230,7 @@ export default function Home() {
       const snapshot = await getDocs(q);
       const newPolls = await Promise.all(snapshot.docs.map(processPollData));
       
-      // Filtrar novamente para garantir que apenas enquetes comerciais apareçam
+      // Filtrar novamente para garantir que apenas enquetes comerciais apareçam (isCommercial === true)
       const filteredNewPolls = newPolls.filter(poll => poll.isCommercial === true);
       
       setCommercialPolls(prev => [...prev, ...filteredNewPolls]);
@@ -474,7 +490,10 @@ export default function Home() {
                   transition={{ duration: 0.3 }}
                   className="w-full mb-8"
                 >
-                  <PollForm onPollCreated={() => { handlePollCreated(); setShowPollForm(false); }} />
+                  <PollForm 
+                    onPollCreated={() => { handlePollCreated(); setShowPollForm(false); }} 
+                    isCommercial={user?.accountType === 'commercial'} 
+                  />
                 </motion.div>
               </AnimatePresence>
             )}

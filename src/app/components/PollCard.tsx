@@ -406,7 +406,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
             className="w-8 h-8 rounded-full mr-2"
           />
           <span 
-            className={`overflow-hidden text-ellipsis whitespace-nowrap
+            className={`break-words
               ${poll.rank
                 ? "text-white" // If ranked, force white text for creator name
                 : (poll.isCommercial && companyThemeColor)
