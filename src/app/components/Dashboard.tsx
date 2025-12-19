@@ -316,7 +316,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       // user é garantido como não nulo aqui
       const userDocRef = doc(db, "users", user.uid);
       if (newPhotoURL) {
-        updateData.photoURL = newPhotoURL;
+        updateData.avatarUrl = newPhotoURL; // Salvar como avatarUrl no Firestore
       }
       if (newBannerURL) { // NOVO: Adicionar bannerURL ao updateData
         updateData.bannerURL = newBannerURL;

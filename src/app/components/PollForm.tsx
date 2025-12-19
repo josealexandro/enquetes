@@ -204,7 +204,8 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
           name: (isCommercial && user.commercialName) 
             ? user.commercialName 
             : (user.displayName || user.email || "Usuário Logado"),
-          avatarUrl: user.photoURL || "https://www.gravatar.com/avatar/?d=mp", // Fallback para Gravatar
+          // Priorizar avatarUrl do Firestore (perfil atualizado), senão usar photoURL do Firebase Auth
+          avatarUrl: (user as any).avatarUrl || user.photoURL || "https://www.gravatar.com/avatar/?d=mp",
           id: user.uid,
           ...(user.commercialName && { commercialName: user.commercialName }), // Adicionar commercialName se existir
           ...(user.themeColor && { themeColor: user.themeColor }), // Adicionar themeColor se existir

@@ -403,7 +403,12 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
             alt={(poll.isCommercial && poll.creator.commercialName) || poll.creator.name || "Avatar do criador"} // Adicionar fallback para alt
             width={32}
             height={32}
-            className="w-8 h-8 rounded-full mr-2"
+            className="w-8 h-8 rounded-full mr-2 object-cover"
+            unoptimized={poll.creator.avatarUrl?.includes('firebasestorage') || false} // Desabilitar otimização para Firebase Storage se necessário
+            onError={(e) => {
+              // Fallback caso a imagem falhe ao carregar
+              (e.target as HTMLImageElement).src = "https://www.gravatar.com/avatar/?d=mp";
+            }}
           />
           <span 
             className={`break-words

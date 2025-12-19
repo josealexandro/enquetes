@@ -96,7 +96,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             displayName: firebaseUser.displayName || null,
             accountType: (userData?.accountType as 'personal' | 'commercial') || 'personal',
             commercialName: (userData?.commercialName as string | null) || null,
-            avatarUrl: firebaseUser.photoURL || null,
+            // Priorizar avatarUrl do Firestore (perfil atualizado), senão usar photoURL do Firebase Auth
+            avatarUrl: (userData?.avatarUrl as string | null) || firebaseUser.photoURL || null,
             aboutUs: (userData?.aboutUs as string | null) || null,
             contactEmail: (userData?.contactEmail as string | null) || null,
             address: (userData?.address as string | null) || null,
@@ -153,7 +154,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           displayName: firebaseAuthUser.displayName || null,
           accountType: (userData?.accountType as 'personal' | 'commercial') || 'personal',
           commercialName: (userData?.commercialName as string | null) || null,
-          avatarUrl: firebaseAuthUser.photoURL || null,
+          // Priorizar avatarUrl do Firestore (perfil atualizado), senão usar photoURL do Firebase Auth
+          avatarUrl: (userData?.avatarUrl as string | null) || firebaseAuthUser.photoURL || null,
           aboutUs: (userData?.aboutUs as string | null) || null,
           contactEmail: (userData?.contactEmail as string | null) || null,
           address: (userData?.address as string | null) || null,
