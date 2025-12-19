@@ -194,6 +194,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     const updateData: {
       displayName?: string;
       photoURL?: string;
+      avatarUrl?: string; // Adicionar avatarUrl ao tipo
       aboutUs?: string;
       contactEmail?: string;
       address?: string;
