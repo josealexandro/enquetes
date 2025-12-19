@@ -200,7 +200,10 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
         options: filteredOptions.map(optionText => ({ id: uuidv4(), text: optionText, votes: 0 })),
         category: category,
         creator: { // Salvar o objeto creator completo
-          name: user.displayName || user.email || "Usuário Logado",
+          // Se for comercial, usar commercialName como nome principal, senão usar displayName ou email
+          name: (isCommercial && user.commercialName) 
+            ? user.commercialName 
+            : (user.displayName || user.email || "Usuário Logado"),
           avatarUrl: user.photoURL || "https://www.gravatar.com/avatar/?d=mp", // Fallback para Gravatar
           id: user.uid,
           ...(user.commercialName && { commercialName: user.commercialName }), // Adicionar commercialName se existir

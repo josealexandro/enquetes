@@ -400,7 +400,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
         <div className="flex items-center flex-grow max-w-[calc(100%-48px)]"> {/* Ajustado max-w para dar espaço ao troféu */}
           <Image
             src={poll.creator.avatarUrl || "https://www.gravatar.com/avatar/?d=mp"} // Usar fallback para Gravatar se avatarUrl for nulo/vazio
-            alt={poll.creator.name || "Avatar do criador"} // Adicionar fallback para alt
+            alt={(poll.isCommercial && poll.creator.commercialName) || poll.creator.name || "Avatar do criador"} // Adicionar fallback para alt
             width={32}
             height={32}
             className="w-8 h-8 rounded-full mr-2"
@@ -421,7 +421,9 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
               }
             }}
           > {/* Aplicar textColorClass */}
-            {poll.creator.name}
+            {poll.isCommercial && poll.creator.commercialName 
+              ? poll.creator.commercialName 
+              : poll.creator.name}
           </span>
         </div>
         {poll.rank && (

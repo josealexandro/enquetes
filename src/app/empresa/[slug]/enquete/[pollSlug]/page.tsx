@@ -72,7 +72,9 @@ const getPollData = async (companySlug: string, pollSlug: string): Promise<PollD
           title: data.title,
           options: data.options || [],
           category: data.category || "Geral",
-          creatorName: data.creator.name || "Desconhecido",
+          creatorName: (data.isCommercial && data.creator.commercialName) 
+            ? data.creator.commercialName 
+            : (data.creator.name || "Desconhecido"),
           creatorAvatarUrl: data.creator.avatarUrl || undefined,
           createdAt: data.createdAt?.toDate() || new Date(),
           isCommercial: data.isCommercial || false,
