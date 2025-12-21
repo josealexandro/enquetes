@@ -56,7 +56,11 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
       paymentMethod: "stripe",
       status: "ACTIVE",
     });
-    subscription = (await getSubscriptionByCompany(companyId))!;
+    subscription = await getSubscriptionByCompany(companyId);
+    if (!subscription) {
+      console.error("Falha ao criar assinatura após checkout session:", session.id);
+      throw new Error("Não foi possível criar a assinatura após o checkout");
+    }
   } else {
     // Se já existe, atualiza o plano e status (para o caso de troca de plano)
     await switchSubscriptionPlan({

@@ -19,6 +19,7 @@ import { motion } from "framer-motion"; // Importar motion para animações
 import CompanyRatingInput from "@/app/components/CompanyRatingInput"; // Importar o novo componente de avaliação
 import Notification from "@/app/components/Notification"; // Importar o novo componente de notificação
 import RatingSuccessAnimation from "@/app/components/RatingSuccessAnimation"; // Importar o novo componente de animação de estrelas
+import ExpandableImage from "@/app/components/ExpandableImage"; // Importar componente de imagem expansível
 
 interface CompanyProfilePageProps {
   params: Promise<{ slug: string }>; // Atualizado para Promise
@@ -96,6 +97,7 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null); // Estado para a mensagem da notificação
   const [notificationType, setNotificationType] = useState<'success' | 'error' | 'info'>('info'); // Estado para o tipo da notificação
   const [showRatingAnimation, setShowRatingAnimation] = useState(false); // Novo estado para controlar a animação das estrelas
+  const [isProfileImageExpanded, setIsProfileImageExpanded] = useState(false); // Estado para controlar a expansão da imagem de perfil
 
   // Removido useEffect que logava company, será logado dentro do useEffect principal
   // useEffect(() => { ... }, [company]);
@@ -218,9 +220,14 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
     }
     try {
       const pollRef = doc(db, "polls", pollId);
+      const pollToUpdate = companyPolls.find(p => p.id === pollId);
+      if (!pollToUpdate) {
+        console.error("Enquete não encontrada para votação");
+        return;
+      }
       // A atualização real-time via onSnapshot se encarregará de atualizar o estado local
       await updateDoc(pollRef, {
-        "options": companyPolls.find(p => p.id === pollId)?.options.map(opt =>
+        "options": pollToUpdate.options.map(opt =>
           opt.id === optionId ? { ...opt, votes: opt.votes + 1 } : opt
         ),
         votedBy: arrayUnion(user.uid),
@@ -250,35 +257,36 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
     // Removido: <CompanyFooterProvider> {/* Envolver o componente com o Provider */} // Remover o Provider
     <div className="w-full max-w-screen-xl mx-auto px-4 py-8 md:py-12 lg:py-16"> {/* Removido cor de fundo e sombra */}
       <div
-        className="relative flex flex-col items-center justify-center rounded-b-lg p-6 mb-6 shadow-lg bg-gradient-to-r from-purple-500 to-indigo-600 h-48 md:h-64" // Adicionado relative aqui
+        className="relative flex flex-col items-center justify-center rounded-b-lg p-6 mb-6 shadow-lg bg-gradient-to-r from-purple-500 to-indigo-600 h-48 md:h-64 overflow-visible" // Adicionado overflow-visible
         style={company.bannerURL ? { backgroundImage: `url(${company.bannerURL})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}} // Fundo dinâmico
       >
         {company.bannerURL && (
           <div className="absolute inset-0 bg-black opacity-40 rounded-b-lg"></div>
         )}
-        <div className="relative flex items-center w-full max-w-4xl z-10"> {/* Adicionado relative e z-10 */}
+        <div className="relative flex items-center w-full max-w-4xl z-10" style={{ overflow: 'visible' }}> {/* Adicionado overflow-visible */}
           {company.photoURL ? (
-            <div className="w-24 h-24 rounded-full overflow-hidden shadow-lg border-4 border-white flex-shrink-0"> {/* Contêiner para garantir o formato redondo e corte */}
-              <Image
-                src={company.photoURL}
-                alt={company.commercialName || "Logo da empresa"}
-                width={96} 
-                height={96}
-                objectFit="cover" // Usar "cover" para preencher e cortar, garantindo o formato redondo
-                className="w-full h-full" // Fazer a imagem preencher o contêiner
-              />
-            </div>
+            <ExpandableImage
+              src={company.photoURL}
+              alt={company.commercialName || "Logo da empresa"}
+              defaultSize={96}
+              expandedSize={256}
+              borderColor="white"
+              showBorder={true}
+              onExpansionChange={setIsProfileImageExpanded}
+            />
           ) : (
             <div className="w-24 h-24 flex items-center justify-center bg-gray-200 rounded-full text-gray-700 text-2xl font-semibold border-4 border-white shadow-lg flex-shrink-0">
               {company.commercialName?.charAt(0)}
             </div>
           )}
-          <div className="flex flex-col ml-4 flex-grow">
-            <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight drop-shadow-md">{company.commercialName}</h1>
-            {company.description && (
-               <p className="text-base text-purple-100 font-semibold italic mt-1 font-permanent-marker drop-shadow-md">{company.description}</p>
-            )}
-          </div>
+          {!isProfileImageExpanded && (
+            <div className="flex flex-col ml-4 flex-grow">
+              <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight drop-shadow-md">{company.commercialName}</h1>
+              {company.description && (
+                 <p className="text-base text-purple-100 font-semibold italic mt-1 font-permanent-marker drop-shadow-md">{company.description}</p>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-col gap-2 ml-auto"> {/* Ícones empilhados verticalmente e alinhados à direita */}
             {company.facebookUrl && (

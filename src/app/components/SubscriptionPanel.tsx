@@ -241,8 +241,15 @@ const SubscriptionPanel = ({
 
   const createOrSwitchSubscription = async (plan: Plan) => {
     const isSwitching = Boolean(subscription);
-    const endpoint = isSwitching
-      ? `/api/subscriptions/${subscription!.id}/plan`
+    if (isSwitching && !subscription?.id) {
+      throw new Error("Não foi possível identificar a assinatura atual para alteração.");
+    }
+    const subscriptionId = subscription?.id;
+    if (isSwitching && !subscriptionId) {
+      throw new Error("Não foi possível identificar a assinatura atual para alteração.");
+    }
+    const endpoint = isSwitching && subscriptionId
+      ? `/api/subscriptions/${subscriptionId}/plan`
       : "/api/subscriptions";
     const method = isSwitching ? "PATCH" : "POST";
     const payload = isSwitching
@@ -318,15 +325,10 @@ const SubscriptionPanel = ({
     setAlert(null);
 
     try {
-      // Mantemos a criação/alteração da assinatura internamente
-      await createOrSwitchSubscription(plan);
+      // Vai direto para o Stripe - a assinatura será criada pelo webhook após confirmação do pagamento
       await startCheckoutFlow(plan);
 
-      setAlert({
-        type: "success",
-        message:
-          "Redirecionando para o checkout seguro do Pagar.me. Após a confirmação, atualizaremos o plano.",
-      });
+      // Não precisa mostrar alerta aqui, pois já está redirecionando
     } catch (err) {
       console.error("Erro ao selecionar plano:", err);
       setAlert({
@@ -334,9 +336,8 @@ const SubscriptionPanel = ({
         message:
           err instanceof Error
             ? err.message
-            : "Não foi possível enviar a solicitação. Tente mais tarde.",
+            : "Não foi possível iniciar o checkout. Tente mais tarde.",
       });
-    } finally {
       setProcessingPlanId(null);
     }
   };

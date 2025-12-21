@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Poll } from '../types/poll';
 import PollCard from './PollCard';
 import { motion } from 'framer-motion'; // Importar motion
@@ -50,14 +50,14 @@ const getTextColorClass = (rank: number) => {
   }
 };
 
-export default function PollPodium({ polls, onVote, onDelete, onCardClick }: PollPodiumProps) {
-  console.log("PollPodium: onVote prop recebida:", onVote); // Este log é crucial
-
-  const pollRank1 = polls.find(poll => poll.rank === 1);
-  const pollRank2 = polls.find(poll => poll.rank === 2);
-  const pollRank3 = polls.find(poll => poll.rank === 3);
-
-  console.log("Polls no PollPodium:", polls); // Adicionar este log para inspecionar os dados
+export default React.memo(function PollPodium({ polls, onVote, onDelete, onCardClick }: PollPodiumProps) {
+  const { pollRank1, pollRank2, pollRank3 } = useMemo(() => {
+    return {
+      pollRank1: polls.find(poll => poll.rank === 1),
+      pollRank2: polls.find(poll => poll.rank === 2),
+      pollRank3: polls.find(poll => poll.rank === 3),
+    };
+  }, [polls]);
 
   return (
     <div className="flex flex-col items-end justify-center space-y-4 md:flex-row md:space-y-0 md:space-x-4 mb-8">
@@ -131,4 +131,4 @@ export default function PollPodium({ polls, onVote, onDelete, onCardClick }: Pol
       )}
     </div>
   );
-}
+});

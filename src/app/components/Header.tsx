@@ -11,6 +11,7 @@ import Login from "./Auth/Login";
 import Signup from "./Auth/Signup";
 import { motion } from "framer-motion";
 import { faBars, faTimes } from '@fortawesome/free-solid-svg-icons'; // Import hamburger and close icons
+import ExpandableImage from "./ExpandableImage"; // Importar componente de imagem expansível
 
 interface HeaderProps {
   showLoginModal: boolean;
@@ -23,6 +24,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
   const [darkMode, setDarkMode] = useState(false); // Inicializa como false para evitar hidratação
   const [mounted, setMounted] = useState(false); // Novo estado para controlar a montagem no cliente
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
+  const [isAvatarExpanded, setIsAvatarExpanded] = useState(false); // Estado para controlar expansão do avatar
   const { user, logout /*, loading */ } = useAuth(); // Remover loading, pois não está sendo usado
   const router = useRouter(); // Inicializar useRouter
   // REMOVIDO: const { openLoginModal, openSignupModal } = useAuthModal();
@@ -135,22 +137,24 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
           ) : (
             <>
               {user.avatarUrl && (
-                <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-zinc-700"> {/* Adicionado wrapper para garantir o recorte redondo */}
-                  <Image 
-                    src={user.avatarUrl}
-                    alt="Avatar do Usuário"
-                    width={32}
-                    height={32}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                <ExpandableImage
+                  src={user.avatarUrl}
+                  alt="Avatar do Usuário"
+                  defaultSize={32}
+                  expandedSize={128}
+                  showBorder={false}
+                  className="bg-zinc-700"
+                  onExpansionChange={setIsAvatarExpanded}
+                />
               )}
-              <span className="text-white">
-                Olá, {user.accountType === 'commercial' && user.commercialName
-                  ? user.commercialName
-                  : user.displayName || user.email}
-                !
-              </span>
+              {!isAvatarExpanded && (
+                <span className="text-white">
+                  Olá, {user.accountType === 'commercial' && user.commercialName
+                    ? user.commercialName
+                    : user.displayName || user.email}
+                  !
+                </span>
+              )}
               <motion.button
                 onClick={() => { logout(); setIsMobileMenuOpen(false); }}
                 className="px-4 py-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors duration-300"

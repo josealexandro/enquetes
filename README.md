@@ -110,6 +110,14 @@ src/
 
 ---
 
+## 🛡️ Boas Práticas e Prevenção de Problemas
+
+Para evitar que correções importantes sejam perdidas, consulte o guia:
+- **[Boas Práticas](docs/BEST_PRACTICES.md)** - Checklist e workflow recomendado
+- **Script de Verificação:** Execute `npm run verify-fixes` para verificar correções críticas
+
+---
+
 ## 🤝 Contribuição
 
 Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou enviar pull requests.

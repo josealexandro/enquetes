@@ -178,11 +178,11 @@ export default function DashboardPage() {
       {/* Main Content */}
       <main className="flex-1 p-8 overflow-y-auto md:ml-64">
         {activeSection === "polls" ? (
-          <DashboardComponent polls={polls} user={user!} />
+          <DashboardComponent polls={polls} user={user} />
         ) : (
           <SubscriptionPanel
-            companyId={user!.uid}
-            companyName={user!.displayName || user!.email || "Empresa"}
+            companyId={user.uid}
+            companyName={user.displayName || user.email || "Empresa"}
           />
         )}
       </main>

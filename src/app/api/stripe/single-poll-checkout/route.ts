@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import stripe from "@/app/services/stripeService";
+import { getStripe } from "@/app/services/stripeService";
 
 export async function POST(req: NextRequest) {
   const { companyId, companyName, successUrl, cancelUrl, priceId } = await req.json();
@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
       mode: "payment", // Mudança para "payment" para compra avulsa
       line_items: [

@@ -15,6 +15,11 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+
+// Validar se Firebase está configurado
+if (!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) {
+  console.warn("[subscriptionService] Firebase não está configurado. Algumas funcionalidades podem não funcionar.");
+}
 import { DEFAULT_PLANS } from "@/app/data/planSeeds";
 import {
   Plan,
@@ -72,18 +77,36 @@ export async function listPlans(): Promise<Plan[]> {
 }
 
 export async function getSubscriptionByCompany(companyId: string) {
-  const subscriptionQuery = query(
-    getSubscriptionsCollection(),
-    where("companyId", "==", companyId),
-    limit(1)
-  );
+  try {
+    if (!companyId || companyId.trim().length === 0) {
+      console.error("[getSubscriptionByCompany] companyId inválido:", companyId);
+      return null;
+    }
 
-  const snapshot = await getDocs(subscriptionQuery);
-  if (!snapshot.docs.length) {
-    return null;
+    const subscriptionQuery = query(
+      getSubscriptionsCollection(),
+      where("companyId", "==", companyId),
+      limit(1)
+    );
+
+    const snapshot = await getDocs(subscriptionQuery);
+    if (!snapshot.docs.length) {
+      return null;
+    }
+
+    const subscriptionData = snapshot.docs[0].data();
+    
+    // Garantir que os campos obrigatórios existam
+    if (!subscriptionData) {
+      console.error("[getSubscriptionByCompany] Dados da assinatura vazios");
+      return null;
+    }
+
+    return subscriptionData as Subscription;
+  } catch (error) {
+    console.error("[getSubscriptionByCompany] Erro ao buscar assinatura:", error);
+    throw error; // Re-lançar para que a API route possa tratar
   }
-
-  return snapshot.docs[0].data() as Subscription;
 }
 
 export async function getPlanBySlug(slug: PlanSlug) {

@@ -7,6 +7,18 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
+    // Verificar se Firebase está configurado
+    if (!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) {
+      console.error("[GET_SUBSCRIPTION] Firebase não está configurado");
+      return NextResponse.json(
+        { 
+          message: "Firebase não está configurado. Verifique as variáveis de ambiente.",
+          error: "FIREBASE_NOT_CONFIGURED"
+        },
+        { status: 500 }
+      );
+    }
+
     const companyId = request.nextUrl.searchParams.get("companyId");
 
     if (!companyId) {
@@ -16,12 +28,36 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    console.log("[GET_SUBSCRIPTION] Buscando assinatura para companyId:", companyId);
+    
     const subscription = await getSubscriptionByCompany(companyId);
+    
+    console.log("[GET_SUBSCRIPTION] Assinatura encontrada:", subscription ? "sim" : "não");
+    
     return NextResponse.json({ subscription });
   } catch (error) {
-    console.error("[GET_SUBSCRIPTION]", error);
+    console.error("[GET_SUBSCRIPTION] Erro detalhado:", error);
+    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    // Verificar se é erro de permissão do Firestore
+    if (errorMessage.includes("permission") || errorMessage.includes("Permission")) {
+      return NextResponse.json(
+        { 
+          message: "Erro de permissão ao acessar assinatura. Verifique as regras do Firestore.",
+          error: "PERMISSION_DENIED",
+          hint: "As regras do Firestore podem estar bloqueando o acesso à collection 'subscriptions'"
+        },
+        { status: 403 }
+      );
+    }
+    
     return NextResponse.json(
-      { message: "Erro ao buscar assinatura." },
+      { 
+        message: "Erro ao buscar assinatura.",
+        error: errorMessage,
+        ...(process.env.NODE_ENV === 'development' && { stack: errorStack })
+      },
       { status: 500 }
     );
   }

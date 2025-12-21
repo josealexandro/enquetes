@@ -12,6 +12,7 @@ import { Poll } from "../types/poll"; // Importar a interface Poll
 import { v4 as uuidv4 } from "uuid"; // Para gerar IDs únicos para as opções
 import Image from "next/image"; // Importar o componente Image do Next.js
 import slugify from "@/utils/slugify"; // Importar a função slugify
+import ExpandableImage from "./ExpandableImage"; // Importar componente de imagem expansível
 import QRCode from "react-qr-code"; // Importar QRCode
 // Removido: import { UserInfo, User } from "firebase/auth"; // Removido: UserInfo e User não são necessários aqui
 // Removido: import { AuthContextType } from "../context/AuthContext"; // Removido: AuthContextType não é necessário ser importado diretamente para o tipo CustomUser
@@ -189,7 +190,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
 
     if (uploadingImage) return; // Previne múltiplos envios
 
-    let newPhotoURL: string | undefined = user!.photoURL || undefined;
+    let newPhotoURL: string | undefined = user.photoURL || undefined;
     let updateRequired = false;
     const updateData: {
       displayName?: string;
@@ -267,7 +268,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       }
     }
 
-    let newBannerURL: string | undefined = user!.bannerURL || undefined; // Novo: para o URL do banner
+    let newBannerURL: string | undefined = user.bannerURL || undefined; // Novo: para o URL do banner
     if (bannerFile) {
       setUploadingImage(true); // Reutilizando o estado de uploading, pode ser bom ter um para banner
       try {
@@ -509,13 +510,16 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
         <div className="space-y-4">
           {/* Seção de upload de imagem */}
           <div className="flex flex-col items-center mb-6">
-            <Image
-              src={imagePreviewUrl || user?.photoURL || "/logoPrincipal.png"}
-              alt="Pré-visualização do Avatar"
-              width={128}
-              height={128}
-              className="rounded-full object-cover border-4 border-indigo-500 mb-4"
-            />
+            <div className="mb-4">
+              <ExpandableImage
+                src={imagePreviewUrl || user?.photoURL || "/logoPrincipal.png"}
+                alt="Pré-visualização do Avatar"
+                defaultSize={128}
+                expandedSize={256}
+                borderColor="indigo-500"
+                showBorder={true}
+              />
+            </div>
             <label htmlFor="profile-image-upload" className="block text-gray-400 mb-2">Alterar Imagem de Perfil</label>
             <input
               id="profile-image-upload"

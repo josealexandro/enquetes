@@ -16,6 +16,7 @@ import HeartAnimation from "@/components/HeartAnimation"; // Importar o componen
 import { useRef } from "react"; // Importar useRef
 import { useRouter } from 'next/navigation'; // Importar useRouter
 import { getContrastTextColor } from "@/utils/colorUtils"; // Importar a função utilitária
+import ExpandableImage from "./ExpandableImage"; // Importar componente de imagem expansível
 
 // Lazy load de componentes não críticos para a renderização inicial
 const AuthPromptCard = lazy(() => import("./Auth/AuthPromptCard"));
@@ -47,6 +48,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
   const [showHeartAnimation, setShowHeartAnimation] = useState(false);
   const [heartAnimationPosition, setHeartAnimationPosition] = useState<{ x: number; y: number } | null>(null);
   const [showQRCodeModal, setShowQRCodeModal] = useState(false); // Estado para controlar o modal de QR Code
+  const [isAvatarExpanded, setIsAvatarExpanded] = useState(false); // Estado para controlar expansão do avatar
   const pollCardRef = useRef<HTMLDivElement>(null); // Referência para o card da enquete
   const router = useRouter(); // Usar o useRouter para navegação
 
@@ -397,28 +399,33 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
       ref={pollCardRef} // Atribuir a referência ao div principal
     >
       <div className="flex items-center justify-between text-sm text-white mb-4">
-        <div className="flex items-center flex-grow max-w-[calc(100%-48px)]"> {/* Ajustado max-w para dar espaço ao troféu */}
-          <Image
-            src={poll.creator.avatarUrl || "https://www.gravatar.com/avatar/?d=mp"} // Usar fallback para Gravatar se avatarUrl for nulo/vazio
-            alt={(poll.isCommercial && poll.creator.commercialName) || poll.creator.name || "Avatar do criador"} // Adicionar fallback para alt
-            width={32}
-            height={32}
-            className="w-8 h-8 rounded-full mr-2 object-cover"
-            unoptimized={poll.creator.avatarUrl?.includes('firebasestorage') || false} // Desabilitar otimização para Firebase Storage se necessário
-            onError={(e) => {
-              // Fallback caso a imagem falhe ao carregar
-              (e.target as HTMLImageElement).src = "https://www.gravatar.com/avatar/?d=mp";
-            }}
-          />
-          <span 
-            className={`break-words
-              ${poll.rank
-                ? "text-white" // If ranked, force white text for creator name
-                : (poll.isCommercial && companyThemeColor)
-                  ? getContrastTextColor(companyThemeColor) // Use a função para cor do tema
-                  : (isExpanded ? "text-white" : textColorClass) // Otherwise, default logic
-              }
-            `}
+        <div className="flex items-center flex-grow max-w-[calc(100%-48px)] min-w-0"> {/* Adicionado min-w-0 para permitir quebra de palavras */}
+          <div className="mr-2">
+            <ExpandableImage
+              src={poll.creator.avatarUrl || "https://www.gravatar.com/avatar/?d=mp"}
+              alt={(poll.isCommercial && poll.creator.commercialName) || poll.creator.name || "Avatar do criador"}
+              defaultSize={32}
+              expandedSize={128}
+              showBorder={false}
+              className="mr-0"
+              onExpansionChange={setIsAvatarExpanded}
+            />
+          </div>
+          {!isAvatarExpanded && (
+            <span 
+              className={`break-words overflow-wrap-anywhere word-break-break-word max-w-full overflow-hidden
+                ${poll.rank
+                  ? "text-white" // If ranked, force white text for creator name
+                  : (poll.isCommercial && companyThemeColor)
+                    ? getContrastTextColor(companyThemeColor) // Use a função para cor do tema
+                    : (isExpanded ? "text-white" : textColorClass) // Otherwise, default logic
+                }
+              `}
+              style={{ 
+                wordWrap: 'break-word',
+                overflowWrap: 'break-word',
+                maxWidth: '100%'
+              }}
             onClick={(e) => {
               e.stopPropagation(); // Evita que o clique no nome do criador expanda/recolha o card
               if (enableCompanyLink && poll.isCommercial && companySlug) {
@@ -430,6 +437,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
               ? poll.creator.commercialName 
               : poll.creator.name}
           </span>
+          )}
         </div>
         {poll.rank && (
           <motion.div
@@ -464,7 +472,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
       </div>
 
       <h2
-        className={`text-2xl font-semibold max-w-full break-words overflow-hidden mb-4 ${
+        className={`text-2xl font-semibold max-w-full break-words overflow-hidden mb-4 word-break-break-word overflow-wrap-anywhere ${
           isExpanded ? "line-clamp-none" : "line-clamp-2"
         } ${
           (poll.isCommercial && companyThemeColor && !poll.rank)
@@ -580,7 +588,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
                         handleVoteClick(option.id); 
                       }}
                       disabled={!!votedOptionId} // Desabilitar se já votou localmente
-                      className={`flex-1 w-full text-left font-medium transition-colors duration-200 break-words break-all whitespace-normal leading-snug
+                      className={`flex-1 w-full text-left font-medium transition-colors duration-200 break-words overflow-wrap-anywhere word-break-break-word whitespace-normal leading-snug
                         ${votedOptionId === option.id
                           ? "text-blue-600 dark:text-blue-400"
                           : votedOptionId
