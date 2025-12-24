@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore"; // Adicionado updateDoc
+import { collection, query, where, getDocs, doc, updateDoc, arrayUnion } from "firebase/firestore"; // Adicionado updateDoc e arrayUnion
 import slugify from "@/utils/slugify";
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 import Link from "next/link"; // Adicionado Link
@@ -110,7 +110,6 @@ const PollDetailPage: React.FC<PollDetailPageProps> = ({ params }) => { // Alter
   }, [slug, pollSlug]);
 
   const handleVote = async (optionId: string) => {
-    console.log("handleVote chamado para optionId:", optionId); // Novo log no início
     if (!user) {
       setFeedbackMessage("Você precisa estar logado para votar.");
       setFeedbackType("error");
@@ -130,27 +129,45 @@ const PollDetailPage: React.FC<PollDetailPageProps> = ({ params }) => { // Alter
     }
 
     const pollRef = doc(db, "polls", poll.id);
+    const isOwner = poll.creator.id === user.uid;
     const updatedOptions = poll.options.map((option) =>
       option.id === optionId ? { ...option, votes: option.votes + 1 } : option
     );
 
-    const updatedVotedBy = poll.isCommercial && user
-      ? [...(poll.votedBy || []), user.uid]
-      : poll.votedBy;
-
     try {
-      await updateDoc(pollRef, {
-        options: updatedOptions,
-        ...(poll.isCommercial && { votedBy: updatedVotedBy }),
-      });
+      // Se for o dono, pode atualizar options e votedBy juntos
+      if (isOwner) {
+        const updatedVotedBy = user
+          ? [...(poll.votedBy || []), user.uid]
+          : poll.votedBy;
+        
+        await updateDoc(pollRef, {
+          options: updatedOptions,
+          votedBy: updatedVotedBy,
+        });
+      } else {
+        // Se não for o dono, atualizar options e votedBy juntos
+        // As regras do Firestore validam que apenas uma opção teve seu voto incrementado
+        const updatedVotedBy = user
+          ? [...(poll.votedBy || []), user.uid]
+          : poll.votedBy;
+        
+        await updateDoc(pollRef, {
+          options: updatedOptions,
+          votedBy: updatedVotedBy,
+        });
+      }
 
       // Atualizar o estado local da enquete
       setPoll((prevPoll) => {
         if (!prevPoll) return null;
+        const newVotedBy = user
+          ? [...(prevPoll.votedBy || []), user.uid]
+          : prevPoll.votedBy;
         return {
           ...prevPoll,
           options: updatedOptions,
-          votedBy: updatedVotedBy,
+          votedBy: newVotedBy,
         };
       });
       // Disparar a animação de coração na posição do clique

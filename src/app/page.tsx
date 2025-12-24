@@ -10,7 +10,7 @@ import { useAuth } from "./context/AuthContext";
 import { motion } from "framer-motion";
 import { AnimatePresence } from "framer-motion"; // Importar AnimatePresence
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, orderBy, updateDoc, deleteDoc, doc, getDoc, Timestamp, limit, startAfter, getDocs, where, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
+import { collection, query, orderBy, updateDoc, deleteDoc, doc, getDoc, Timestamp, limit, startAfter, getDocs, where, QueryDocumentSnapshot, DocumentData, arrayUnion } from "firebase/firestore";
 import { useRouter } from 'next/navigation';
 import PollPodium from "./components/PollPodium";
 import slugify from "@/utils/slugify";
@@ -316,17 +316,12 @@ export default function Home() {
       return;
     }
 
-    console.log("handleVote (na página) - Chamado para pollId:", pollId, "com optionId:", optionId);
-    console.log("handleVote (na página) - Poll antes da atualização:", JSON.parse(JSON.stringify(pollToUpdate)));
-
     // Preparar as opções atualizadas para a UI otimista e para o Firestore
     const updatedOptionsForOptimisticUI = pollToUpdate.options.map((option) => {
-      const isThisOptionVoted = option.id === optionId; // Adicionar log para a comparação
+      const isThisOptionVoted = option.id === optionId;
       const newOption = isThisOptionVoted ? { ...option, votes: option.votes + 1 } : option;
-      console.log("handleVote (na página) - UI Otimista - Opção:", option.id, "Clicada:", isThisOptionVoted, "Votos antes:", option.votes, "Votos depois:", newOption.votes);
       return newOption;
     });
-    console.log("handleVote (na página) - UI Otimista - Updated Options:", JSON.parse(JSON.stringify(updatedOptionsForOptimisticUI)));
 
     // Preparar o array votedBy atualizado para a UI otimista e para o Firestore
     const updatedVotedByForOptimisticUI = user
@@ -347,29 +342,47 @@ export default function Home() {
 
     try {
       const pollRef = doc(db, "polls", pollId);
+      const isOwner = pollToUpdate.creator.id === user?.uid;
       
-      // Não precisamos buscar currentPoll novamente se já temos pollToUpdate
-      // Usaremos a mesma lógica de atualização para o Firestore que preparamos acima
+      // Preparar as opções atualizadas
       const updatedOptionsForFirestore = pollToUpdate.options.map(option => {
-        const isThisOptionVoted = option.id === optionId; // Adicionar log para a comparação
+        const isThisOptionVoted = option.id === optionId;
         const newOption = isThisOptionVoted ? { ...option, votes: option.votes + 1 } : option;
-        console.log("handleVote (na página) - Firestore - Opção:", option.id, "Clicada:", isThisOptionVoted, "Votos antes:", option.votes, "Votos depois:", newOption.votes);
         return newOption;
       });
-      console.log("handleVote (na página) - Firestore - Updated Options:", JSON.parse(JSON.stringify(updatedOptionsForFirestore)));
-      
-      // Remover a condição de isCommercial para que votedBy seja sempre atualizado
-      const updatedVotedByForFirestore = user
-        ? [...(pollToUpdate.votedBy || []), user.uid]
-        : pollToUpdate.votedBy;
 
-      await updateDoc(pollRef, {
-        options: updatedOptionsForFirestore,
-        votedBy: updatedVotedByForFirestore, // VotedBy agora é sempre atualizado
-      });
+      // Se for o dono da enquete, pode atualizar options e votedBy juntos
+      if (isOwner) {
+        const updatedVotedByForFirestore = user
+          ? [...(pollToUpdate.votedBy || []), user.uid]
+          : pollToUpdate.votedBy;
+        
+        await updateDoc(pollRef, {
+          options: updatedOptionsForFirestore,
+          votedBy: updatedVotedByForFirestore,
+        });
+      } else {
+        // Se não for o dono, atualizar options e votedBy juntos
+        // As regras do Firestore validam que apenas uma opção teve seu voto incrementado
+        const updatedVotedByForFirestore = user
+          ? [...(pollToUpdate.votedBy || []), user.uid]
+          : pollToUpdate.votedBy;
+        
+        await updateDoc(pollRef, {
+          options: updatedOptionsForFirestore,
+          votedBy: updatedVotedByForFirestore,
+        });
+      }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao votar:", error);
+      
+      // Se o erro for de permissão, não mostrar erro ao usuário
+      // O onSnapshot vai atualizar se funcionou
+      if (error?.code === 'permission-denied') {
+        return;
+      }
+      
       alert("Erro ao registrar voto. Tente novamente.");
       // Reverter a UI se o voto falhar
       const updateState = (prevPolls: Poll[]) =>
@@ -444,6 +457,9 @@ export default function Home() {
 
         <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
           Crie enquetes e envie para outras pessoas.
+        </p>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
+          Um sistema profissional para sua empresa ouvir clientes e obter confiança
         </p>
       </div>
 

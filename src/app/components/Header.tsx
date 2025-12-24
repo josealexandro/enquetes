@@ -106,20 +106,20 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
         </div>
 
         {/* Desktop menu items and mobile menu content */}
-        <div className={`md:flex items-center space-x-6 ${isMobileMenuOpen ? "flex flex-col absolute top-full left-0 w-full bg-zinc-800 p-4 shadow-md items-center space-y-4" : "hidden"}`}>
-          <Link href="/" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
-          <Link href="/enquetes" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300" onClick={() => setIsMobileMenuOpen(false)}>Enquetes</Link>
+        <div className={`md:flex items-center space-x-6 ${isMobileMenuOpen ? "flex flex-col absolute top-full left-0 w-full bg-zinc-800 p-4 shadow-md items-center space-y-4 z-50" : "hidden"}`}>
+          <Link href="/" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300 py-2 px-4 min-h-[44px] flex items-center" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
+          <Link href="/enquetes" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300 py-2 px-4 min-h-[44px] flex items-center" onClick={() => setIsMobileMenuOpen(false)}>Enquetes</Link>
           {user && user.accountType === 'personal' && (
-            <Link href="/profile" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300" onClick={() => setIsMobileMenuOpen(false)}>Meu Perfil</Link>
+            <Link href="/profile" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300 py-2 px-4 min-h-[44px] flex items-center" onClick={() => setIsMobileMenuOpen(false)}>Meu Perfil</Link>
           )}
           {user && user.accountType === 'commercial' && (
-            <Link href="/dashboard" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300" onClick={() => setIsMobileMenuOpen(false)}>Dashboard</Link>
+            <Link href="/dashboard" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300 py-2 px-4 min-h-[44px] flex items-center" onClick={() => setIsMobileMenuOpen(false)}>Dashboard</Link>
           )}
           {!user ? (
             <>
               <motion.button
                 onClick={() => { setShowLoginModal(true); setIsMobileMenuOpen(false); }}
-                className="px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition-colors duration-300"
+                className="px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition-colors duration-300 min-h-[44px] min-w-[100px] flex items-center justify-center"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -127,7 +127,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
               </motion.button>
               <motion.button
                 onClick={() => { setShowSignupModal(true); setIsMobileMenuOpen(false); }}
-                className="px-4 py-2 rounded-full bg-gray-200 text-zinc-800 hover:bg-gray-300 transition-colors duration-300"
+                className="px-4 py-2 rounded-full bg-gray-200 text-zinc-800 hover:bg-gray-300 transition-colors duration-300 min-h-[44px] min-w-[120px] flex items-center justify-center"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -157,7 +157,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
               )}
               <motion.button
                 onClick={() => { logout(); setIsMobileMenuOpen(false); }}
-                className="px-4 py-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors duration-300"
+                className="px-4 py-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors duration-300 min-h-[44px] min-w-[80px] flex items-center justify-center"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >

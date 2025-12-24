@@ -44,6 +44,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
   const [currentTotalVotes, setCurrentTotalVotes] = useState(poll.options.reduce((sum, opt) => sum + opt.votes, 0)); // Revertido para o estado original
   const { user, isMasterUser } = useAuth(); // Obter o usuário logado e o status de mestre
   const [showAuthPrompt, setShowAuthPrompt] = useState(false); // Novo estado para controlar a visibilidade do AuthPromptCard
+  const [authPromptMessage, setAuthPromptMessage] = useState("Você precisa estar logado para continuar."); // Mensagem do prompt de autenticação
   const { openLoginModal, openSignupModal } = useAuthModal(); // Usar o contexto para abrir modais
   const [showHeartAnimation, setShowHeartAnimation] = useState(false);
   const [heartAnimationPosition, setHeartAnimationPosition] = useState<{ x: number; y: number } | null>(null);
@@ -154,6 +155,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
 
   const handleLike = async (event?: React.MouseEvent) => {
     if (!user) {
+      setAuthPromptMessage("Você precisa estar logado para curtir enquetes.");
       setShowAuthPrompt(true);
       return;
     }
@@ -202,8 +204,15 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
             : {}),
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao curtir/descurtir enquete:", error);
+      
+      // Se o erro for de permissão, não mostrar erro ao usuário
+      // O onSnapshot vai atualizar se funcionou
+      if (error?.code === 'permission-denied') {
+        return;
+      }
+      
       // Revert Optimistic Update on error
       if (hasLiked) {
         setLikes(prev => prev + 1);
@@ -222,6 +231,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
 
   const handleDislike = async () => {
     if (!user) {
+      setAuthPromptMessage("Você precisa estar logado para descurtir enquetes.");
       setShowAuthPrompt(true);
       return;
     }
@@ -261,8 +271,15 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
             : {}),
         });
       }
-    } catch (error) {
-      console.error("Erro ao curtir/descurtir enquete:", error);
+    } catch (error: any) {
+      console.error("Erro ao descurtir enquete:", error);
+      
+      // Se o erro for de permissão, não mostrar erro ao usuário
+      // O onSnapshot vai atualizar se funcionou
+      if (error?.code === 'permission-denied') {
+        return;
+      }
+      
       // Revert Optimistic Update
       if (hasDisliked) {
         setDislikes(prev => prev + 1);
@@ -275,12 +292,13 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
             setLikedBy(prev => [...prev, user.uid]);
         }
       }
-      alert("Erro ao curtir/descurtir enquete. Tente novamente.");
+      alert("Erro ao descurtir enquete. Tente novamente.");
     }
   };
 
   const handleVoteClick = (optionId: string) => {
     if (!user) { // Adicionar verificação de login aqui
+      setAuthPromptMessage("Você precisa estar logado para votar em enquetes.");
       setShowAuthPrompt(true); // Mostrar o card de prompt de autenticação
       return;
     }
@@ -296,6 +314,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
 
   const handleAddComment = async (text: string, parentId?: string) => {
     if (!user) {
+      setAuthPromptMessage("Você precisa estar logado para comentar em enquetes.");
       setShowAuthPrompt(true); // Mostrar o card de prompt de autenticação
       return;
     }
@@ -325,10 +344,25 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
 
       // Incrementar commentCount no documento da enquete principal
       const pollRef = doc(db, "polls", poll.id);
-      await updateDoc(pollRef, { commentCount: increment(1) });
+      try {
+        await updateDoc(pollRef, { commentCount: increment(1) });
+      } catch (countError: any) {
+        // Se falhar ao atualizar commentCount mas o comentário foi criado, não mostrar erro
+        // O onSnapshot vai atualizar o estado automaticamente
+        if (countError?.code !== 'permission-denied') {
+          console.error("Erro ao atualizar commentCount:", countError);
+        }
+      }
       // onSnapshot já vai atualizar o estado de comments, não precisamos fazer setComments aqui
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao adicionar comentário:", error);
+      
+      // Se o erro for de permissão, não mostrar erro ao usuário
+      // O comentário pode ter sido criado mesmo com o erro
+      if (error?.code === 'permission-denied') {
+        return;
+      }
+      
       alert("Erro ao adicionar comentário. Tente novamente.");
     }
   };
@@ -345,11 +379,25 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
 
       // Decrementar commentCount no documento da enquete principal
       const pollRef = doc(db, "polls", poll.id);
-      await updateDoc(pollRef, { commentCount: increment(-1) });
+      try {
+        await updateDoc(pollRef, { commentCount: increment(-1) });
+      } catch (countError: any) {
+        // Se falhar ao atualizar commentCount mas o comentário foi excluído, não mostrar erro
+        // O onSnapshot vai atualizar o estado automaticamente
+        if (countError?.code !== 'permission-denied') {
+          console.error("Erro ao atualizar commentCount:", countError);
+        }
+      }
       // onSnapshot já vai atualizar o estado de comments, não precisamos fazer setComments aqui
-      console.log("Comentário excluído com sucesso!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao excluir comentário:", error);
+      
+      // Se o erro for de permissão, não mostrar erro ao usuário
+      // O comentário pode ter sido excluído mesmo com o erro
+      if (error?.code === 'permission-denied') {
+        return;
+      }
+      
       alert("Erro ao excluir comentário. Tente novamente.");
     }
   };
@@ -494,28 +542,28 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
             <FontAwesomeIcon icon={faShareNodes} size="lg" />
           </button>
           {showShareMenu && (
-            <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-zinc-700 rounded-md shadow-lg py-1 z-10">
+            <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-zinc-700 rounded-md shadow-lg py-1 z-10 sm:left-0 sm:right-auto">
               <button
                 onClick={copyToClipboard}
-                className="block w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-600"
+                className="block w-full text-left px-4 py-3 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-600 min-h-[44px] flex items-center"
               >
                 Copiar Link
               </button>
               <button
                 onClick={shareOnWhatsApp}
-                className="block w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-600"
+                className="block w-full text-left px-4 py-3 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-600 min-h-[44px] flex items-center"
               >
                 Compartilhar no WhatsApp
               </button>
               <button
                 onClick={handleGenerateQRCode}
-                className="block w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-600"
+                className="block w-full text-left px-4 py-3 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-600 min-h-[44px] flex items-center"
               >
                 Gerar QR Code
               </button>
               <button
                 onClick={shareGeneric}
-                className="block w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-600"
+                className="block w-full text-left px-4 py-3 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-600 min-h-[44px] flex items-center"
               >
                 Compartilhar
               </button>
@@ -525,7 +573,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
 
         <button
           onClick={(e) => handleLike(e)}
-          className={`p-2 rounded-full transition-colors duration-200 ${
+          className={`p-2 rounded-full transition-colors duration-200 min-h-[44px] min-w-[44px] flex items-center justify-center ${
             user && likedBy.includes(user.uid)
               ? "text-red-500 hover:text-red-600 bg-red-100 dark:bg-red-900"
               : "text-zinc-300 hover:text-red-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
@@ -538,7 +586,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
 
         <button
           onClick={handleDislike}
-          className={`p-2 rounded-full transition-colors duration-200 ${
+          className={`p-2 rounded-full transition-colors duration-200 min-h-[44px] min-w-[44px] flex items-center justify-center ${
             user && dislikedBy.includes(user.uid)
               ? "text-indigo-500 hover:text-indigo-600 bg-indigo-100 dark:bg-indigo-900"
               : "text-zinc-300 hover:text-indigo-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
@@ -635,7 +683,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
       {showAuthPrompt && (
         <Suspense fallback={null}>
           <AuthPromptCard
-            message="Você precisa estar logado para votar."
+            message={authPromptMessage}
             onClose={() => setShowAuthPrompt(false)}
             onLoginClick={() => {
               setShowAuthPrompt(false);

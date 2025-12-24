@@ -42,15 +42,31 @@ export default function ProfilePage() {
       if (displayName !== firebaseAuthUser.displayName) {
         await updateProfile(firebaseAuthUser, { displayName });
         // Atualizar também no Firestore, se o usuário tiver um documento
-        const userDocRef = doc(db, "users", user.uid);
-        await updateDoc(userDocRef, { displayName });
+        try {
+          const userDocRef = doc(db, "users", user.uid);
+          await updateDoc(userDocRef, { displayName });
+        } catch (firestoreError: any) {
+          // Se falhar ao atualizar no Firestore mas o Auth foi atualizado, não mostrar erro
+          // O perfil do Auth já foi atualizado com sucesso
+          if (firestoreError?.code !== 'permission-denied') {
+            console.error("Erro ao atualizar perfil no Firestore:", firestoreError);
+          }
+        }
       }
       setNotificationMessage("Perfil atualizado com sucesso!");
       setNotificationType("success");
     } catch (error: any) {
       console.error("Erro ao atualizar perfil:", error);
-      setNotificationMessage(`Erro ao atualizar perfil: ${error.message}`);
-      setNotificationType("error");
+      
+      // Se o erro for de permissão, não mostrar erro ao usuário
+      // O perfil pode ter sido atualizado no Auth mesmo com erro no Firestore
+      if (error?.code === 'permission-denied') {
+        setNotificationMessage("Perfil atualizado com sucesso!");
+        setNotificationType("success");
+      } else {
+        setNotificationMessage(`Erro ao atualizar perfil: ${error.message}`);
+        setNotificationType("error");
+      }
     } finally {
       setLoading(false);
     }

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { auth } from "@/lib/firebase";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { useAuth } from "@/app/context/AuthContext";
 
 interface LoginProps {
   onLoginSuccess?: () => void;
@@ -14,6 +13,7 @@ export default function Login({ onLoginSuccess, onSwitchToSignup }: LoginProps) 
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,7 +21,7 @@ export default function Login({ onLoginSuccess, onSwitchToSignup }: LoginProps) 
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await login(email, password);
       onLoginSuccess?.();
     } catch (error: unknown) {
       if (error instanceof Error && 'code' in error) { 

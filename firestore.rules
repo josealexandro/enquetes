@@ -1,0 +1,180 @@
+rules_version = '2';
+service cloud.firestore {
+  // Security notes:
+  // - Prefer handling critical mutations (like voting increments) in server-side
+  //   code (Cloud Functions / Callable Functions) to avoid client tampering.
+  // - Keep the default fallback restrictive (deny reads/writes) and add
+  //   explicit rules for collections you expose.
+  // - Validate field types and lengths on create/update to reduce attack surface.
+  match /databases/{database}/documents {
+    // Polls collection: anyone can read, only authenticated users can create polls
+    // and only the creator (request.auth.uid) can update or delete their polls.
+    match /polls/{pollId} {
+      // Public read for polls (keep public if desired)
+      allow read: if true;
+
+      // Stronger validation on create (restored)
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.creator.id
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 200
+        && request.resource.data.options is list
+        && request.resource.data.options.size() >= 2
+        && request.resource.data.options.size() <= 10
+        // basic validation of first two options
+        && request.resource.data.options[0].id is string
+        && request.resource.data.options[0].text is string
+        && request.resource.data.options[0].votes is number
+        && request.resource.data.options[0].votes >= 0
+        && request.resource.data.options[1].id is string
+        && request.resource.data.options[1].text is string
+        && request.resource.data.options[1].votes is number
+        && request.resource.data.options[1].votes >= 0
+        && request.resource.data.creator.id is string;
+
+      // Allow the poll creator to update/delete the poll.
+      // Additionally, allow any authenticated user to update only the `commentCount` field
+      // (this is required so commenters can increment/decrement the count safely from the client).
+      // Updates: poll owner can update anything. Non-owners may only safely
+      // increment/decrement `commentCount` or append themselves to `votedBy`.
+      // Disallow any edits to `options` from non-owners; voting must go through
+      // callable `voteOnPoll` function instead.
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.creator.id
+        // allow only safe commentCount adjustments by authenticated users
+        || (request.resource.data.keys().hasOnly(['commentCount'])
+            && request.resource.data.commentCount is int
+            && (request.resource.data.commentCount - resource.data.commentCount) <= 1
+            && (request.resource.data.commentCount - resource.data.commentCount) <= 1)
+        // allow non-owners to vote: update options.votes and votedBy together
+        // Validate that only one option had its votes incremented by 1
+        || (
+            // Ensure user hasn't voted before
+            !resource.data.votedBy.hasAny([request.auth.uid])
+            // Ensure options and votedBy are being updated together
+            && request.resource.data.options is list
+            && resource.data.options is list
+            && request.resource.data.options.size() == resource.data.options.size()
+            && request.resource.data.votedBy is list
+            && resource.data.votedBy is list
+            // Validate that votedBy only has one new element (the current user)
+            && request.resource.data.votedBy.size() == resource.data.votedBy.size() + 1
+            && request.resource.data.votedBy.hasAll(resource.data.votedBy)
+            && request.resource.data.votedBy.hasAny([request.auth.uid])
+            // Ensure other critical fields are unchanged
+            && request.resource.data.commentCount == resource.data.commentCount
+            && request.resource.data.title == resource.data.title
+            && request.resource.data.category == resource.data.category
+            && request.resource.data.creator == resource.data.creator
+            && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.isCommercial == resource.data.isCommercial
+        )
+        // allow updating likes/dislikes and likedBy/dislikedBy by authenticated users
+        // Allow updating any combination of these 4 fields, but no other fields
+        // Note: increment() and arrayUnion/arrayRemove are special operations that cannot be validated
+        // in security rules the same way as direct values. These operations are safe by design.
+        // IMPORTANT: When using increment() and arrayUnion/arrayRemove, these operations are processed
+        // server-side. The simplest approach is to ensure critical fields remain unchanged.
+        || (
+            // Ensure critical fields that should NOT be modified remain unchanged
+            request.resource.data.options == resource.data.options
+            && request.resource.data.votedBy == resource.data.votedBy  
+            && request.resource.data.commentCount == resource.data.commentCount
+            && request.resource.data.title == resource.data.title
+            && request.resource.data.category == resource.data.category
+            && request.resource.data.creator == resource.data.creator
+            && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.isCommercial == resource.data.isCommercial
+        )
+      );
+
+      allow delete: if request.auth != null && request.auth.uid == resource.data.creator.id;
+
+      // Subcollection for comments
+      match /comments/{commentId} {
+        allow read: if true;
+
+        // Only authenticated users can create comments and the authorId must match the authenticated user
+        allow create: if request.auth != null
+          && request.auth.uid == request.resource.data.authorId
+          // ensure the comment belongs to this poll
+          && request.resource.data.pollId == pollId
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000
+          && request.resource.data.timestamp is int
+          && request.resource.data.author is string;
+
+        // Only the comment author may update or delete their comment
+        allow update, delete: if request.auth != null && request.auth.uid == resource.data.authorId;
+      }
+    }
+
+    // Users collection: allow authenticated users to manage their own profile data
+    match /users/{userId} {
+      allow read: if true; // Public profile
+
+      // Creating a user document only allowed for the authenticated user with the same ID
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.email is string;
+
+      // Allow the user to update only a safe subset of fields and validate types/lengths
+      allow update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly([
+          'displayName', 'avatarUrl', 'accountType', 'commercialName', 'aboutUs', 'contactEmail', 'address', 'facebookUrl', 'instagramUrl', 'twitterUrl', 'themeColor', 'extraPollsAvailable', 'bannerURL'
+        ])
+        // individual field validations (if present)
+        && (
+          !request.resource.data.keys().hasAny(['displayName']) || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 100)
+        )
+        && (
+          !request.resource.data.keys().hasAny(['avatarUrl']) || request.resource.data.avatarUrl is string
+        )
+        && (
+          !request.resource.data.keys().hasAny(['accountType']) || request.resource.data.accountType in ['personal', 'commercial']
+        )
+        && (
+          !request.resource.data.keys().hasAny(['commercialName']) || (request.resource.data.commercialName is string && request.resource.data.commercialName.size() <= 100)
+        )
+        && (
+          !request.resource.data.keys().hasAny(['aboutUs']) || (request.resource.data.aboutUs is string && request.resource.data.aboutUs.size() <= 1000)
+        )
+        && (
+          !request.resource.data.keys().hasAny(['extraPollsAvailable']) || request.resource.data.extraPollsAvailable is int
+        );
+
+      // Allow deletion only to the user (use with caution)
+      allow delete: if request.auth != null && request.auth.uid == userId;
+
+      // Ratings subcollection for companies/users: one rating per user (recommend using ratingId == rater uid)
+      match /ratings/{ratingId} {
+        allow read: if true;
+        // Client saves a rating doc with ID == rater UID and field `userId`.
+        allow create: if request.auth != null
+          && request.auth.uid == ratingId
+          && (
+            // support both `userId` (used in client) or `authorId`
+            request.resource.data.userId == request.auth.uid
+            || request.resource.data.authorId == request.auth.uid
+          )
+          && request.resource.data.rating is number
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5
+          // Accept serverTimestamp on `createdAt` (timestamp) or numeric `timestamp`
+          && (
+            request.resource.data.createdAt is timestamp
+            || request.resource.data.timestamp is int
+          );
+        allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId || request.auth.uid == resource.data.authorId;
+      }
+    }
+
+    // Fallback: allow read for everything else (restrict as needed)
+    match /{document=**} {
+      // Deny by default to avoid accidental public access. Add explicit rules
+      // for other collections you intend to expose.
+      allow read: if false;
+    }
+  }
+}

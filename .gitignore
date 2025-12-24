@@ -17,14 +17,14 @@ pmp-debug/
 .env.local
 .env*.local
 
-# Firebase configuration (may contain sensitive project IDs)
-firebase.json
+# Firebase configuration (firebase.json is safe to commit - it only contains emulator configs)
+# firebase.json - COMMIT THIS FILE (it's needed for the project)
 
-# Firestore rules (if you want to keep them private)
-firestore.rules
+# Firestore rules - COMMIT THIS FILE (security rules should be in the repo)
+# firestore.rules - COMMIT THIS FILE
 
-# Storage rules (if you want to keep them private)
-storage.rules
+# Storage rules - COMMIT THIS FILE (security rules should be in the repo)
+# storage.rules - COMMIT THIS FILE
 
 # Log files
 npm-debug.log*

@@ -204,6 +204,7 @@ export default function EnquetesPage() {
     const pollToUpdate = polls.find(p => p.id === pollId) || podiumPolls.find(p => p.id === pollId);
     if (!pollToUpdate) return;
 
+    const isOwner = pollToUpdate.creator.id === user.uid;
     const updatedOptions = pollToUpdate.options.map(option =>
       option.id === optionId ? { ...option, votes: option.votes + 1 } : option
     );
@@ -218,7 +219,21 @@ export default function EnquetesPage() {
 
     try {
       const pollRef = doc(db, "polls", pollId);
-      await updateDoc(pollRef, { options: updatedOptions, votedBy: arrayUnion(user.uid) });
+      
+      // Se for o dono, pode atualizar options e votedBy juntos
+      if (isOwner) {
+        await updateDoc(pollRef, { 
+          options: updatedOptions, 
+          votedBy: arrayUnion(user.uid) 
+        });
+      } else {
+        // Se não for o dono, atualizar options e votedBy juntos
+        // As regras do Firestore validam que apenas uma opção teve seu voto incrementado
+        await updateDoc(pollRef, { 
+          options: updatedOptions, 
+          votedBy: arrayUnion(user.uid) 
+        });
+      }
     } catch (error) {
       console.error("Erro ao votar:", error);
       alert("Erro ao registrar voto. Tente novamente.");

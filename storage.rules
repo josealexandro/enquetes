@@ -1,0 +1,44 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Avatares: usuários autenticados podem fazer upload apenas para seu próprio diretório
+    match /avatars/{userId}/{fileName} {
+      allow read: if true; // Qualquer um pode ler avatares
+      allow write: if request.auth != null && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024 // Limite de 5MB
+        && request.resource.contentType.matches('image/.*'); // Apenas imagens
+    }
+    
+    // Imagens de perfil: formato profile_images/{userId}-{uuid}-{filename}
+    // Captura qualquer arquivo em profile_images/
+    match /profile_images/{fileName} {
+      allow read: if true; // Qualquer um pode ler imagens de perfil
+      allow write: if request.auth != null
+        && request.resource.size < 5 * 1024 * 1024 // Limite de 5MB
+        && request.resource.contentType.matches('image/.*'); // Apenas imagens
+      // Nota: A validação do userId está no código da aplicação (o path inclui o userId)
+      // O contentType agora é definido explicitamente no código via metadata
+    }
+    
+    // Banners: formato banner_images/{userId}-{uuid}-{filename}
+    // Captura qualquer arquivo em banner_images/
+    match /banner_images/{fileName} {
+      allow read: if true; // Qualquer um pode ler banners
+      allow write: if request.auth != null
+        && request.resource.size < 5 * 1024 * 1024 // Limite de 5MB
+        && request.resource.contentType.matches('image/.*'); // Apenas imagens
+      // Nota: A validação do userId está no código da aplicação (o path inclui o userId)
+      // O contentType agora é definido explicitamente no código via metadata
+    }
+    
+    // Imagens de enquetes: usuários autenticados podem fazer upload
+    match /poll_images/{fileName} {
+      allow read: if true; // Qualquer um pode ler imagens de enquetes
+      allow write: if request.auth != null
+        && request.resource.size < 5 * 1024 * 1024 // Limite de 5MB
+        && request.resource.contentType.matches('image/.*'); // Apenas imagens
+      // O contentType agora é definido explicitamente no código via metadata
+    }
+  }
+}
+
