@@ -26,6 +26,11 @@ interface PollDetailData {
   category: string;
   creatorName: string;
   creatorAvatarUrl?: string;
+  creator: {
+    id: string;
+    name: string;
+    avatarUrl?: string;
+  };
   createdAt: Date;
   isCommercial: boolean;
   votedBy?: string[]; // Adicionado campo para controle de votos duplicados em enquetes comerciais
@@ -76,6 +81,13 @@ const getPollData = async (companySlug: string, pollSlug: string): Promise<PollD
             ? data.creator.commercialName 
             : (data.creator.name || "Desconhecido"),
           creatorAvatarUrl: data.creator.avatarUrl || undefined,
+          creator: {
+            id: data.creator.id || "",
+            name: (data.isCommercial && data.creator.commercialName) 
+              ? data.creator.commercialName 
+              : (data.creator.name || "Desconhecido"),
+            avatarUrl: data.creator.avatarUrl || undefined,
+          },
           createdAt: data.createdAt?.toDate() || new Date(),
           isCommercial: data.isCommercial || false,
           votedBy: data.votedBy || [], // Buscar votedBy
