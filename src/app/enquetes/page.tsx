@@ -36,6 +36,10 @@ export default function EnquetesPage() {
 
     let creatorName = creatorData.name || creatorData.displayName || "Usuário Desconhecido";
     let creatorAvatarUrl = creatorData.avatarUrl || creatorData.photoURL || "https://www.gravatar.com/avatar/?d=mp";
+    // Filtrar URLs de exemplo
+    if (creatorAvatarUrl.includes('example.com')) {
+      creatorAvatarUrl = "https://www.gravatar.com/avatar/?d=mp";
+    }
     let creatorCommercialName = creatorData.commercialName || undefined;
     let creatorThemeColor = creatorData.themeColor || undefined;
 
@@ -49,6 +53,10 @@ export default function EnquetesPage() {
           const userData = userDocSnap.data();
           creatorName = userData.name || userData.displayName || "Usuário";
           creatorAvatarUrl = userData.avatarUrl || userData.photoURL || "https://www.gravatar.com/avatar/?d=mp";
+          // Filtrar URLs de exemplo
+          if (creatorAvatarUrl.includes('example.com')) {
+            creatorAvatarUrl = "https://www.gravatar.com/avatar/?d=mp";
+          }
           creatorCommercialName = userData.commercialName || undefined;
           creatorThemeColor = userData.themeColor || undefined;
         }

@@ -20,7 +20,9 @@ export default function ClientProvidersWrapper({
   const [showSignupModal, setShowSignupModal] = useState(false);
   const pathname = usePathname();
 
-  const shouldShowFooter = !pathname?.startsWith("/dashboard") && !pathname?.startsWith("/empresa/");
+  // DOCUMENTAÇÃO: Footer aparece em todas as páginas exceto dashboard
+  // Na página pública da empresa, o footer usa dados da empresa via CompanyFooterContext
+  const shouldShowFooter = !pathname?.startsWith("/dashboard");
 
   return (
     <AuthProvider>
@@ -36,7 +38,9 @@ export default function ClientProvidersWrapper({
             setShowSignupModal={setShowSignupModal}
           />
           <div className="mt-16">{children}</div>
-          {shouldShowFooter && <CompaniesSection />}
+          {/* CompaniesSection só aparece nas páginas principais, não nas páginas de empresas individuais */}
+          {shouldShowFooter && !pathname?.startsWith("/empresa/") && <CompaniesSection />}
+          {/* Footer aparece em todas as páginas exceto dashboard, usando dados da empresa quando disponível */}
           {shouldShowFooter && <Footer />}
         </CompanyFooterProvider>
       </AuthModalProvider>

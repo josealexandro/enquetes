@@ -47,7 +47,8 @@ export default function DashboardPage() {
   //   }
   // }, [searchParams, refreshUserData]); // Depende de searchParams e refreshUserData
 
-  // Hook para buscar as enquetes
+  // Hook para buscar as enquetes do usuário em tempo real
+  // Usa onSnapshot para atualizar automaticamente quando há mudanças
   useEffect(() => {
     if (!user) return;
 
@@ -55,21 +56,39 @@ export default function DashboardPage() {
     const q = query(pollsCollection, where("creator.id", "==", user.uid), orderBy("createdAt", "desc"));
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const fetchedPollsPromises = snapshot.docs.map(async (docSnap) => {
-        const data = docSnap.data();
-        const commentsQuery = query(collection(db, `polls/${docSnap.id}/comments`));
-        const commentsSnapshot = await getDocs(commentsQuery);
-        const commentCount = commentsSnapshot.size;
+      try {
+        // Para cada enquete, buscar a contagem de comentários
+        const fetchedPollsPromises = snapshot.docs.map(async (docSnap) => {
+          const data = docSnap.data();
+          try {
+            const commentsQuery = query(collection(db, `polls/${docSnap.id}/comments`));
+            const commentsSnapshot = await getDocs(commentsQuery);
+            const commentCount = commentsSnapshot.size;
 
-        return {
-          id: docSnap.id,
-          ...data,
-          commentCount: commentCount,
-          createdAt: data.createdAt, // Firebase retorna Timestamp, a interface Poll agora aceita isso
-        } as Poll;
-      });
-      const fetchedPolls = await Promise.all(fetchedPollsPromises);
-      setPolls(fetchedPolls);
+            return {
+              id: docSnap.id,
+              ...data,
+              commentCount: commentCount,
+              createdAt: data.createdAt, // Firebase retorna Timestamp, a interface Poll agora aceita isso
+            } as Poll;
+          } catch (commentError) {
+            // Se houver erro ao buscar comentários, retornar enquete com commentCount = 0
+            return {
+              id: docSnap.id,
+              ...data,
+              commentCount: 0,
+              createdAt: data.createdAt,
+            } as Poll;
+          }
+        });
+        const fetchedPolls = await Promise.all(fetchedPollsPromises);
+        setPolls(fetchedPolls);
+      } catch (error) {
+        console.error("Erro ao processar enquetes no Dashboard:", error);
+      }
+    }, (error) => {
+      // Erro no listener não deve quebrar a aplicação
+      console.error("Erro no listener de enquetes do Dashboard:", error);
     });
 
     return () => unsubscribe();

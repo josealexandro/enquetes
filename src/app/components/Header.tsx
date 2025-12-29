@@ -12,6 +12,7 @@ import Signup from "./Auth/Signup";
 import { motion } from "framer-motion";
 import { faBars, faTimes } from '@fortawesome/free-solid-svg-icons'; // Import hamburger and close icons
 import ExpandableImage from "./ExpandableImage"; // Importar componente de imagem expansível
+import { getValidAvatarUrl } from "@/utils/avatarUtils"; // Importar a função utilitária de avatar
 
 interface HeaderProps {
   showLoginModal: boolean;
@@ -138,7 +139,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
             <>
               {user.avatarUrl && (
                 <ExpandableImage
-                  src={user.avatarUrl}
+                  src={getValidAvatarUrl(user.avatarUrl)}
                   alt="Avatar do Usuário"
                   defaultSize={32}
                   expandedSize={128}
@@ -149,6 +150,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
               )}
               {!isAvatarExpanded && (
                 <span className="text-white">
+                  {/* DOCUMENTAÇÃO: Para contas comerciais usa commercialName, para pessoais usa displayName */}
                   Olá, {user.accountType === 'commercial' && user.commercialName
                     ? user.commercialName
                     : user.displayName || user.email}

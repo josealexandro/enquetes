@@ -23,6 +23,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'example.com', // Permitir example.com (pode ser usado em dados de teste)
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   /* config options here */

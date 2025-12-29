@@ -40,6 +40,14 @@ export default function CompaniesSection() {
               height={150}
             />
           </div>
+          <div className="bg-white p-4 rounded-lg shadow-md">
+            <Image
+              src="/segmentar io.png"
+              alt="Segmentar IO"
+              width={150}
+              height={150}
+            />
+          </div>
         </div>
       </div>
     </section>

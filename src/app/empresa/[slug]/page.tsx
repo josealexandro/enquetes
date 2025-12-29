@@ -56,17 +56,19 @@ const getCompanyData = async (slug: string): Promise<CompanyData | null> => {
         companyData = {
           id: doc.id,
           displayName: data.displayName || data.commercialName,
-          commercialName: data.commercialName,
-          photoURL: data.photoURL || undefined,
+          // Se commercialName não existir, usar displayName (para empresas que não têm commercialName definido)
+          commercialName: data.commercialName || data.displayName,
+          // IMPORTANTE: Usar avatarUrl (campo do Firestore) em vez de photoURL para manter consistência
+          photoURL: data.avatarUrl || data.photoURL || undefined,
           description: data.description || undefined,
           aboutUs: data.aboutUs || undefined,
           contactEmail: data.contactEmail || undefined,
           address: data.address || undefined,
           facebookUrl: data.facebookUrl || undefined,
-          instagramUrl: data.instagramUrl || undefined, // Mapeia diretamente para instagramUrl
-          twitterUrl: data.twitterUrl || undefined,   // Mapeia diretamente para twitterUrl
-          themeColor: data.themeColor || undefined, // Obter themeColor
-          bannerURL: data.bannerURL || undefined, // NOVO: Obter bannerURL
+          instagramUrl: data.instagramUrl || undefined,
+          twitterUrl: data.twitterUrl || undefined,
+          themeColor: data.themeColor || undefined,
+          bannerURL: data.bannerURL || undefined,
         };
       }
     });
@@ -111,6 +113,37 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
       setCompanyFooterData(fetchedCompany); // Definir os dados da empresa no contexto do rodapé
 
       if (fetchedCompany) {
+        // DOCUMENTAÇÃO: onSnapshot atualiza dados da empresa em tempo real e sincroniza com o footer
+        // Quando dados são salvos na dashboard, este listener atualiza automaticamente a página e o footer
+        const companyDocRef = doc(db, "users", fetchedCompany.id);
+        const unsubscribeCompany = onSnapshot(companyDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            console.log("onSnapshot detectou mudança na empresa - dados do Firestore:", data); // DEBUG
+            const updatedCompany: CompanyData = {
+              id: docSnap.id,
+              displayName: data.displayName || data.commercialName,
+              commercialName: data.commercialName || data.displayName,
+              photoURL: data.avatarUrl || data.photoURL || undefined,
+              description: data.description || undefined,
+              aboutUs: data.aboutUs || undefined,
+              contactEmail: data.contactEmail || undefined,
+              address: data.address || undefined,
+              facebookUrl: data.facebookUrl || undefined,
+              instagramUrl: data.instagramUrl || undefined,
+              twitterUrl: data.twitterUrl || undefined,
+              themeColor: data.themeColor || undefined,
+              bannerURL: data.bannerURL || undefined,
+            };
+            console.log("CompanyData atualizado para o contexto:", updatedCompany); // DEBUG
+            setCompany(updatedCompany);
+            // Atualiza o contexto do footer para que as informações apareçam no footer da página pública
+            setCompanyFooterData(updatedCompany);
+            console.log("setCompanyFooterData chamado com:", updatedCompany); // DEBUG
+          }
+        }, (error) => {
+          console.error("Erro ao carregar dados da empresa:", error);
+        });
         // Adicionar listener para as avaliações da empresa
         const companyRatingsRef = collection(db, `users/${fetchedCompany.id}/ratings`);
         const unsubscribeRatings = onSnapshot(companyRatingsRef, (snapshot) => {
@@ -147,6 +180,10 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
                 const userData = userDocSnap.data();
                 creatorName = userData.name || userData.displayName || "Usuário";
                 creatorAvatarUrl = userData.avatarUrl || "https://www.gravatar.com/avatar/?d=mp";
+                // Filtrar URLs de exemplo
+                if (creatorAvatarUrl.includes('example.com')) {
+                  creatorAvatarUrl = "https://www.gravatar.com/avatar/?d=mp";
+                }
                 creatorCommercialName = userData.commercialName || undefined; // Obter commercialName
                 creatorThemeColor = userData.themeColor || undefined; // Obter themeColor
               }
@@ -180,7 +217,11 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
           setLoading(false);
         });
 
-        return () => { unsubscribe(); unsubscribeRatings(); }; // Limpar ambos os listeners
+        return () => { 
+          unsubscribe(); 
+          unsubscribeRatings(); 
+          unsubscribeCompany(); // Limpar o listener da empresa
+        };
       } else {
         setLoading(false);
       }
@@ -267,7 +308,7 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
           {company.photoURL ? (
             <ExpandableImage
               src={company.photoURL}
-              alt={company.commercialName || "Logo da empresa"}
+              alt={company.commercialName || company.displayName || "Logo da empresa"}
               defaultSize={96}
               expandedSize={256}
               borderColor="white"
@@ -276,12 +317,12 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
             />
           ) : (
             <div className="w-24 h-24 flex items-center justify-center bg-gray-200 rounded-full text-gray-700 text-2xl font-semibold border-4 border-white shadow-lg flex-shrink-0">
-              {company.commercialName?.charAt(0)}
+              {(company.commercialName || company.displayName)?.charAt(0)}
             </div>
           )}
           {!isProfileImageExpanded && (
             <div className="flex flex-col ml-4 flex-grow">
-              <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight drop-shadow-md">{company.commercialName}</h1>
+              <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight drop-shadow-md">{company.commercialName || company.displayName}</h1>
               {company.description && (
                  <p className="text-base text-purple-100 font-semibold italic mt-1 font-permanent-marker drop-shadow-md">{company.description}</p>
               )}

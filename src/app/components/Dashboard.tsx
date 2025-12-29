@@ -26,7 +26,7 @@ interface DashboardProps {
 }
 
 const Dashboard = ({ polls, user }: DashboardProps) => {
-  const { isMasterUser, firebaseAuthUser } = useAuth(); // Obter isMasterUser e firebaseAuthUser do contexto
+  const { isMasterUser, firebaseAuthUser, refreshUserData } = useAuth(); // Obter isMasterUser, firebaseAuthUser e refreshUserData do contexto
   const [activePollsCount, setActivePollsCount] = useState(0);
   // Removido: const [totalResponsesThisMonth, setTotalResponsesThisMonth] = useState(0); // Novo estado
   const [averageVotesPerPoll, setAverageVotesPerPoll] = useState(0); // Novo estado
@@ -314,50 +314,103 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
         return;
       }
 
-      // 2. Opcional: Atualizar no Firestore se for um usuário comercial
+      // 2. Atualizar no Firestore
       // user é garantido como não nulo aqui
       const userDocRef = doc(db, "users", user.uid);
+      
+      // Garantir que apenas campos permitidos sejam enviados
+      const firestoreUpdateData: Record<string, any> = {};
+      
+      // DOCUMENTAÇÃO: Atualiza displayName e commercialName juntos para contas comerciais
+      // Isso garante que Header e outros componentes usem o nome correto
+      if (editedCompanyName.trim() !== (user.displayName || "") && editedCompanyName.trim().length > 0) {
+        if (editedCompanyName.trim().length > 100) {
+          setFeedbackMessage("O nome da empresa não pode ter mais de 100 caracteres.");
+          setFeedbackType("error");
+          setTimeout(() => setFeedbackMessage(null), 3000);
+          return;
+        }
+        firestoreUpdateData.displayName = editedCompanyName.trim();
+        // Para contas comerciais, atualizar commercialName também (usado pelo Header)
+        if (user.accountType === 'commercial') {
+          firestoreUpdateData.commercialName = editedCompanyName.trim();
+        }
+      }
+      
       if (newPhotoURL) {
-        updateData.avatarUrl = newPhotoURL; // Salvar como avatarUrl no Firestore
+        firestoreUpdateData.avatarUrl = newPhotoURL; // Salvar como avatarUrl no Firestore
       }
       if (newBannerURL) { // NOVO: Adicionar bannerURL ao updateData
-        updateData.bannerURL = newBannerURL;
+        firestoreUpdateData.bannerURL = newBannerURL;
       }
-      // Adicionar os novos campos ao updateData se tiverem sido alterados
+      // Adicionar os novos campos ao firestoreUpdateData se tiverem sido alterados
       if (editedAboutUs !== (user.aboutUs || "")) {
-        updateData.aboutUs = editedAboutUs;
+        if (editedAboutUs.length > 1000) {
+          setFeedbackMessage("O campo 'Sobre Nós' não pode ter mais de 1000 caracteres.");
+          setFeedbackType("error");
+          setTimeout(() => setFeedbackMessage(null), 3000);
+          return;
+        }
+        firestoreUpdateData.aboutUs = editedAboutUs;
       }
       if (editedContactEmail !== (user.contactEmail || "")) {
-        updateData.contactEmail = editedContactEmail;
+        firestoreUpdateData.contactEmail = editedContactEmail;
       }
       if (editedAddress !== (user.address || "")) {
-        updateData.address = editedAddress;
+        firestoreUpdateData.address = editedAddress;
       }
       if (editedFacebookUrl !== (user.facebookUrl || "")) {
-        updateData.facebookUrl = editedFacebookUrl;
+        firestoreUpdateData.facebookUrl = editedFacebookUrl;
       }
       if (editedInstagramUrl !== (user.instagramUrl || "")) {
-        updateData.instagramUrl = editedInstagramUrl;
+        firestoreUpdateData.instagramUrl = editedInstagramUrl;
       }
       if (editedTwitterUrl !== (user.twitterUrl || "")) {
-        updateData.twitterUrl = editedTwitterUrl;
+        firestoreUpdateData.twitterUrl = editedTwitterUrl;
       }
       if (editedThemeColor !== (user.themeColor || "#6366f1")) {
-        updateData.themeColor = editedThemeColor; // Adicionar themeColor ao updateData
+        firestoreUpdateData.themeColor = editedThemeColor;
       }
 
-      await updateDoc(userDocRef, updateData);
+      // Só atualizar no Firestore se houver dados para atualizar
+      if (Object.keys(firestoreUpdateData).length > 0) {
+        console.log("Atualizando Firestore com:", firestoreUpdateData);
+        await updateDoc(userDocRef, firestoreUpdateData);
+        console.log("Firestore atualizado com sucesso");
+        
+        // IMPORTANTE: Pequeno delay para garantir que o Firestore processou a atualização
+        // Isso garante que o onSnapshot no contexto detecte a mudança antes de forçar refresh
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // IMPORTANTE: Forçar atualização dos dados do usuário no contexto
+        // Isso garante que o Header e outros componentes sejam atualizados imediatamente
+        // O onSnapshot também detecta mudanças automaticamente, mas este refresh garante atualização imediata
+        await refreshUserData();
+        console.log("refreshUserData concluído");
+      }
       setFeedbackMessage("Perfil atualizado com sucesso!");
       setFeedbackType("success");
       setImageFile(null); // Limpa o arquivo após o upload e salvamento
 
     } catch (error: unknown) { 
+      console.error("Erro completo ao atualizar perfil:", error);
       if (error instanceof Error) {
-        console.error("Erro ao atualizar perfil:", error.message); 
-        setFeedbackMessage(error.message);
+        console.error("Erro ao atualizar perfil:", error.message);
+        // Verificar se é erro de permissão do Firestore
+        if (error.message.includes('permission-denied') || error.message.includes('Permission denied')) {
+          setFeedbackMessage("Erro de permissão: Verifique se você está logado e tem permissão para atualizar seu perfil.");
+        } else {
+          setFeedbackMessage(error.message);
+        }
       } else {
-        console.error("Erro desconhecido ao atualizar perfil:", error);
-        setFeedbackMessage("Erro ao atualizar perfil.");
+        // Verificar se é um erro do Firestore
+        const firestoreError = error as any;
+        if (firestoreError?.code === 'permission-denied') {
+          setFeedbackMessage("Erro de permissão: Verifique se você está logado e tem permissão para atualizar seu perfil.");
+        } else {
+          console.error("Erro desconhecido ao atualizar perfil:", error);
+          setFeedbackMessage("Erro ao atualizar perfil. Tente novamente.");
+        }
       }
       setFeedbackType("error");
     } finally {

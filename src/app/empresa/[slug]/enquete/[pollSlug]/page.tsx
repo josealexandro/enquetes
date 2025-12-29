@@ -80,13 +80,17 @@ const getPollData = async (companySlug: string, pollSlug: string): Promise<PollD
           creatorName: (data.isCommercial && data.creator.commercialName) 
             ? data.creator.commercialName 
             : (data.creator.name || "Desconhecido"),
-          creatorAvatarUrl: data.creator.avatarUrl || undefined,
+          creatorAvatarUrl: data.creator.avatarUrl && !data.creator.avatarUrl.includes('example.com')
+            ? data.creator.avatarUrl
+            : undefined,
           creator: {
             id: data.creator.id || "",
             name: (data.isCommercial && data.creator.commercialName) 
               ? data.creator.commercialName 
               : (data.creator.name || "Desconhecido"),
-            avatarUrl: data.creator.avatarUrl || undefined,
+            avatarUrl: data.creator.avatarUrl && !data.creator.avatarUrl.includes('example.com')
+              ? data.creator.avatarUrl
+              : undefined,
           },
           createdAt: data.createdAt?.toDate() || new Date(),
           isCommercial: data.isCommercial || false,
@@ -215,7 +219,9 @@ const PollDetailPage: React.FC<PollDetailPageProps> = ({ params }) => { // Alter
           {poll.creatorAvatarUrl && (
             <div className="w-8 h-8 rounded-full overflow-hidden ml-2"> {/* Wrapper para a imagem */}
               <Image
-                src={poll.creatorAvatarUrl}
+                src={poll.creatorAvatarUrl && !poll.creatorAvatarUrl.includes('example.com')
+                  ? poll.creatorAvatarUrl
+                  : "https://www.gravatar.com/avatar/?d=mp"}
                 alt={poll.creatorName || "Avatar do criador"}
                 width={32}
                 height={32}

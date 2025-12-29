@@ -87,13 +87,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (firebaseUser) {
         // Listener para mudanças no documento do usuário no Firestore
         const userDocRef = doc(db, "users", firebaseUser.uid);
+        // DOCUMENTAÇÃO: onSnapshot detecta mudanças no Firestore e atualiza o contexto automaticamente
+        // Quando dados são salvos na dashboard, Header e outros componentes são atualizados em tempo real
         unsubscribeFirestore = onSnapshot(userDocRef, (docSnap) => {
           const userData = docSnap.exists() ? docSnap.data() : null;
 
-          setFirebaseAuthUser(firebaseUser); // Armazenar o objeto User original
+          setFirebaseAuthUser(firebaseUser);
           const customUser = {
             ...firebaseUser,
-            displayName: firebaseUser.displayName || null,
+            // Prioriza dados do Firestore (atualizados na dashboard) sobre dados do Firebase Auth
+            displayName: (userData?.displayName as string | null) || firebaseUser.displayName || null,
             accountType: (userData?.accountType as 'personal' | 'commercial') || 'personal',
             commercialName: (userData?.commercialName as string | null) || null,
             // Priorizar avatarUrl do Firestore (perfil atualizado), senão usar photoURL do Firebase Auth
@@ -111,6 +114,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(customUser);
           setIsMasterUser(false); // Definir como false temporariamente
         }, (error) => {
+          // Erro ao escutar mudanças no documento do usuário não deve quebrar a aplicação
+          // O usuário continuará usando os dados do Firebase Auth como fallback
           console.error("Erro ao escutar mudanças no documento do usuário:", error);
         });
       } else {
@@ -151,7 +156,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         const customUser = {
           ...firebaseAuthUser,
-          displayName: firebaseAuthUser.displayName || null,
+          // Priorizar displayName do Firestore (perfil atualizado), senão usar do Firebase Auth
+          displayName: (userData?.displayName as string | null) || firebaseAuthUser.displayName || null,
           accountType: (userData?.accountType as 'personal' | 'commercial') || 'personal',
           commercialName: (userData?.commercialName as string | null) || null,
           // Priorizar avatarUrl do Firestore (perfil atualizado), senão usar photoURL do Firebase Auth
@@ -163,9 +169,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
           instagramUrl: (userData?.instagramUrl as string | null) || null,
           twitterUrl: (userData?.twitterUrl as string | null) || null,
           themeColor: (userData?.themeColor as string | null) || null,
+          bannerURL: (userData?.bannerURL as string | null) || null, // Adicionar bannerURL
           extraPollsAvailable: (userData?.extraPollsAvailable as number) || 0,
         };
         setUser(customUser);
+        console.log("Dados do usuário atualizados:", customUser.displayName); // Log para debug
       } catch (error) {
         console.error("Erro ao recarregar dados do usuário:", error);
       } finally {

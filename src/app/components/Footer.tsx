@@ -2,15 +2,34 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFacebookF, faTwitter, faInstagram } from '@fortawesome/free-brands-svg-icons'; // Importar ícones de redes sociais
 import { faEnvelope } from '@fortawesome/free-solid-svg-icons'; // Importar ícone de envelope
 import Link from 'next/link';
+import { usePathname } from 'next/navigation'; // Importar usePathname para verificar a rota atual
 import { useAuth } from "../context/AuthContext"; // Importar useAuth
 import { useCompanyFooter } from "../context/CompanyFooterContext"; // Importar useCompanyFooter
 
 export default function Footer() {
   const { user } = useAuth(); // Usar o hook useAuth para acessar o usuário
   const { companyFooterData } = useCompanyFooter(); // Usar o hook para acessar os dados do rodapé da empresa
+  const pathname = usePathname(); // Obter a rota atual
 
-  // Decidir qual conjunto de dados usar: companyFooterData (se presente) ou user (se logado) ou padrão
-  const dataToUse = companyFooterData || user;
+  // DOCUMENTAÇÃO: Lógica para exibir dados no footer
+  // - Página pública da empresa (/empresa/[slug]): usa companyFooterData (atualizado via onSnapshot)
+  // - Outras páginas: usa null (valores padrão) para evitar mostrar dados da empresa na página principal
+  const isCompanyPublicPage = pathname?.startsWith("/empresa/");
+  const dataToUse = isCompanyPublicPage 
+    ? companyFooterData // Dados da empresa na página pública
+    : null; // Valores padrão em outras páginas
+  
+  // DEBUG: Log para verificar os dados que estão sendo usados
+  if (isCompanyPublicPage) {
+    console.log("Footer - Página pública da empresa detectada");
+    console.log("Footer - pathname:", pathname);
+    console.log("Footer - companyFooterData:", companyFooterData);
+    console.log("Footer - user:", user);
+    console.log("Footer - dataToUse:", dataToUse);
+    console.log("Footer - aboutUs:", dataToUse?.aboutUs);
+    console.log("Footer - contactEmail:", dataToUse?.contactEmail);
+    console.log("Footer - address:", dataToUse?.address);
+  }
 
   return (
     <footer className="w-full bg-zinc-800 text-white py-8 px-4 sm:px-6 lg:px-8 mt-16">

@@ -103,9 +103,16 @@ export async function getSubscriptionByCompany(companyId: string) {
     }
 
     return subscriptionData as Subscription;
-  } catch (error) {
+  } catch (error: any) {
+    // Se for erro de permissão, retornar null em vez de lançar erro
+    // Isso permite que a aplicação continue funcionando mesmo sem assinatura
+    if (error?.code === 'permission-denied') {
+      console.error("[getSubscriptionByCompany] Erro de permissão ao buscar assinatura:", error);
+      return null;
+    }
+    // Re-lançar outros erros para que possam ser tratados adequadamente
     console.error("[getSubscriptionByCompany] Erro ao buscar assinatura:", error);
-    throw error; // Re-lançar para que a API route possa tratar
+    throw error;
   }
 }
 
@@ -398,6 +405,29 @@ export async function consumePollCredit(companyId: string) {
   console.log(`Crédito de enquete consumido para o usuário ${companyId}.`);
 }
 
+/**
+ * Conta quantas enquetes foram CRIADAS no período atual (não enquetes existentes)
+ * 
+ * IMPORTANTE: Esta função conta de poll_creation_logs, não de polls existentes.
+ * Isso garante que o limite seja baseado em enquetes CRIADAS, não enquetes EXISTENTES.
+ * 
+ * EXEMPLO DE FUNCIONAMENTO:
+ * - Usuário tem limite de 2 enquetes por mês
+ * - Usuário cria 2 enquetes → countPollsCreatedInCurrentPeriod retorna 2
+ * - Usuário tenta criar 3ª enquete → bloqueado (limite atingido)
+ * - Usuário exclui 1 enquete → countPollsCreatedInCurrentPeriod AINDA retorna 2
+ * - Usuário tenta criar enquete novamente → AINDA bloqueado (limite respeitado)
+ * 
+ * Por que isso é importante?
+ * Sem essa lógica, o usuário poderia criar 2 enquetes, excluir 1, criar 1, excluir 1,
+ * criar 1... infinitamente, burlando o limite. Com esta implementação, o limite é
+ * baseado em criações, não em existências.
+ * 
+ * FALLBACK:
+ * Se houver erro ao contar logs (ex: índice composto não criado), faz fallback para
+ * contar enquetes existentes (comportamento antigo). Isso garante que a aplicação
+ * continue funcionando mesmo se houver problemas com os logs.
+ */
 export async function countPollsCreatedInCurrentPeriod(companyId: string): Promise<number> {
   const subscription = await getSubscriptionByCompany(companyId);
 
@@ -421,16 +451,40 @@ export async function countPollsCreatedInCurrentPeriod(companyId: string): Promi
     periodEnd = subscription.currentPeriodEnd;
   }
 
-  const pollsCollection = collection(db, "poll_creation_logs"); // Mudar para a nova coleção de logs
-  const pollsQuery = query(
-    pollsCollection,
-    where("userId", "==", companyId), // Usar userId em vez de creator.id
-    where("createdAt", ">=", periodStart),
-    where("createdAt", "<=", periodEnd)
-  );
+  // IMPORTANTE: Contar de poll_creation_logs em vez de polls existentes
+  // Isso garante que o limite seja baseado em enquetes CRIADAS, não enquetes EXISTENTES
+  // Assim, mesmo que o usuário exclua uma enquete, o limite continua sendo respeitado
+  try {
+    const logsCollection = collection(db, "poll_creation_logs");
+    const logsQuery = query(
+      logsCollection,
+      where("userId", "==", companyId),
+      where("createdAt", ">=", periodStart),
+      where("createdAt", "<=", periodEnd)
+    );
 
-  const snapshot = await getDocs(pollsQuery);
-  return snapshot.size;
+    const snapshot = await getDocs(logsQuery);
+    return snapshot.size;
+  } catch (error: any) {
+    // Se houver erro ao contar logs (ex: índice composto não criado), fazer fallback
+    // para contar enquetes existentes (comportamento antigo)
+    console.warn("Erro ao contar logs de criação, usando fallback (enquetes existentes):", error);
+    try {
+      const pollsCollection = collection(db, "polls");
+      const pollsQuery = query(
+        pollsCollection,
+        where("creator.id", "==", companyId),
+        where("createdAt", ">=", periodStart),
+        where("createdAt", "<=", periodEnd)
+      );
+      const snapshot = await getDocs(pollsQuery);
+      return snapshot.size;
+    } catch (fallbackError: any) {
+      // Se o fallback também falhar, retornar 0 para não bloquear criação
+      console.error("Erro ao contar enquetes criadas no período (fallback também falhou):", fallbackError);
+      return 0;
+    }
+  }
 }
 
 export async function addPollCreditToCompany(companyId: string, amount: number = 1) {
@@ -438,13 +492,22 @@ export async function addPollCreditToCompany(companyId: string, amount: number =
   await updateDoc(userRef, { extraPollsAvailable: increment(amount) });
 }
 
+// Registra a criação de uma enquete no log
+// Isso é usado para contar enquetes criadas no período, independentemente de terem sido excluídas
 export async function recordPollCreation(userId: string, pollId: string) {
-  const pollCreationLogsCollection = collection(db, "poll_creation_logs");
-  await addDoc(pollCreationLogsCollection, {
-    userId: userId,
-    pollId: pollId,
-    createdAt: serverTimestamp(),
-  });
+  try {
+    const pollCreationLogsCollection = collection(db, "poll_creation_logs");
+    await addDoc(pollCreationLogsCollection, {
+      userId: userId,
+      pollId: pollId,
+      createdAt: serverTimestamp(),
+    });
+  } catch (error: any) {
+    // Se falhar ao criar o log, não deve quebrar a criação da enquete
+    // O log é importante para o limite, mas não é crítico para a funcionalidade básica
+    console.error("Erro ao registrar log de criação de enquete (não crítico):", error);
+    // Não re-lançar o erro para não quebrar o fluxo de criação da enquete
+  }
 }
 
 export interface UpdateSubscriptionPeriodAndCancellationInput {

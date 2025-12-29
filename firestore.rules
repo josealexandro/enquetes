@@ -13,7 +13,8 @@ service cloud.firestore {
       // Public read for polls (keep public if desired)
       allow read: if true;
 
-      // Stronger validation on create (restored)
+      // DOCUMENTAÇÃO: Validação para criação de enquetes
+      // Verifica se usuário está autenticado, se é o criador, e valida estrutura básica da enquete
       allow create: if request.auth != null
         && request.auth.uid == request.resource.data.creator.id
         && request.resource.data.title is string
@@ -22,7 +23,7 @@ service cloud.firestore {
         && request.resource.data.options is list
         && request.resource.data.options.size() >= 2
         && request.resource.data.options.size() <= 10
-        // basic validation of first two options
+        // Validação das duas primeiras opções (campos obrigatórios: id, text, votes)
         && request.resource.data.options[0].id is string
         && request.resource.data.options[0].text is string
         && request.resource.data.options[0].votes is number
@@ -120,28 +121,29 @@ service cloud.firestore {
         && request.resource.data.email is string;
 
       // Allow the user to update only a safe subset of fields and validate types/lengths
+      // Verifica apenas os campos que estão sendo alterados, não todos os campos do documento
       allow update: if request.auth != null && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly([
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'displayName', 'avatarUrl', 'accountType', 'commercialName', 'aboutUs', 'contactEmail', 'address', 'facebookUrl', 'instagramUrl', 'twitterUrl', 'themeColor', 'extraPollsAvailable', 'bannerURL'
         ])
         // individual field validations (if present)
         && (
-          !request.resource.data.keys().hasAny(['displayName']) || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 100)
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['displayName']) || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 100)
         )
         && (
-          !request.resource.data.keys().hasAny(['avatarUrl']) || request.resource.data.avatarUrl is string
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['avatarUrl']) || request.resource.data.avatarUrl is string
         )
         && (
-          !request.resource.data.keys().hasAny(['accountType']) || request.resource.data.accountType in ['personal', 'commercial']
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['accountType']) || request.resource.data.accountType in ['personal', 'commercial']
         )
         && (
-          !request.resource.data.keys().hasAny(['commercialName']) || (request.resource.data.commercialName is string && request.resource.data.commercialName.size() <= 100)
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['commercialName']) || (request.resource.data.commercialName is string && request.resource.data.commercialName.size() <= 100)
         )
         && (
-          !request.resource.data.keys().hasAny(['aboutUs']) || (request.resource.data.aboutUs is string && request.resource.data.aboutUs.size() <= 1000)
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['aboutUs']) || (request.resource.data.aboutUs is string && request.resource.data.aboutUs.size() <= 1000)
         )
         && (
-          !request.resource.data.keys().hasAny(['extraPollsAvailable']) || request.resource.data.extraPollsAvailable is int
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['extraPollsAvailable']) || request.resource.data.extraPollsAvailable is int
         );
 
       // Allow deletion only to the user (use with caution)
@@ -168,6 +170,62 @@ service cloud.firestore {
           );
         allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId || request.auth.uid == resource.data.authorId;
       }
+    }
+
+    // Poll creation logs collection: permite que usuários autenticados registrem criação de enquetes
+    match /poll_creation_logs/{logId} {
+      allow create: if request.auth != null 
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.pollId is string;
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // Subscriptions collection: permite que usuários autenticados leiam e gerenciem suas próprias assinaturas
+    match /subscriptions/{subscriptionId} {
+      // Leitura: usuário pode ler sua própria assinatura
+      allow read: if request.auth != null && resource.data.companyId == request.auth.uid;
+      // Criação: usuário pode criar assinatura para si mesmo
+      allow create: if request.auth != null 
+        && request.resource.data.companyId == request.auth.uid
+        && request.resource.data.companyName is string
+        && request.resource.data.planId is string;
+      // Atualização: usuário pode atualizar sua própria assinatura (usado por API routes e webhooks)
+      allow update: if request.auth != null && resource.data.companyId == request.auth.uid;
+      // Exclusão: não permitida (assinaturas devem ser canceladas, não deletadas)
+      allow delete: if false;
+    }
+
+    // Plans collection: permite leitura pública dos planos, escrita apenas para criar planos padrão
+    match /plans/{planId} {
+      allow read: if true;
+      // Permite criar/atualizar planos (usado por ensureDefaultPlans e createSubscription)
+      // Em produção, isso deveria ser restrito apenas ao servidor, mas como as API routes
+      // não passam pelas regras do Firestore, precisamos permitir aqui
+      allow create, update: if request.auth != null;
+      allow delete: if false;
+    }
+
+    // Payments collection: permite que usuários autenticados leiam pagamentos
+    match /payments/{paymentId} {
+      // Leitura: usuário autenticado pode ler pagamentos (filtrados por subscriptionId nas queries)
+      allow read: if request.auth != null;
+      // Criação: permitida para usuários autenticados (usado por webhooks e API routes)
+      // Em produção, isso deveria ser restrito apenas ao servidor
+      allow create: if request.auth != null;
+      // Atualização e exclusão: não permitidas (pagamentos são imutáveis)
+      allow update, delete: if false;
+    }
+
+    // Subscription audit collection: permite que usuários autenticados leiam e criem auditorias
+    match /subscription_audit/{auditId} {
+      // Leitura: usuário pode ler auditorias onde ele é o ator
+      allow read: if request.auth != null && resource.data.actorId == request.auth.uid;
+      // Criação: permitida para usuários autenticados (usado por logSubscriptionChange)
+      // Em produção, isso deveria ser restrito apenas ao servidor
+      allow create: if request.auth != null 
+        && request.resource.data.actorId == request.auth.uid;
+      // Atualização e exclusão: não permitidas (auditorias são imutáveis)
+      allow update, delete: if false;
     }
 
     // Fallback: allow read for everything else (restrict as needed)

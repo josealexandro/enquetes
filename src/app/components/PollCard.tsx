@@ -16,6 +16,7 @@ import HeartAnimation from "@/components/HeartAnimation"; // Importar o componen
 import { useRef } from "react"; // Importar useRef
 import { useRouter } from 'next/navigation'; // Importar useRouter
 import { getContrastTextColor } from "@/utils/colorUtils"; // Importar a função utilitária
+import { getValidAvatarUrl } from "@/utils/avatarUtils"; // Importar a função utilitária de avatar
 import ExpandableImage from "./ExpandableImage"; // Importar componente de imagem expansível
 
 // Lazy load de componentes não críticos para a renderização inicial
@@ -450,7 +451,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
         <div className="flex items-center flex-grow max-w-[calc(100%-48px)] min-w-0"> {/* Adicionado min-w-0 para permitir quebra de palavras */}
           <div className="mr-2">
             <ExpandableImage
-              src={poll.creator.avatarUrl || "https://www.gravatar.com/avatar/?d=mp"}
+              src={getValidAvatarUrl(poll.creator.avatarUrl)}
               alt={(poll.isCommercial && poll.creator.commercialName) || poll.creator.name || "Avatar do criador"}
               defaultSize={32}
               expandedSize={128}

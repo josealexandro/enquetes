@@ -7,7 +7,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 // import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Importar Firebase Storage
 import { v4 as uuidv4 } from "uuid"; // Importar uuidv4
 import { useAuth } from "@/app/context/AuthContext";
-import { getPollsLimitForCompany, countPollsCreatedInCurrentPeriod, recordPollCreation } from "@/app/services/subscriptionService"; // Importar funções de limite e registro
+import { getPollsLimitForCompany, countPollsCreatedInCurrentPeriod, recordPollCreation } from "@/app/services/subscriptionService"; // Importar funções de limite
 import { useRouter } from "next/navigation";
 
 interface PollFormProps {
@@ -109,7 +109,9 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => { // Tornar handleSubmit assíncrono
+  // Processa o envio do formulário de criação de enquete
+  // Valida os dados, verifica limites e cria a enquete no Firestore
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // if (uploadingImage) return; // Previne o envio enquanto a imagem está sendo carregada
@@ -118,6 +120,7 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
     const filteredOptions = options.map(opt => opt.trim()).filter(opt => opt !== "");
     const hasDuplicates = new Set(filteredOptions).size !== filteredOptions.length;
 
+    // Validações básicas do formulário
     if (!trimmedTitle) {
       setFeedbackMessage("O título da enquete não pode estar vazio.");
       setFeedbackType("error");
@@ -148,25 +151,31 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
       return;
     }
     
-    // Lógica para verificar o limite de enquetes por mês e créditos avulsos
+    // Verificar o limite de enquetes por mês e créditos avulsos
     if (user.uid) {
-      const pollsLimit = await getPollsLimitForCompany(user.uid);
-      const pollsCreated = await countPollsCreatedInCurrentPeriod(user.uid);
-      const hasExtraCredit = (user.extraPollsAvailable && user.extraPollsAvailable > 0) || false;
-      const extraPollsCount = user.extraPollsAvailable || 0; // Obter a contagem real
+      try {
+        const pollsLimit = await getPollsLimitForCompany(user.uid);
+        const pollsCreated = await countPollsCreatedInCurrentPeriod(user.uid);
+        const hasExtraCredit = (user.extraPollsAvailable && user.extraPollsAvailable > 0) || false;
+        const extraPollsCount = user.extraPollsAvailable || 0;
 
-      if (pollsLimit !== null && pollsCreated >= pollsLimit && !hasExtraCredit) {
-        setFeedbackMessage("Você atingiu o limite de enquetes para o seu plano neste mês. Compre um crédito avulso para postar mais enquetes.");
-        setFeedbackType("error");
-        return;
-      }
-      //meu
-      // Se atingiu o limite, mas tem créditos avulsos, usa um crédito
-      if (pollsLimit !== null && pollsCreated >= pollsLimit && hasExtraCredit && user.uid) {
-        await updateUserDocument(user.uid, { extraPollsAvailable: user.extraPollsAvailable! - 1 });
-        setFeedbackMessage(`Crédito de enquete avulsa utilizado com sucesso! Você tem ${extraPollsCount - 1} créditos restantes. Você pode criar sua enquete agora.`);
-        setFeedbackType("success");
-        // Não dar return aqui para permitir a criação da enquete
+        // Se atingiu o limite e não tem créditos avulsos, bloquear criação
+        if (pollsLimit !== null && pollsCreated >= pollsLimit && !hasExtraCredit) {
+          setFeedbackMessage("Você atingiu o limite de enquetes para o seu plano neste mês. Compre um crédito avulso para postar mais enquetes.");
+          setFeedbackType("error");
+          return;
+        }
+        
+        // Se atingiu o limite, mas tem créditos avulsos, usar um crédito
+        if (pollsLimit !== null && pollsCreated >= pollsLimit && hasExtraCredit && user.uid) {
+          await updateUserDocument(user.uid, { extraPollsAvailable: user.extraPollsAvailable! - 1 });
+          setFeedbackMessage(`Crédito de enquete avulsa utilizado com sucesso! Você tem ${extraPollsCount - 1} créditos restantes. Você pode criar sua enquete agora.`);
+          setFeedbackType("success");
+          // Não dar return aqui para permitir a criação da enquete
+        }
+      } catch (limitError) {
+        // Não bloquear a criação se houver erro ao verificar limites
+        console.error("Erro ao verificar limites de enquetes:", limitError);
       }
     }
 
@@ -194,51 +203,98 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
     // }
 
     try {
+      if (!user || !user.uid) {
+        setFeedbackMessage("Erro: Usuário não autenticado. Por favor, faça login novamente.");
+        setFeedbackType("error");
+        setTimeout(() => setFeedbackMessage(null), 3000);
+        return;
+      }
+      
       const pollsCollectionRef = collection(db, "polls");
-      const newPollRef = await addDoc(pollsCollectionRef, {
+      
+      // Preparar dados do criador da enquete
+      // Se for comercial, usar commercialName como nome principal, senão usar displayName ou email
+      const creatorData = {
+        name: (isCommercial && user.commercialName) 
+          ? user.commercialName 
+          : (user.displayName || user.email || "Usuário Logado"),
+        // Priorizar avatarUrl do Firestore (perfil atualizado), senão usar photoURL do Firebase Auth
+        avatarUrl: (user as any).avatarUrl || user.photoURL || "https://www.gravatar.com/avatar/?d=mp",
+        id: user.uid,
+        ...(user.commercialName && { commercialName: user.commercialName }),
+        ...(user.themeColor && { themeColor: user.themeColor }),
+      };
+      
+      // Preparar dados da enquete para criação no Firestore
+      const pollData = {
         title: trimmedTitle,
         options: filteredOptions.map(optionText => ({ id: uuidv4(), text: optionText, votes: 0 })),
         category: category,
-        creator: { // Salvar o objeto creator completo
-          // Se for comercial, usar commercialName como nome principal, senão usar displayName ou email
-          name: (isCommercial && user.commercialName) 
-            ? user.commercialName 
-            : (user.displayName || user.email || "Usuário Logado"),
-          // Priorizar avatarUrl do Firestore (perfil atualizado), senão usar photoURL do Firebase Auth
-          avatarUrl: (user as any).avatarUrl || user.photoURL || "https://www.gravatar.com/avatar/?d=mp",
-          id: user.uid,
-          ...(user.commercialName && { commercialName: user.commercialName }), // Adicionar commercialName se existir
-          ...(user.themeColor && { themeColor: user.themeColor }), // Adicionar themeColor se existir
-        },
+        creator: creatorData,
         createdAt: serverTimestamp(),
         isCommercial: isCommercial,
-        commentCount: 0, // Inicializar commentCount com 0
-        likes: 0, // Inicializar likes com 0
-        likedBy: [], // Inicializar likedBy como array vazio
-        dislikes: 0, // Inicializar dislikes com 0
-        dislikedBy: [], // Inicializar dislikedBy como array vazio
+        commentCount: 0,
+        likes: 0,
+        likedBy: [],
+        dislikes: 0,
+        dislikedBy: [],
         // ...(imageUrl && { imageUrl }), // Adiciona imageUrl apenas se existir
-      });
+      };
+      
+      // Criar a enquete no Firestore
+      const newPollRef = await addDoc(pollsCollectionRef, pollData);
 
-      // Registrar a criação da enquete
-      if (user.uid) {
+      /**
+       * Registrar a criação no log para controle de limites
+       * 
+       * IMPORTANTE: Este log é usado para contar enquetes CRIADAS, não enquetes EXISTENTES.
+       * Isso garante que o limite seja respeitado mesmo se o usuário excluir enquetes.
+       * 
+       * EXEMPLO:
+       * - Limite: 2 enquetes por mês
+       * - Usuário cria 2 enquetes → 2 logs criados
+       * - Usuário exclui 1 enquete → ainda tem 2 logs (limite respeitado)
+       * - Usuário tenta criar 3ª enquete → bloqueado (limite atingido)
+       * 
+       * Se este log não for criado, o sistema fará fallback para contar enquetes existentes,
+       * mas o ideal é que o log seja criado para garantir o controle correto de limites.
+       */
+      try {
         await recordPollCreation(user.uid, newPollRef.id);
+      } catch (logError) {
+        // Erro ao criar log não deve impedir a criação da enquete
+        // O log é importante para o limite, mas não é crítico para a funcionalidade básica
+        console.error("Erro ao registrar log de criação (não crítico):", logError);
       }
 
+      // Mostrar mensagem de sucesso e limpar o formulário
       setFeedbackMessage("Enquete criada com sucesso!");
       setFeedbackType("success");
+      
       setTitle("");
       setOptions(["", ""]);
-      setCategory("Geral"); // Resetar categoria para o padrão
+      setCategory("Geral");
+      
+      // Limpar mensagem após 3 segundos e chamar callback
       setTimeout(() => {
         setFeedbackMessage(null);
         onPollCreated?.();
       }, 3000);
-    } catch (error) {
-      console.error("Erro ao criar enquete:", error);
-      setFeedbackMessage("Erro ao criar enquete."); // Usar mensagem mais genérica, já que o erro pode vir do Firestore
+    } catch (error: any) {
+      // Tratar erros na criação da enquete
+      if (error?.isNonCritical) {
+        // Erro não crítico (ex: log de criação), ignorar
+        return;
+      }
+      
+      // Verificar se é erro de permissão
+      if (error?.code === 'permission-denied' || error?.message?.includes('permission') || error?.message?.includes('Permission')) {
+        setFeedbackMessage("Erro de permissão: Verifique se você está logado e se as regras do Firestore foram atualizadas. Se o problema persistir, entre em contato com o suporte.");
+      } else {
+        setFeedbackMessage(error?.message || "Erro ao criar enquete. Tente novamente.");
+      }
       setFeedbackType("error");
-      setTimeout(() => setFeedbackMessage(null), 3000);
+      setTimeout(() => setFeedbackMessage(null), 5000);
     }
   };
 

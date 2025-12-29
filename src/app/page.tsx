@@ -47,11 +47,16 @@ export default function Home() {
 
     let creatorName = creatorData.name || creatorData.displayName || "Usuário Desconhecido";
     let creatorAvatarUrl = creatorData.avatarUrl || creatorData.photoURL || "https://www.gravatar.com/avatar/?d=mp";
+    // Filtrar URLs de exemplo
+    if (creatorAvatarUrl.includes('example.com')) {
+      creatorAvatarUrl = "https://www.gravatar.com/avatar/?d=mp";
+    }
     let creatorCommercialName = creatorData.commercialName || undefined;
     let creatorThemeColor = creatorData.themeColor || undefined;
 
     const hasCompleteCreatorData = (creatorData.name || creatorData.displayName) && (creatorData.avatarUrl || creatorData.photoURL);
 
+    // Se os dados do criador não estão completos na enquete, buscar do documento do usuário
     if (creatorId && !hasCompleteCreatorData) {
       try {
         const userDocRef = doc(db, "users", creatorId);
@@ -60,11 +65,16 @@ export default function Home() {
           const userData = userDocSnap.data();
           creatorName = userData.name || userData.displayName || "Usuário";
           creatorAvatarUrl = userData.avatarUrl || userData.photoURL || "https://www.gravatar.com/avatar/?d=mp";
+          // Filtrar URLs de exemplo
+          if (creatorAvatarUrl.includes('example.com')) {
+            creatorAvatarUrl = "https://www.gravatar.com/avatar/?d=mp";
+          }
           creatorCommercialName = userData.commercialName || undefined;
           creatorThemeColor = userData.themeColor || undefined;
         }
       } catch (error) {
-        console.error("Erro ao buscar dados do criador (fallback):", error);
+        // Erro ao buscar dados do criador não deve quebrar o processamento da enquete
+        // Os dados já existentes na enquete serão usados como fallback
       }
     }
     
@@ -141,10 +151,11 @@ export default function Home() {
   }, []);
 
   // Buscar Enquetes Iniciais (Paginadas)
+  // Busca enquetes públicas e comerciais separadamente para exibição na página inicial
   const fetchInitialPolls = useCallback(async () => {
     setLoadingPolls(true);
     try {
-      // Busca Públicas
+      // Busca Públicas: enquetes não comerciais ordenadas por data de criação
       const qPublic = query(
         collection(db, "polls"), 
         where("isCommercial", "==", false),
@@ -152,7 +163,7 @@ export default function Home() {
         limit(8)
       );
       
-      // Busca Comerciais
+      // Busca Comerciais: enquetes comerciais ordenadas por data de criação
       const qCommercial = query(
         collection(db, "polls"),
         where("isCommercial", "==", true),
@@ -160,8 +171,13 @@ export default function Home() {
         limit(8)
       );
 
-      const [publicSnap, commercialSnap] = await Promise.all([getDocs(qPublic), getDocs(qCommercial)]);
+      // Executar ambas as queries em paralelo
+      const [publicSnap, commercialSnap] = await Promise.all([
+        getDocs(qPublic), 
+        getDocs(qCommercial)
+      ]);
 
+      // Processar dados das enquetes (incluindo busca de dados do criador se necessário)
       const processedPublic = await Promise.all(publicSnap.docs.map(processPollData));
       const processedCommercial = await Promise.all(commercialSnap.docs.map(processPollData));
 
@@ -174,9 +190,11 @@ export default function Home() {
       setPublicPolls(filteredPublic);
       setCommercialPolls(filteredCommercial);
 
+      // Salvar último documento para paginação
       setLastPublicDoc(publicSnap.docs[publicSnap.docs.length - 1] || null);
       setLastCommercialDoc(commercialSnap.docs[commercialSnap.docs.length - 1] || null);
 
+      // Verificar se há mais documentos para carregar
       if (publicSnap.docs.length < 8) setHasMorePublic(false);
       if (commercialSnap.docs.length < 8) setHasMoreCommercial(false);
 
@@ -300,7 +318,41 @@ export default function Home() {
     };
   }, [showPollForm]);
 
-  const handlePollCreated = () => {
+  // Recarrega as enquetes após criar uma nova enquete
+  // Atualiza a lista de enquetes e o pódio para refletir a nova enquete criada
+  const handlePollCreated = async () => {
+    // Pequeno delay para garantir que o Firestore processou a criação antes de recarregar
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Recarregar as enquetes após criar uma nova
+    try {
+      await fetchInitialPolls();
+    } catch (error) {
+      console.error("Erro ao recarregar enquetes após criação:", error);
+    }
+    
+    // Recarregar o pódio caso a nova enquete seja pública
+    // O pódio mostra as 3 enquetes públicas com mais likes
+    try {
+      const q = query(
+        collection(db, "polls"), 
+        where("isCommercial", "==", false),
+        orderBy("likes", "desc"), 
+        limit(3)
+      );
+      const snapshot = await getDocs(q);
+      const polls = await Promise.all(snapshot.docs.map(processPollData));
+      const publicPolls = polls.filter(poll => poll.isCommercial === false);
+      const rankedPolls = publicPolls.map((poll, index) => ({
+        ...poll,
+        rank: index + 1
+      }));
+      setPodiumPolls(rankedPolls);
+    } catch (error) {
+      console.error("Erro ao recarregar pódio:", error);
+    }
+    
+    // Mudar filtro para "mine" para mostrar as enquetes do usuário
     setActiveFilter("mine");
   };
 
