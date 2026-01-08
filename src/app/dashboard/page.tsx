@@ -104,18 +104,22 @@ export default function DashboardPage() {
 
   return (
     <div className="flex h-screen bg-gray-900 text-white">
-      <Suspense fallback={null}> {/* Suspense Boundary para DashboardPaymentHandler */}
+      <Suspense fallback={null}>
+        {/* DOCUMENTAÇÃO: Componente para gerenciar pagamentos */}
         <DashboardPaymentHandler />
       </Suspense>
+      
       {/* Botão para abrir/fechar a sidebar em mobile */}
+      {/* DOCUMENTAÇÃO: Botão hamburger visível apenas no mobile */}
       <button
-        className="md:hidden fixed top-4 left-4 z-50 p-2 text-white focus:outline-none"
+        className="md:hidden fixed top-4 left-4 z-50 p-3 bg-gray-800 rounded-lg text-white hover:bg-gray-700 focus:outline-none transition-colors"
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
       >
         <FontAwesomeIcon icon={isSidebarOpen ? faTimes : faBars} size="lg" />
       </button>
 
       {/* Overlay para mobile */}
+      {/* DOCUMENTAÇÃO: Overlay escuro quando sidebar está aberta no mobile */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black opacity-50 z-40 md:hidden"
@@ -124,86 +128,131 @@ export default function DashboardPage() {
       )}
 
       {/* Sidebar */}
+      {/* DOCUMENTAÇÃO: Sidebar fixa no desktop (md:fixed), oculta no mobile (abre com botão) */}
       <aside
-        className={`fixed inset-y-0 left-0 w-64 bg-gray-800 p-4 transform transition-transform duration-300 ease-in-out z-50 
-          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0`}
+        className={`fixed inset-y-0 left-0 w-64 bg-gray-800 border-r border-gray-700 transform transition-transform duration-300 ease-in-out z-50 flex flex-col
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
+          md:translate-x-0`}
       >
-        <h1 className="text-2xl font-bold mb-6">ENQUETES</h1>
-        <nav>
-          <ul>
-            <li className="mb-2">
-              <Link href="/" className="flex items-center p-2 rounded-lg bg-gray-700">
-                <span className="mr-2">🏠</span> Início
-              </Link>
-            </li>
-            <li className="mb-2">
-              <Link href="/enquetes" className="flex items-center p-2 rounded-lg">
-                <span className="mr-2">📊</span> Enquetes
-              </Link>
-            </li>
-            <li className="mb-2">
-              <a href="#" className="flex items-center p-2 rounded-lg">
-                <span className="mr-2">💬</span> Comentários
-              </a>
-            </li>
-            <li className="mb-2">
-              <a href="#" className="flex items-center p-2 rounded-lg">
-                <span className="mr-2">📈</span> Estatísticas
-              </a>
-            </li>
-            <li className="mb-2">
-              <a href="#" className="flex items-center p-2 rounded-lg">
-                <span className="mr-2">🏢</span> Perfil da Empresa\
-              </a>
-            </li>
-            {user?.accountType === 'commercial' && user?.commercialName && (
-              <li className="mb-2">
-                <Link href={`/empresa/${slugify(user.commercialName)}`} className="flex items-center p-2 rounded-lg hover:bg-gray-700 transition-colors duration-200">
-                  <span className="mr-2">🌐</span> Ver Página Pública
-                </Link>
-              </li>
-            )}
-            <li className="mb-2">
-              <button
-                type="button"
-                onClick={() => setActiveSection("subscription")}
-                className={`flex items-center p-2 rounded-lg w-full text-left ${
-                  activeSection === "subscription" ? "bg-gray-700" : "hover:bg-gray-700"
-                }`}
-              >
-                <span className="mr-2">💳</span> Assinatura
-              </button>
-            </li>
-            <li className="mb-2">
-              <a href="#" className="flex items-center p-2 rounded-lg">
-                <span className="mr-2">⚙️</span> Configurações
-              </a>
-            </li>
-            <li className="mb-2">
+        {/* Cabeçalho da Sidebar */}
+        <div className="p-6 border-b border-gray-700">
+          <h1 className="text-xl font-bold text-white">Dashboard</h1>
+          <p className="text-sm text-gray-400 mt-1">Painel de Controle</p>
+        </div>
+
+        {/* Navegação */}
+        <nav className="flex-1 overflow-y-auto p-4">
+          <ul className="space-y-1">
+            {/* Seção Principal */}
+            <li>
               <button
                 type="button"
                 onClick={() => setActiveSection("polls")}
-                className={`flex items-center p-2 rounded-lg w-full text-left ${
-                  activeSection === "polls" ? "bg-gray-700" : "hover:bg-gray-700"
+                className={`flex items-center w-full p-3 rounded-lg text-left transition-colors ${
+                  activeSection === "polls" 
+                    ? "bg-indigo-600 text-white" 
+                    : "text-gray-300 hover:bg-gray-700 hover:text-white"
                 }`}
               >
-                <span className="mr-2">📝</span> Minhas Enquetes
+                <span className="mr-3 text-lg">📝</span>
+                <span className="font-medium">Minhas Enquetes</span>
+              </button>
+            </li>
+
+            {/* Separador */}
+            <li className="my-4">
+              <div className="h-px bg-gray-700"></div>
+            </li>
+
+            {/* Links de Navegação */}
+            <li>
+              <Link 
+                href="/" 
+                className="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+              >
+                <span className="mr-3 text-lg">🏠</span>
+                <span>Início</span>
+              </Link>
+            </li>
+            <li>
+              <Link 
+                href="/enquetes" 
+                className="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+              >
+                <span className="mr-3 text-lg">📊</span>
+                <span>Enquetes</span>
+              </Link>
+            </li>
+
+            {/* Separador */}
+            <li className="my-4">
+              <div className="h-px bg-gray-700"></div>
+            </li>
+
+            {/* Seção Empresa */}
+            {user?.accountType === 'commercial' && user?.commercialName && (
+              <li>
+                <Link 
+                  href={`/empresa/${slugify(user.commercialName)}`} 
+                  className="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                >
+                  <span className="mr-3 text-lg">🌐</span>
+                  <span>Página Pública</span>
+                </Link>
+              </li>
+            )}
+
+            {/* Separador */}
+            <li className="my-4">
+              <div className="h-px bg-gray-700"></div>
+            </li>
+
+            {/* Assinatura */}
+            <li>
+              <button
+                type="button"
+                onClick={() => setActiveSection("subscription")}
+                className={`flex items-center w-full p-3 rounded-lg text-left transition-colors ${
+                  activeSection === "subscription" 
+                    ? "bg-indigo-600 text-white" 
+                    : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                }`}
+              >
+                <span className="mr-3 text-lg">💳</span>
+                <span className="font-medium">Assinatura</span>
               </button>
             </li>
           </ul>
         </nav>
+
+        {/* Rodapé da Sidebar */}
+        <div className="p-4 border-t border-gray-700">
+          <div className="flex items-center p-3 rounded-lg bg-gray-700">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">
+                {user?.displayName || "Empresa"}
+              </p>
+              <p className="text-xs text-gray-400 truncate">
+                {user?.email || ""}
+              </p>
+            </div>
+          </div>
+        </div>
       </aside>
       
       {/* Main Content */}
-      <main className="flex-1 p-8 overflow-y-auto md:ml-64">
-        {activeSection === "polls" ? (
-          <DashboardComponent polls={polls} user={user} />
-        ) : (
-          <SubscriptionPanel
-            companyId={user.uid}
-            companyName={user.displayName || user.email || "Empresa"}
-          />
-        )}
+      {/* DOCUMENTAÇÃO: Conteúdo principal com margin-left no desktop para compensar sidebar fixa de 256px (w-64) */}
+      <main className="flex-1 overflow-y-auto bg-gray-900 md:ml-64">
+        <div className="p-4 sm:p-6 lg:p-8">
+          {activeSection === "polls" ? (
+            <DashboardComponent polls={polls} user={user} />
+          ) : (
+            <SubscriptionPanel
+              companyId={user.uid}
+              companyName={user.displayName || user.email || "Empresa"}
+            />
+          )}
+        </div>
       </main>
     </div>
   );

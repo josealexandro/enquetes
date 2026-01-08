@@ -53,8 +53,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${poppins.variable} ${geistSans.variable} ${geistMono.variable} ${permanentMarker.variable} antialiased`}> {/* Adicionado permanentMarker.variable */}
-        {/* O script de tema foi movido para Header.tsx para gerenciamento centralizado */}
-        
         <ClientProvidersWrapper> {/* Usar o novo componente wrapper */}
           {children}
         </ClientProvidersWrapper>

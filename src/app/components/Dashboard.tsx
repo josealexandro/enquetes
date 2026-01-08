@@ -14,6 +14,7 @@ import Image from "next/image"; // Importar o componente Image do Next.js
 import slugify from "@/utils/slugify"; // Importar a função slugify
 import ExpandableImage from "./ExpandableImage"; // Importar componente de imagem expansível
 import QRCode from "react-qr-code"; // Importar QRCode
+import PollResults from "./PollResults"; // Importar componente de resultados de enquete
 // Removido: import { UserInfo, User } from "firebase/auth"; // Removido: UserInfo e User não são necessários aqui
 // Removido: import { AuthContextType } from "../context/AuthContext"; // Removido: AuthContextType não é necessário ser importado diretamente para o tipo CustomUser
 
@@ -28,6 +29,18 @@ interface DashboardProps {
 const Dashboard = ({ polls, user }: DashboardProps) => {
   const { isMasterUser, firebaseAuthUser, refreshUserData } = useAuth(); // Obter isMasterUser, firebaseAuthUser e refreshUserData do contexto
   const [activePollsCount, setActivePollsCount] = useState(0);
+  const [selectedPollForResults, setSelectedPollForResults] = useState<Poll | null>(null); // Estado para controlar qual enquete mostrar resultados
+  const [qrCodeSize, setQrCodeSize] = useState(256); // Tamanho do QR Code (responsivo)
+  
+  // DOCUMENTAÇÃO: Ajustar tamanho do QR Code baseado no tamanho da tela
+  useEffect(() => {
+    const updateQrCodeSize = () => {
+      setQrCodeSize(window.innerWidth < 640 ? 200 : 256);
+    };
+    updateQrCodeSize();
+    window.addEventListener('resize', updateQrCodeSize);
+    return () => window.removeEventListener('resize', updateQrCodeSize);
+  }, []);
   // Removido: const [totalResponsesThisMonth, setTotalResponsesThisMonth] = useState(0); // Novo estado
   const [averageVotesPerPoll, setAverageVotesPerPoll] = useState(0); // Novo estado
   // Removido: const [totalCommercialCommentsThisMonth, setTotalCommercialCommentsThisMonth] = useState(0); // NOVO ESTADO
@@ -493,77 +506,113 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
 
   return (
     <div className="dashboard-container">
-      <h2 className="text-3xl font-bold mb-6">Olá, {user?.displayName || "Empresa"}!</h2>
+      {/* Título principal - Responsivo para mobile */}
+      {/* DOCUMENTAÇÃO: Título menor no mobile (text-2xl) e maior no desktop (text-3xl) */}
+      <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">
+        Olá, {user?.displayName || "Empresa"}!
+      </h2>
 
       {/* Plano Comercial */}
-        <div className="bg-gray-800 p-6 rounded-lg shadow-md mb-6 flex flex-col md:flex-row justify-between items-center">
-          <div className="mb-4 md:mb-0">
-            <h3 className="text-xl font-semibold">Plano Comercial</h3>
-            <p className="text-gray-400">{activePollsCount} enquetes ativas</p>
-          </div>
-          <div className="flex flex-col md:flex-row gap-4">
-            {user?.accountType === 'commercial' && user?.commercialName && (
-              <button
-                onClick={() => setShowQrCodeModal(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300"
-              >
-                Gerar QR Code da Página Pública
-              </button>
-            )}
-            <button
-              onClick={() => setShowCreatePollModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300"
-            >
-              Criar nova enquete comercial
-            </button>
-          </div>
+      {/* DOCUMENTAÇÃO: Layout responsivo - coluna no mobile, linha no desktop */}
+      <div className="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md mb-4 sm:mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="w-full md:w-auto">
+          <h3 className="text-lg sm:text-xl font-semibold mb-1 sm:mb-0">Plano Comercial</h3>
+          <p className="text-sm sm:text-base text-gray-400">{activePollsCount} enquetes ativas</p>
         </div>
+        {/* DOCUMENTAÇÃO: Botões em coluna no mobile, linha no desktop */}
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          {user?.accountType === 'commercial' && user?.commercialName && (
+            <button
+              onClick={() => setShowQrCodeModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg transition duration-300 text-sm sm:text-base w-full sm:w-auto"
+            >
+              Gerar QR Code
+            </button>
+          )}
+          <button
+            onClick={() => setShowCreatePollModal(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-lg transition duration-300 text-sm sm:text-base w-full sm:w-auto"
+          >
+            Criar Enquete
+          </button>
+        </div>
+      </div>
 
       {/* Minhas Enquetes */}
-      <div className="bg-gray-800 p-6 rounded-lg shadow-md mb-6">
-        <h3 className="text-xl font-semibold mb-4">Minhas enquetes</h3>
+      {/* DOCUMENTAÇÃO: Padding responsivo - menor no mobile */}
+      <div className="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md mb-4 sm:mb-6">
+        <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Minhas enquetes</h3>
         <div className="space-y-4">
           {polls.length === 0 ? (
-            <p className="text-gray-400">Você ainda não criou nenhuma enquete.</p>
+            <p className="text-gray-400 text-sm sm:text-base text-center py-4">
+              Você ainda não criou nenhuma enquete.
+            </p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {polls.map((poll) => (
-                <PollCard 
-                  key={poll.id} 
-                  poll={poll} 
-                  onVote={handleVote} 
-                  onDelete={handleDeletePoll} 
-                  companySlug={companySlug} // Passar o slug da empresa para o PollCard
-                  companyThemeColor={user.themeColor || undefined} // Passar o tema de cor da empresa para o PollCard, convertendo null para undefined
-                />
-              ))}
-            </div>
+            <>
+              {/* DOCUMENTAÇÃO: Grid responsivo - 1 coluna no mobile, 2 no tablet, 3 no desktop */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                {polls.map((poll) => (
+                  <div key={poll.id} className="relative">
+                    <PollCard 
+                      poll={poll} 
+                      onVote={handleVote} 
+                      onDelete={handleDeletePoll} 
+                      companySlug={companySlug} // Passar o slug da empresa para o PollCard
+                      companyThemeColor={user.themeColor || undefined} // Passar o tema de cor da empresa para o PollCard, convertendo null para undefined
+                    />
+                    {/* Botão para ver resultados - Responsivo */}
+                    {/* DOCUMENTAÇÃO: Botão com texto menor no mobile */}
+                    <button
+                      onClick={() => setSelectedPollForResults(selectedPollForResults?.id === poll.id ? null : poll)}
+                      className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-3 sm:px-4 rounded-lg transition-colors text-xs sm:text-sm"
+                    >
+                      {selectedPollForResults?.id === poll.id ? "Ocultar Resultados" : "Ver Resultados"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {/* Exibir resultados da enquete selecionada */}
+              {/* DOCUMENTAÇÃO: Margem responsiva */}
+              {selectedPollForResults && (
+                <div className="mt-4 sm:mt-6">
+                  <PollResults poll={selectedPollForResults} />
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
 
       {/* Estatísticas */}
-      <div className="bg-gray-800 p-6 rounded-lg shadow-md mb-6">
-        <h3 className="text-xl font-semibold mb-4">Estatísticas</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-700 p-4 rounded-lg text-center">
-            <p className="text-2xl font-bold">{totalMonthlyEngagement}</p>
-            <p className="text-gray-400">Engajamento total neste mês</p>
+      {/* DOCUMENTAÇÃO: Cards de estatísticas responsivos - padding e texto ajustados para mobile */}
+      <div className="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md mb-4 sm:mb-6">
+        <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Estatísticas</h3>
+        {/* DOCUMENTAÇÃO: Grid mantém 2 colunas mas com gap menor no mobile */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="bg-gray-700 p-3 sm:p-4 rounded-lg text-center">
+            <p className="text-xl sm:text-2xl font-bold mb-1">{totalMonthlyEngagement}</p>
+            <p className="text-gray-400 text-xs sm:text-sm leading-tight">
+              Engajamento total neste mês
+            </p>
           </div>
-          <div className="bg-gray-700 p-4 rounded-lg text-center">
-            <p className="text-2xl font-bold">{averageVotesPerPoll.toFixed(1)}</p>
-            <p className="text-gray-400">Média de votos por enquete</p>
+          <div className="bg-gray-700 p-3 sm:p-4 rounded-lg text-center">
+            <p className="text-xl sm:text-2xl font-bold mb-1">{averageVotesPerPoll.toFixed(1)}</p>
+            <p className="text-gray-400 text-xs sm:text-sm leading-tight">
+              Média de votos por enquete
+            </p>
           </div>
         </div>
       </div>
 
       {/* Personalização */}
-      <div className="bg-gray-800 p-6 rounded-lg shadow-md">
-        <h3 className="text-xl font-semibold mb-4">Personalização</h3>
+      {/* DOCUMENTAÇÃO: Seção de personalização com padding e espaçamentos responsivos */}
+      <div className="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md">
+        <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Personalização</h3>
         <div className="space-y-4">
           {/* Seção de upload de imagem */}
-          <div className="flex flex-col items-center mb-6">
-            <div className="mb-4">
+          {/* DOCUMENTAÇÃO: Layout responsivo - imagem e inputs ajustados para mobile */}
+          <div className="flex flex-col items-center mb-4 sm:mb-6">
+            <div className="mb-3 sm:mb-4">
               <ExpandableImage
                 src={imagePreviewUrl || user?.photoURL || "/logoPrincipal.png"}
                 alt="Pré-visualização do Avatar"
@@ -573,13 +622,15 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                 showBorder={true}
               />
             </div>
-            <label htmlFor="profile-image-upload" className="block text-gray-400 mb-2">Alterar Imagem de Perfil</label>
+            <label htmlFor="profile-image-upload" className="block text-gray-400 mb-2 text-sm sm:text-base">
+              Alterar Imagem de Perfil
+            </label>
             <input
               id="profile-image-upload"
               type="file"
               accept={ACCEPTED_IMAGE_TYPES.join(", ")}
               onChange={handleImageChange}
-              className="w-full max-w-sm px-4 py-2 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
+              className="w-full max-w-sm px-3 sm:px-4 py-2 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white text-sm sm:text-base file:mr-2 sm:file:mr-4 file:py-1.5 sm:file:py-2 file:px-3 sm:file:px-4 file:rounded-full file:border-0 file:text-xs sm:file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
             />
             {uploadingImage && (
               <div className="flex items-center justify-center p-2 mt-2">
@@ -598,14 +649,17 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
           </div>
 
           {/* Seção de upload de imagem de banner */}
-          <div className="flex flex-col items-center mb-6">
-            <label htmlFor="banner-image-upload" className="block text-gray-400 mb-2">Alterar Imagem do Banner</label>
+          {/* DOCUMENTAÇÃO: Input de banner responsivo */}
+          <div className="flex flex-col items-center mb-4 sm:mb-6">
+            <label htmlFor="banner-image-upload" className="block text-gray-400 mb-2 text-sm sm:text-base">
+              Alterar Imagem do Banner
+            </label>
             <input
               id="banner-image-upload"
               type="file"
               accept={ACCEPTED_IMAGE_TYPES.join(", ")}
               onChange={handleBannerChange}
-              className="w-full max-w-sm px-4 py-2 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
+              className="w-full max-w-sm px-3 sm:px-4 py-2 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white text-sm sm:text-base file:mr-2 sm:file:mr-4 file:py-1.5 sm:file:py-2 file:px-3 sm:file:px-4 file:rounded-full file:border-0 file:text-xs sm:file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
             />
             {bannerPreviewUrl && (
               <div className="mt-4 w-full max-w-sm">
@@ -624,15 +678,18 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
           </div>
 
           {/* Seção de nome da empresa */}
+          {/* DOCUMENTAÇÃO: Inputs responsivos com padding e texto ajustados */}
           <div>
-            <label htmlFor="companyName" className="block text-gray-400 mb-2">Nome da empresa</label>
+            <label htmlFor="companyName" className="block text-gray-400 mb-2 text-sm sm:text-base">
+              Nome da empresa
+            </label>
             <div className="flex gap-2">
               <input
                 type="text"
                 id="companyName"
                 value={editedCompanyName}
                 onChange={(e) => setEditedCompanyName(e.target.value)}
-                className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full p-2.5 sm:p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base"
               />
             </div>
             {feedbackMessage && feedbackType === "success" && (
@@ -642,79 +699,89 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
             )}
 
             {/* Campos de texto para as informações do rodapé */}
-            <div className="mt-6">
-              <label htmlFor="aboutUs" className="block text-gray-400 mb-2">Sobre Nós</label>
+            {/* DOCUMENTAÇÃO: Todos os inputs com tamanhos responsivos */}
+            <div className="mt-4 sm:mt-6">
+              <label htmlFor="aboutUs" className="block text-gray-400 mb-2 text-sm sm:text-base">
+                Sobre Nós
+              </label>
               <textarea
                 id="aboutUs"
                 value={editedAboutUs}
                 onChange={(e) => setEditedAboutUs(e.target.value)}
-                className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[100px]"
+                className="w-full p-2.5 sm:p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[100px] text-sm sm:text-base"
                 rows={4}
               ></textarea>
             </div>
-            <div className="mt-4">
-              <label htmlFor="contactEmail" className="block text-gray-400 mb-2">Email de Contato</label>
+            <div className="mt-3 sm:mt-4">
+              <label htmlFor="contactEmail" className="block text-gray-400 mb-2 text-sm sm:text-base">
+                Email de Contato
+              </label>
               <input
                 type="email"
                 id="contactEmail"
                 value={editedContactEmail}
                 onChange={(e) => setEditedContactEmail(e.target.value)}
-                className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full p-2.5 sm:p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base"
               />
             </div>
-            <div className="mt-4">
-              <label htmlFor="address" className="block text-gray-400 mb-2">Endereço</label>
+            <div className="mt-3 sm:mt-4">
+              <label htmlFor="address" className="block text-gray-400 mb-2 text-sm sm:text-base">
+                Endereço
+              </label>
               <input
                 type="text"
                 id="address"
                 value={editedAddress}
                 onChange={(e) => setEditedAddress(e.target.value)}
-                className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full p-2.5 sm:p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base"
               />
             </div>
-            <div className="mt-4">
-              <label className="block text-gray-400 mb-2">Redes Sociais</label>
+            <div className="mt-3 sm:mt-4">
+              <label className="block text-gray-400 mb-2 text-sm sm:text-base">Redes Sociais</label>
               <input
                 type="url"
                 placeholder="URL do Facebook"
                 value={editedFacebookUrl}
                 onChange={(e) => setEditedFacebookUrl(e.target.value)}
-                className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2"
+                className="w-full p-2.5 sm:p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2 text-sm sm:text-base"
               />
               <input
                 type="url"
                 placeholder="URL do Instagram"
                 value={editedInstagramUrl}
                 onChange={(e) => setEditedInstagramUrl(e.target.value)}
-                className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2"
+                className="w-full p-2.5 sm:p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2 text-sm sm:text-base"
               />
               <input
                 type="url"
                 placeholder="URL do Twitter"
                 value={editedTwitterUrl}
                 onChange={(e) => setEditedTwitterUrl(e.target.value)}
-                className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full p-2.5 sm:p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base"
               />
             </div>
 
             {/* Seletor de cor do tema */}
-            <div className="mt-4">
-              <label htmlFor="themeColor" className="block text-gray-400 mb-2">Cor do Tema</label>
+            <div className="mt-3 sm:mt-4">
+              <label htmlFor="themeColor" className="block text-gray-400 mb-2 text-sm sm:text-base">
+                Cor do Tema
+              </label>
               <input
                 type="color"
                 id="themeColor"
                 value={editedThemeColor}
                 onChange={(e) => setEditedThemeColor(e.target.value)}
-                className="w-full h-12 rounded-lg bg-gray-700 border border-gray-600 cursor-pointer"
+                className="w-full h-10 sm:h-12 rounded-lg bg-gray-700 border border-gray-600 cursor-pointer"
               />
             </div>
 
-            {/* Botão Salvar Alterações movido para cá */}
-            <div className="mt-6 flex justify-end">
+            {/* Botão Salvar Alterações */}
+            {/* DOCUMENTAÇÃO: Botão responsivo com tamanho ajustado para mobile */}
+            <div className="mt-4 sm:mt-6 flex justify-end">
               <button
                 onClick={handleSaveProfile}
                 disabled={uploadingImage} // Desabilita o botão enquanto a imagem está sendo carregada
-                className={`px-6 py-3 bg-green-600 text-white font-bold rounded-lg transition duration-300 ${uploadingImage ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700'}`}
+                className={`px-4 sm:px-6 py-2.5 sm:py-3 bg-green-600 text-white font-bold rounded-lg transition duration-300 text-sm sm:text-base w-full sm:w-auto ${uploadingImage ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700'}`}
               >
                 Salvar Alterações
               </button>
@@ -727,12 +794,13 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       </div>
 
       {/* Modal de Criação de Enquete */}
+      {/* DOCUMENTAÇÃO: Modal responsivo com padding ajustado para mobile */}
       {showCreatePollModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-gray-900 p-8 rounded-lg shadow-xl w-full max-w-md relative">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+          <div className="bg-gray-900 p-4 sm:p-8 rounded-lg shadow-xl w-full max-w-md relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setShowCreatePollModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl"
+              className="absolute top-2 sm:top-4 right-2 sm:right-4 text-gray-400 hover:text-white text-xl sm:text-2xl z-10"
             >
               &times;
             </button>
@@ -742,30 +810,36 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       )}
 
       {/* Modal do QR Code */}
+      {/* DOCUMENTAÇÃO: Modal de QR Code responsivo - QR Code menor no mobile */}
       {showQrCodeModal && companyPublicPageUrl && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm relative flex flex-col items-center">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+          <div className="bg-white p-4 sm:p-8 rounded-lg shadow-xl w-full max-w-sm relative flex flex-col items-center max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setShowQrCodeModal(false)}
-              className="absolute top-4 right-4 text-gray-800 hover:text-gray-600 text-xl"
+              className="absolute top-2 sm:top-4 right-2 sm:right-4 text-gray-800 hover:text-gray-600 text-xl sm:text-2xl z-10"
             >
               &times;
             </button>
             <Image
               src="/logoPrincipal.png"
               alt="PollApp Logo"
-              width={100} // Ajuste o tamanho conforme necessário
-              height={100} // Ajuste o tamanho conforme necessário
-              className="mb-2"
+              width={80}
+              height={80}
+              className="mb-2 sm:w-[100px] sm:h-[100px]"
             />
-            <div className="p-4 bg-white rounded-lg shadow-inner">
-              <QRCode value={companyPublicPageUrl} size={256} level="H" />
+            <div className="p-2 sm:p-4 bg-white rounded-lg shadow-inner">
+              {/* DOCUMENTAÇÃO: QR Code responsivo - tamanho ajustado automaticamente */}
+              <QRCode 
+                value={companyPublicPageUrl} 
+                size={qrCodeSize} 
+                level="H" 
+              />
             </div>
             <a
               href={companyPublicPageUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-4 text-indigo-600 hover:text-indigo-800 font-semibold"
+              className="mt-3 sm:mt-4 text-indigo-600 hover:text-indigo-800 font-semibold text-sm sm:text-base text-center"
             >
               Ir para a Página da Empresa
             </a>

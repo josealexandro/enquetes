@@ -20,6 +20,150 @@ body {
   font-family: var(--font-inter), sans-serif;
 }
 
+/* ============================================
+   TEMA PDF EXCLUSIVO - CORES HEX FIXAS
+   ============================================
+   DOCUMENTAÇÃO: Tema visual exclusivo para PDF
+   - Usa APENAS cores HEX ou RGB (NUNCA lab, oklch, variáveis CSS)
+   - Não reutiliza classes Tailwind dinâmicas
+   - Garante PDF colorido sem erros
+   ============================================ */
+
+/* Base do tema PDF */
+.pdf-safe {
+  background: #ffffff !important;
+  color: #111827 !important; /* gray-900 */
+}
+
+/* ========== BACKGROUNDS ========== */
+.pdf-safe .bg-zinc-100 {
+  background-color: #f9fafb !important; /* gray-50 */
+}
+
+.pdf-safe .bg-zinc-50 {
+  background-color: #f3f4f6 !important; /* gray-100 */
+}
+
+.pdf-safe .bg-zinc-200 {
+  background-color: #e5e7eb !important; /* gray-200 */
+}
+
+.pdf-safe .bg-white {
+  background-color: #ffffff !important;
+}
+
+/* ========== TEXTOS ========== */
+.pdf-safe .text-zinc-900,
+.pdf-safe h2,
+.pdf-safe h3 {
+  color: #1f2937 !important; /* gray-800 - títulos principais */
+}
+
+.pdf-safe .text-zinc-700,
+.pdf-safe .text-zinc-700 * {
+  color: #374151 !important; /* gray-700 */
+}
+
+.pdf-safe .text-zinc-600,
+.pdf-safe .text-zinc-600 * {
+  color: #4b5563 !important; /* gray-600 */
+}
+
+.pdf-safe .text-zinc-500,
+.pdf-safe .text-zinc-500 * {
+  color: #6b7280 !important; /* gray-500 */
+}
+
+.pdf-safe .text-white {
+  color: #ffffff !important;
+}
+
+/* ========== BORDAS ========== */
+.pdf-safe .border-zinc-200,
+.pdf-safe .border {
+  border-color: #e5e7eb !important; /* gray-200 */
+}
+
+.pdf-safe .border-zinc-300 {
+  border-color: #d1d5db !important; /* gray-300 */
+}
+
+/* ========== CORES CORPORATIVAS COLORIDAS ========== */
+/* Azul - Informações importantes, títulos de seções */
+.pdf-safe .text-indigo-600,
+.pdf-safe .text-blue-600 {
+  color: #2563eb !important; /* blue-600 - profissional */
+}
+
+/* Verde - Sucesso, resultados positivos */
+.pdf-safe .text-green-600,
+.pdf-safe .text-green-500 {
+  color: #16a34a !important; /* green-600 */
+}
+
+/* Amarelo/Laranja - Avisos, menos votada */
+.pdf-safe .text-yellow-600,
+.pdf-safe .text-yellow-500 {
+  color: #f59e0b !important; /* amber-500 */
+}
+
+/* Vermelho - Alertas, erros */
+.pdf-safe .text-red-600,
+.pdf-safe .text-red-500 {
+  color: #dc2626 !important; /* red-600 */
+}
+
+/* Roxo - Destaques especiais, diferenças */
+.pdf-safe .text-purple-600,
+.pdf-safe .text-purple-500 {
+  color: #9333ea !important; /* purple-600 */
+}
+
+/* ========== BACKGROUNDS COLORIDOS (se necessário) ========== */
+.pdf-safe .bg-blue-50 {
+  background-color: #eff6ff !important; /* blue-50 */
+}
+
+.pdf-safe .bg-green-50 {
+  background-color: #f0fdf4 !important; /* green-50 */
+}
+
+.pdf-safe .bg-yellow-50 {
+  background-color: #fefce8 !important; /* yellow-50 */
+}
+
+/* ========== GRÁFICOS - CORES HEX DIRETAS ========== */
+/* DOCUMENTAÇÃO: Cores do gráfico são definidas manualmente em HEX no componente */
+/* Estas classes garantem que qualquer cor aplicada seja convertida para HEX */
+.pdf-safe [style*="background-color"] {
+  /* Mantém cores inline que já são HEX */
+}
+
+/* Forçar cores HEX em elementos com classes de cor do gráfico */
+.pdf-safe .bg-indigo-500 {
+  background-color: #6366f1 !important;
+}
+
+.pdf-safe .bg-blue-500 {
+  background-color: #3b82f6 !important;
+}
+
+.pdf-safe .bg-green-500 {
+  background-color: #10b981 !important;
+}
+
+.pdf-safe .bg-yellow-500 {
+  background-color: #eab308 !important;
+}
+
+.pdf-safe .bg-red-500 {
+  background-color: #ef4444 !important;
+}
+
+.pdf-safe .bg-purple-500 {
+  background-color: #a855f7 !important;
+}
+
 /* Remover #root já que o layout é gerenciado pelo Next.js e Tailwind */
 /* #root {
   display: flex;

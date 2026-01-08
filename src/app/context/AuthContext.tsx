@@ -12,6 +12,9 @@ import {
   onAuthStateChanged,
   User,
   updateProfile,
+  signInWithPopup,
+  GoogleAuthProvider,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 
 interface UserDataToSave {
@@ -44,6 +47,8 @@ export interface AuthContextType {
   loading: boolean;
   isMasterUser: boolean; // Novo campo para indicar se o usuário é mestre
   login: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>; // Função para recuperar senha
   signup: (email: string, password: string, displayName: string,
     accountType: 'personal' | 'commercial',
     commercialName?: string | null, // Adicionar commercialName
@@ -196,6 +201,66 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  // Função para login com Google usando popup do Firebase Auth
+  const signInWithGoogle = async () => {
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const userCredential = await signInWithPopup(auth, provider);
+      const firebaseUser = userCredential.user;
+      setFirebaseAuthUser(firebaseUser);
+
+      // Verificar se o usuário já existe no Firestore
+      const userDocRef = doc(db, "users", firebaseUser.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      // Se o usuário não existe, criar o documento no Firestore com dados básicos
+      // Usuários do Google são criados como conta 'personal' por padrão
+      if (!userDoc.exists()) {
+        const userDataToSave: UserDataToSave = {
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuário',
+          accountType: 'personal',
+          createdAt: serverTimestamp(),
+          themeColor: null,
+          extraPollsAvailable: 0,
+        };
+        await setDoc(userDocRef, userDataToSave);
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
+      console.error("Erro ao fazer login com Google:", errorMessage);
+      throw new Error(errorMessage || "Erro ao fazer login com Google. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Função para recuperar senha - envia email de redefinição usando Firebase Auth
+  const resetPassword = async (email: string) => {
+    setLoading(true);
+    try {
+      // Envia email de redefinição de senha para o endereço fornecido
+      // O Firebase envia automaticamente um email com link para redefinir a senha
+      await sendPasswordResetEmail(auth, email);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
+      console.error("Erro ao enviar email de recuperação:", errorMessage);
+      // Tratar erros específicos do Firebase
+      if (error instanceof Error && 'code' in error) {
+        const firebaseError = error as { code: string; message: string };
+        if (firebaseError.code === 'auth/user-not-found') {
+          throw new Error("Email não encontrado. Verifique se o email está correto.");
+        } else if (firebaseError.code === 'auth/invalid-email') {
+          throw new Error("Formato de email inválido.");
+        }
+      }
+      throw new Error(errorMessage || "Erro ao enviar email de recuperação. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const signup = async (
     email: string,
     password: string,
@@ -265,7 +330,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isMasterUser, login, signup, logout, firebaseAuthUser, updateUserDocument, refreshUserData }}>
+    <AuthContext.Provider value={{ user, loading, isMasterUser, login, signInWithGoogle, resetPassword, signup, logout, firebaseAuthUser, updateUserDocument, refreshUserData }}>
       {children}
     </AuthContext.Provider>
   );

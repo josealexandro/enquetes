@@ -30,24 +30,37 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
   const router = useRouter(); // Inicializar useRouter
   // REMOVIDO: const { openLoginModal, openSignupModal } = useAuthModal();
 
-  // useEffect para inicializar o tema APENAS no lado do cliente
+  // useEffect para inicializar e aplicar o tema
+  // DOCUMENTAÇÃO: O site sempre inicia em modo claro (branco) por padrão
+  // Só fica escuro se o usuário explicitamente escolher (salvo no localStorage)
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('theme');
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      // Garantir que começa sem dark mode
+      document.documentElement.classList.remove("dark");
       
-      if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+      const savedTheme = localStorage.getItem('theme');
+      
+      // Só ativa dark mode se o usuário tiver escolhido explicitamente
+      // Padrão sempre é light mode (branco)
+      if (savedTheme === 'dark') {
         setDarkMode(true);
+        document.documentElement.classList.add("dark");
       } else {
         setDarkMode(false);
+        document.documentElement.classList.remove("dark");
+        // Salvar light como padrão se não houver preferência
+        if (!savedTheme) {
+          localStorage.setItem("theme", "light");
+        }
       }
       setMounted(true); // O componente foi montado no cliente
     }
   }, []); // Executar apenas uma vez na montagem do cliente
 
-  // useEffect para reagir às mudanças do darkMode (incluindo a inicialização do cliente)
+  // useEffect para aplicar o tema quando darkMode mudar
+  // DOCUMENTAÇÃO: Aplica a classe 'dark' no HTML e salva no localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && mounted) {
       if (darkMode) {
         document.documentElement.classList.add("dark");
         localStorage.setItem("theme", "dark");
@@ -56,11 +69,24 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
         localStorage.setItem("theme", "light");
       }
     }
-  }, [darkMode]); // Este useEffect agora reage apenas às mudanças no estado darkMode
+  }, [darkMode, mounted]); // Reage às mudanças no darkMode
 
+  // Função para alternar entre modo claro e escuro
+  // DOCUMENTAÇÃO: Alterna o estado darkMode e aplica a classe dark diretamente
   const toggleDarkMode = () => {
     setDarkMode((prevMode) => {
-      return !prevMode;
+      const newMode = !prevMode;
+      // Aplicar a classe dark imediatamente quando o usuário clica
+      if (typeof window !== 'undefined') {
+        if (newMode) {
+          document.documentElement.classList.add("dark");
+          localStorage.setItem("theme", "dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+          localStorage.setItem("theme", "light");
+        }
+      }
+      return newMode;
     });
   };
 
@@ -87,17 +113,17 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
   // }
 
   return (
-    <header className="w-full bg-zinc-800 text-white py-1 px-6 fixed top-0 z-50 shadow-md transition-colors duration-300">
+    <header className="w-full bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white py-1 px-6 fixed top-0 z-50 shadow-md transition-colors duration-300">
       <nav className="max-w-7xl mx-auto flex justify-between items-center">
-        <Link href="/" className="hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300">
-          <Image src="/logoHome.png" alt="Logo do Aplicativo de Enquetes" width={120} height={40} objectFit="contain" />
-        </Link>
+          <Link href="/" className="hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300">
+            <Image src="/logoHome.png" alt="Logo do Aplicativo de Enquetes" width={120} height={40} objectFit="contain" className="dark:brightness-0 dark:invert" />
+          </Link>
 
         {/* Mobile menu button */}
         <div className="flex items-center md:hidden">
           <motion.button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="text-white p-2 rounded-full hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors duration-300"
+            className="text-zinc-900 dark:text-white p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors duration-300"
             aria-label="Abrir/Fechar Menu Mobile"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -107,14 +133,14 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
         </div>
 
         {/* Desktop menu items and mobile menu content */}
-        <div className={`md:flex items-center space-x-6 ${isMobileMenuOpen ? "flex flex-col absolute top-full left-0 w-full bg-zinc-800 p-4 shadow-md items-center space-y-4 z-50" : "hidden"}`}>
-          <Link href="/" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300 py-2 px-4 min-h-[44px] flex items-center" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
-          <Link href="/enquetes" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300 py-2 px-4 min-h-[44px] flex items-center" onClick={() => setIsMobileMenuOpen(false)}>Enquetes</Link>
+        <div className={`md:flex items-center space-x-6 ${isMobileMenuOpen ? "flex flex-col absolute top-full left-0 w-full bg-white dark:bg-zinc-800 p-4 shadow-md items-center space-y-4 z-50" : "hidden"}`}>
+          <Link href="/" className="text-zinc-900 dark:text-white hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300 py-2 px-4 min-h-[44px] flex items-center" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
+          <Link href="/enquetes" className="text-zinc-900 dark:text-white hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300 py-2 px-4 min-h-[44px] flex items-center" onClick={() => setIsMobileMenuOpen(false)}>Enquetes</Link>
           {user && user.accountType === 'personal' && (
-            <Link href="/profile" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300 py-2 px-4 min-h-[44px] flex items-center" onClick={() => setIsMobileMenuOpen(false)}>Meu Perfil</Link>
+            <Link href="/profile" className="text-zinc-900 dark:text-white hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300 py-2 px-4 min-h-[44px] flex items-center" onClick={() => setIsMobileMenuOpen(false)}>Meu Perfil</Link>
           )}
           {user && user.accountType === 'commercial' && (
-            <Link href="/dashboard" className="hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300 py-2 px-4 min-h-[44px] flex items-center" onClick={() => setIsMobileMenuOpen(false)}>Dashboard</Link>
+            <Link href="/dashboard" className="text-zinc-900 dark:text-white hover:text-blue-400 hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300 py-2 px-4 min-h-[44px] flex items-center" onClick={() => setIsMobileMenuOpen(false)}>Dashboard</Link>
           )}
           {!user ? (
             <>
@@ -149,7 +175,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
                 />
               )}
               {!isAvatarExpanded && (
-                <span className="text-white">
+                <span className="text-zinc-900 dark:text-white">
                   {/* DOCUMENTAÇÃO: Para contas comerciais usa commercialName, para pessoais usa displayName */}
                   Olá, {user.accountType === 'commercial' && user.commercialName
                     ? user.commercialName
@@ -169,7 +195,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
           )}
           <motion.button
             onClick={toggleDarkMode}
-            className="text-white p-2 rounded-full hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors duration-300"
+            className="text-zinc-900 dark:text-white p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors duration-300"
             aria-label="Alternar Modo Escuro"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
