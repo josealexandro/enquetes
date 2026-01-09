@@ -56,6 +56,8 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
   const [bannerPreviewUrl, setBannerPreviewUrl] = useState<string | null>(null); // Novo estado para a URL de pré-visualização do banner
   const [showQrCodeModal, setShowQrCodeModal] = useState(false); // Estado para controlar a visibilidade do modal QR Code
   const [companyPublicPageUrl, setCompanyPublicPageUrl] = useState(""); // Estado para armazenar o URL da página pública da empresa
+  const [subscription, setSubscription] = useState<any>(null); // Estado para armazenar dados da assinatura
+  const [isCancelling, setIsCancelling] = useState(false); // Estado para controlar o loading do cancelamento
   // Novos estados para as informações do rodapé
   const [editedAboutUs, setEditedAboutUs] = useState(user.aboutUs || "");
   const [editedContactEmail, setEditedContactEmail] = useState(user.contactEmail || "");
@@ -100,6 +102,25 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     } else {
       setCompanyPublicPageUrl(""); // Limpa o URL se não houver nome comercial
     }
+  }, [user]);
+
+  // DOCUMENTAÇÃO: Buscar dados da assinatura para exibir botão de cancelar
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const fetchSubscription = async () => {
+      try {
+        const response = await fetch(`/api/subscriptions?companyId=${user.uid}`);
+        if (response.ok) {
+          const data = await response.json();
+          setSubscription(data.subscription);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar assinatura:", error);
+      }
+    };
+
+    fetchSubscription();
   }, [user]);
 
   // Efeito para contar enquetes ativas e calcular estatísticas quando as enquetes do usuário são atualizadas
@@ -504,6 +525,64 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     }
   };
 
+  // DOCUMENTAÇÃO: Função para cancelar assinatura
+  // Cancela a assinatura no Stripe, que atualiza o Firestore via webhook
+  const handleCancelSubscription = async () => {
+    if (!subscription?.id) {
+      setFeedbackMessage("Assinatura não encontrada.");
+      setFeedbackType("error");
+      setTimeout(() => setFeedbackMessage(null), 3000);
+      return;
+    }
+
+    // Confirmar cancelamento
+    const confirmed = window.confirm(
+      "Tem certeza que deseja cancelar sua assinatura?\n\n" +
+      "Sua assinatura será cancelada ao final do período atual e você continuará tendo acesso até lá."
+    );
+
+    if (!confirmed) return;
+
+    setIsCancelling(true);
+    setFeedbackMessage(null);
+
+    try {
+      const response = await fetch(`/api/subscriptions/${subscription.id}/cancel`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || "Erro ao cancelar assinatura.");
+      }
+
+      setFeedbackMessage("Assinatura cancelada com sucesso! Ela será encerrada ao final do período atual.");
+      setFeedbackType("success");
+      
+      // Atualizar dados da assinatura após alguns segundos
+      setTimeout(async () => {
+        try {
+          const subResponse = await fetch(`/api/subscriptions?companyId=${user.uid}`);
+          if (subResponse.ok) {
+            const subData = await subResponse.json();
+            setSubscription(subData.subscription);
+          }
+        } catch (error) {
+          console.error("Erro ao atualizar dados da assinatura:", error);
+        }
+      }, 2000);
+    } catch (error) {
+      console.error("Erro ao cancelar assinatura:", error);
+      setFeedbackMessage(
+        error instanceof Error ? error.message : "Erro ao cancelar assinatura. Tente novamente."
+      );
+      setFeedbackType("error");
+    } finally {
+      setIsCancelling(false);
+      setTimeout(() => setFeedbackMessage(null), 5000);
+    }
+  };
+
   return (
     <div className="dashboard-container">
       {/* Título principal - Responsivo para mobile */}
@@ -535,6 +614,16 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
           >
             Criar Enquete
           </button>
+          {/* DOCUMENTAÇÃO: Botão de cancelar assinatura - só aparece se houver assinatura ativa */}
+          {subscription && subscription.status === "ACTIVE" && !subscription.cancelAtPeriodEnd && (
+            <button
+              onClick={handleCancelSubscription}
+              disabled={isCancelling}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-4 rounded-lg transition duration-300 text-sm sm:text-base w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isCancelling ? "Cancelando..." : "Cancelar Assinatura"}
+            </button>
+          )}
         </div>
       </div>
 

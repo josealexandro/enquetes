@@ -45,9 +45,12 @@ const findPlanSeedBySlug = (slug: PlanSlug) =>
 
 export async function ensureDefaultPlans() {
   try {
+    // DOCUMENTAÇÃO: Atualiza os planos no Firestore com os dados mais recentes (incluindo originalPrice)
+    // Usa merge: true para atualizar campos existentes e adicionar novos campos sem perder dados
     const tasks = DEFAULT_PLANS.map(async (plan) => {
       try {
         const ref = doc(getPlansCollection(), plan.id);
+        // DOCUMENTAÇÃO: merge: true garante que campos novos (como originalPrice) sejam adicionados
         await setDoc(ref, plan, { merge: true });
       } catch (error) {
         console.error(`[ensureDefaultPlans] Erro ao criar plano ${plan.id}:`, error);
@@ -69,6 +72,7 @@ export async function listPlans(): Promise<Plan[]> {
     if (!snapshot.size) {
       return DEFAULT_PLANS;
     }
+    // DOCUMENTAÇÃO: Retorna planos do Firestore (já atualizados por ensureDefaultPlans)
     return snapshot.docs.map((docSnap) => docSnap.data() as Plan);
   } catch (error) {
     console.error("listPlans fallback to DEFAULT_PLANS:", error);

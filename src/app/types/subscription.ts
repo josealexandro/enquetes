@@ -17,7 +17,8 @@ export interface Plan {
   slug: PlanSlug;
   name: string;
   description: string;
-  price: number;
+  price: number; // Preço atual em centavos (ex: 1990 = R$ 19,90)
+  originalPrice?: number; // Preço original riscado para efeito de promoção (em centavos)
   currency: "BRL";
   billingPeriod: BillingPeriod;
   trialDays?: number;
@@ -25,6 +26,8 @@ export interface Plan {
   features: string[];
   isActive: boolean;
   sortOrder: number;
+  // DOCUMENTAÇÃO: Price ID do Stripe (opcional - se não fornecido, cria dinamicamente)
+  stripePriceId?: string; // ID do preço criado no Stripe (ex: "price_1ABC123...")
 }
 
 export type SubscriptionStatus =

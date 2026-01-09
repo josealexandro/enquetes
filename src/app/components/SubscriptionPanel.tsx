@@ -172,16 +172,27 @@ const getPlanCTA = (
   return { label: "Solicitar mudança", disabled: false };
 };
 
-const renderPlanLimits = (limits: PlanLimits) => (
-  <dl className="grid grid-cols-2 gap-3 text-sm text-gray-300">
-    {Object.entries(limits).map(([key, value]) => (
-      <div key={key} className="bg-gray-900/40 rounded-lg px-3 py-2">
-        <dt className="text-gray-400">{limitLabels[key as keyof PlanLimits]}</dt>
-        <dd className="font-semibold text-white">{value}</dd>
-      </div>
-    ))}
-  </dl>
-);
+const renderPlanLimits = (limits: PlanLimits) => {
+  // DOCUMENTAÇÃO: Filtra limites para exibir apenas: pollsPerMonth, activePolls (se > 0) e commercialProfiles (se > 0)
+  // Remove teamMembers e storageMb da exibição conforme solicitado
+  // Enquetes ativas e perfis comerciais só aparecem se o valor for maior que 0
+  const limitsToShow = [
+    'pollsPerMonth', 
+    ...(limits.activePolls > 0 ? ['activePolls'] : []), 
+    ...(limits.commercialProfiles > 0 ? ['commercialProfiles'] : [])
+  ] as const;
+  
+  return (
+    <dl className="grid grid-cols-2 gap-3 text-sm text-gray-300">
+      {limitsToShow.map((key) => (
+        <div key={key} className="bg-gray-900/40 rounded-lg px-3 py-2">
+          <dt className="text-gray-400">{limitLabels[key]}</dt>
+          <dd className="font-semibold text-white">{limits[key]}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+};
 
 const formatShortDate = (
   timestamp?: FirestoreTimestampLike | null
@@ -432,12 +443,31 @@ const SubscriptionPanel = ({
                   <p className="text-gray-400 text-sm mt-1">{plan.description}</p>
                 </div>
                 <div>
-                  <span className="text-3xl font-bold text-white">
-                    {formatBRL(plan.price)}
-                  </span>
-                  <span className="text-gray-400 text-sm ml-2">
-                    /{plan.billingPeriod === "monthly" ? "mês" : "ano"}
-                  </span>
+                  {/* DOCUMENTAÇÃO: Exibe preço atual e preço original riscado (se houver) para efeito de promoção */}
+                  {plan.originalPrice && plan.originalPrice > plan.price ? (
+                    <div className="flex items-center gap-2">
+                      {/* Preço original riscado */}
+                      <span className="text-xl text-gray-500 line-through">
+                        {formatBRL(plan.originalPrice)}
+                      </span>
+                      {/* Preço atual em destaque */}
+                      <span className="text-3xl font-bold text-white">
+                        {formatBRL(plan.price)}
+                      </span>
+                      <span className="text-gray-400 text-sm ml-2">
+                        /{plan.billingPeriod === "monthly" ? "mês" : "ano"}
+                      </span>
+                    </div>
+                  ) : (
+                    <div>
+                      <span className="text-3xl font-bold text-white">
+                        {formatBRL(plan.price)}
+                      </span>
+                      <span className="text-gray-400 text-sm ml-2">
+                        /{plan.billingPeriod === "monthly" ? "mês" : "ano"}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <ul className="text-sm text-gray-300 space-y-2">
                   {plan.features.map((feature) => (

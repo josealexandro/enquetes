@@ -61,24 +61,36 @@ export async function POST(request: NextRequest) {
     }
 
     const stripe = getStripe();
+    
+    // DOCUMENTAÇÃO: Se o plano tem stripePriceId, usa o preço existente no Stripe
+    // Caso contrário, cria produto/preço dinamicamente
+    const lineItems = plan.stripePriceId
+      ? [
+          {
+            price: plan.stripePriceId, // Usa o Price ID do Stripe
+            quantity: 1,
+          },
+        ]
+      : [
+          {
+            price_data: {
+              currency: currency,
+              product_data: {
+                name: plan.name,
+                description: plan.description || "",
+              },
+              unit_amount: plan.price, // Preço em centavos
+              recurring: {
+                interval: plan.billingPeriod === "monthly" ? "month" : "year",
+              },
+            },
+            quantity: 1,
+          },
+        ];
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: currency,
-            product_data: {
-              name: plan.name,
-              description: plan.description || "",
-            },
-            unit_amount: plan.price, // Preço em centavos
-            recurring: {
-              interval: plan.billingPeriod === "monthly" ? "month" : "year",
-            },
-          },
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       mode: "subscription", // Para pagamentos recorrentes
       success_url: successUrl,
       cancel_url: cancelUrl,

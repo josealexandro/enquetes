@@ -6,15 +6,19 @@ export const DEFAULT_PLANS: Plan[] = [
     slug: "basic",
     name: "Basic",
     description: "Ideal para comerciantes que estão começando a coletar feedback.",
-    // Valor ajustado para testes com cobrança de R$ 10,00
-    price: 1000, // R$ 10,00
+    // DOCUMENTAÇÃO: Preço atual do plano Basic
+    price: 1990, // R$ 19,90 em centavos
+    // DOCUMENTAÇÃO: Preço original riscado para efeito de promoção
+    originalPrice: 2990, // R$ 29,90 em centavos (valor cortado para parecer promoção)
     currency: "BRL",
     billingPeriod: "monthly",
+    // DOCUMENTAÇÃO: Price ID do Stripe - produto criado manualmente no dashboard
+    stripePriceId: "price_1SngyARt7Er6J4QoDYzgDQUK",
     trialDays: 7,
     limits: {
-      pollsPerMonth: 10,
+      pollsPerMonth: 6, // DOCUMENTAÇÃO: Plano básico com 6 enquetes por mês
       activePolls: 3,
-      commercialProfiles: 1,
+      commercialProfiles: 0, // DOCUMENTAÇÃO: Plano básico não tem página comercial
       teamMembers: 2,
       storageMb: 200,
     },
@@ -31,22 +35,26 @@ export const DEFAULT_PLANS: Plan[] = [
     slug: "medium",
     name: "Medium",
     description: "Plano para empresas em crescimento que precisam de mais controle.",
-    price: 7990, // R$ 79,90
+    // DOCUMENTAÇÃO: Preço atual do plano Medium
+    price: 3990, // R$ 39,90 em centavos
+    // DOCUMENTAÇÃO: Preço original riscado para efeito de promoção
+    originalPrice: 5990, // R$ 59,90 em centavos (valor cortado para parecer promoção)
     currency: "BRL",
     billingPeriod: "monthly",
+    // DOCUMENTAÇÃO: Price ID do Stripe - produto criado manualmente no dashboard
+    stripePriceId: "price_1Snh17Rt7Er6J4QoCdFLrWTs",
     trialDays: 7,
     limits: {
-      pollsPerMonth: 40,
+      pollsPerMonth: 14, // DOCUMENTAÇÃO: Plano Medium com 14 enquetes por mês
       activePolls: 10,
-      commercialProfiles: 3,
+      commercialProfiles: 1, // DOCUMENTAÇÃO: Plano Medium com 1 perfil comercial
       teamMembers: 5,
       storageMb: 1000,
     },
     features: [
       "Tudo do Basic",
       "Personalização de temas e cores",
-      "Exportação de resultados (CSV/PDF)",
-      "Suporte prioritário via chat",
+      // DOCUMENTAÇÃO: Exportação de resultados e suporte via chat removidos do plano Medium conforme solicitado
     ],
     isActive: true,
     sortOrder: 2,
@@ -57,22 +65,28 @@ export const DEFAULT_PLANS: Plan[] = [
     name: "Pro",
     description:
       "Solução completa para redes ou marcas que dependem de insights em tempo real.",
-    price: 15990, // R$ 159,90
+    // DOCUMENTAÇÃO: Preço atual do plano Pro
+    price: 7990, // R$ 79,90 em centavos
+    // DOCUMENTAÇÃO: Preço original riscado para efeito de promoção
+    originalPrice: 11990, // R$ 119,90 em centavos (valor cortado para parecer promoção)
     currency: "BRL",
     billingPeriod: "monthly",
+    // DOCUMENTAÇÃO: Price ID do Stripe - produto criado manualmente no dashboard
+    stripePriceId: "price_1Snh22Rt7Er6J4QoK3ycCCp8",
     trialDays: 14,
     limits: {
-      pollsPerMonth: 200,
+      pollsPerMonth: 50, // DOCUMENTAÇÃO: Plano Pro com 50 enquetes por mês
       activePolls: 50,
-      commercialProfiles: 10,
+      commercialProfiles: 1, // DOCUMENTAÇÃO: Plano Pro com 1 perfil comercial
       teamMembers: 20,
       storageMb: 5000,
     },
     features: [
       "Tudo do Medium",
-      "Relatórios avançados e API para BI",
-      "Acesso multiunidade e workflows de aprovação",
-      "CSM dedicado e SLA customizado",
+      "Relatórios visuais e profissionais: Apresente os resultados das suas enquetes com gráficos claros, tabelas organizadas e análises automáticas que facilitam a tomada de decisão e elevam a credibilidade dos seus dados.",
+      "Exportação de resultados em PDF",
+      // DOCUMENTAÇÃO: Relatórios avançados e API para BI substituídos por relatórios visuais e profissionais
+      // Acesso multiunidade, workflows de aprovação, CSM dedicado e SLA customizado removidos do plano Pro
     ],
     isActive: true,
     sortOrder: 3,
