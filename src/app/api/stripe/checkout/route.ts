@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
               },
               unit_amount: plan.price, // Preço em centavos
               recurring: {
-                interval: plan.billingPeriod === "monthly" ? "month" : "year",
+                interval: (plan.billingPeriod === "monthly" ? "month" : "year") as "month" | "year",
               },
             },
             quantity: 1,

@@ -176,11 +176,11 @@ const renderPlanLimits = (limits: PlanLimits) => {
   // DOCUMENTAÇÃO: Filtra limites para exibir apenas: pollsPerMonth, activePolls (se > 0) e commercialProfiles (se > 0)
   // Remove teamMembers e storageMb da exibição conforme solicitado
   // Enquetes ativas e perfis comerciais só aparecem se o valor for maior que 0
-  const limitsToShow = [
+  const limitsToShow: Array<keyof PlanLimits> = [
     'pollsPerMonth', 
-    ...(limits.activePolls > 0 ? ['activePolls'] : []), 
-    ...(limits.commercialProfiles > 0 ? ['commercialProfiles'] : [])
-  ] as const;
+    ...(limits.activePolls > 0 ? (['activePolls'] as const) : []), 
+    ...(limits.commercialProfiles > 0 ? (['commercialProfiles'] as const) : [])
+  ];
   
   return (
     <dl className="grid grid-cols-2 gap-3 text-sm text-gray-300">

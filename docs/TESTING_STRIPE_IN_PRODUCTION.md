@@ -6,7 +6,7 @@ Você pode usar as **chaves de teste do Stripe** (`sk_test_` e `pk_test_`) mesmo
 
 ---
 
-## 📋 Como Configurar
+## 📋 Como Configurar 
 
 ### 1. Obter Chaves de Teste do Stripe
 
