@@ -129,33 +129,36 @@ export default function DashboardPage() {
 
       {/* Sidebar */}
       {/* DOCUMENTAÇÃO: Sidebar fixa no desktop (md:fixed), oculta no mobile (abre com botão) */}
+      {/* Ajuste para tablets: menor largura (w-56) em tablets, largura completa (w-64) em desktop */}
       <aside
-        className={`fixed inset-y-0 left-0 w-64 bg-gray-800 border-r border-gray-700 transform transition-transform duration-300 ease-in-out z-50 flex flex-col
+        className={`fixed inset-y-0 left-0 w-64 md:w-56 lg:w-64 bg-gray-800 border-r border-gray-700 transform transition-transform duration-300 ease-in-out z-50 flex flex-col
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
           md:translate-x-0`}
       >
         {/* Cabeçalho da Sidebar */}
-        <div className="p-6 border-b border-gray-700">
-          <h1 className="text-xl font-bold text-white">Dashboard</h1>
-          <p className="text-sm text-gray-400 mt-1">Painel de Controle</p>
+        {/* Ajuste para tablets: padding menor em tablets */}
+        <div className="p-4 md:p-5 lg:p-6 border-b border-gray-700">
+          <h1 className="text-lg md:text-xl font-bold text-white">Dashboard</h1>
+          <p className="text-xs md:text-sm text-gray-400 mt-1">Painel de Controle</p>
         </div>
 
         {/* Navegação */}
-        <nav className="flex-1 overflow-y-auto p-4">
+        {/* Ajuste para tablets: padding menor em tablets */}
+        <nav className="flex-1 overflow-y-auto p-3 md:p-4">
           <ul className="space-y-1">
             {/* Seção Principal */}
             <li>
               <button
                 type="button"
                 onClick={() => setActiveSection("polls")}
-                className={`flex items-center w-full p-3 rounded-lg text-left transition-colors ${
+                className={`flex items-center w-full p-2 md:p-2.5 lg:p-3 rounded-lg text-left transition-colors ${
                   activeSection === "polls" 
                     ? "bg-indigo-600 text-white" 
                     : "text-gray-300 hover:bg-gray-700 hover:text-white"
                 }`}
               >
-                <span className="mr-3 text-lg">📝</span>
-                <span className="font-medium">Minhas Enquetes</span>
+                <span className="mr-2 md:mr-3 text-base md:text-lg">📝</span>
+                <span className="text-sm md:text-base font-medium">Minhas Enquetes</span>
               </button>
             </li>
 
@@ -168,19 +171,19 @@ export default function DashboardPage() {
             <li>
               <Link 
                 href="/" 
-                className="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                className="flex items-center p-2 md:p-2.5 lg:p-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
               >
-                <span className="mr-3 text-lg">🏠</span>
-                <span>Início</span>
+                <span className="mr-2 md:mr-3 text-base md:text-lg">🏠</span>
+                <span className="text-sm md:text-base">Início</span>
               </Link>
             </li>
             <li>
               <Link 
                 href="/enquetes" 
-                className="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                className="flex items-center p-2 md:p-2.5 lg:p-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
               >
-                <span className="mr-3 text-lg">📊</span>
-                <span>Enquetes</span>
+                <span className="mr-2 md:mr-3 text-base md:text-lg">📊</span>
+                <span className="text-sm md:text-base">Enquetes</span>
               </Link>
             </li>
 
@@ -194,10 +197,10 @@ export default function DashboardPage() {
               <li>
                 <Link 
                   href={`/empresa/${slugify(user.commercialName)}`} 
-                  className="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                  className="flex items-center p-2 md:p-2.5 lg:p-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
                 >
-                  <span className="mr-3 text-lg">🌐</span>
-                  <span>Página Pública</span>
+                  <span className="mr-2 md:mr-3 text-base md:text-lg">🌐</span>
+                  <span className="text-sm md:text-base">Página Pública</span>
                 </Link>
               </li>
             )}
@@ -212,24 +215,25 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={() => setActiveSection("subscription")}
-                className={`flex items-center w-full p-3 rounded-lg text-left transition-colors ${
+                className={`flex items-center w-full p-2 md:p-2.5 lg:p-3 rounded-lg text-left transition-colors ${
                   activeSection === "subscription" 
                     ? "bg-indigo-600 text-white" 
                     : "text-gray-300 hover:bg-gray-700 hover:text-white"
                 }`}
               >
-                <span className="mr-3 text-lg">💳</span>
-                <span className="font-medium">Assinatura</span>
+                <span className="mr-2 md:mr-3 text-base md:text-lg">💳</span>
+                <span className="text-sm md:text-base font-medium">Assinatura</span>
               </button>
             </li>
           </ul>
         </nav>
 
         {/* Rodapé da Sidebar */}
-        <div className="p-4 border-t border-gray-700">
-          <div className="flex items-center p-3 rounded-lg bg-gray-700">
+        {/* Ajuste para tablets: padding menor em tablets */}
+        <div className="p-3 md:p-4 border-t border-gray-700">
+          <div className="flex items-center p-2 md:p-3 rounded-lg bg-gray-700">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
+              <p className="text-xs md:text-sm font-medium text-white truncate">
                 {user?.displayName || "Empresa"}
               </p>
               <p className="text-xs text-gray-400 truncate">
@@ -241,9 +245,11 @@ export default function DashboardPage() {
       </aside>
       
       {/* Main Content */}
-      {/* DOCUMENTAÇÃO: Conteúdo principal com margin-left no desktop para compensar sidebar fixa de 256px (w-64) */}
-      <main className="flex-1 overflow-y-auto bg-gray-900 md:ml-64">
-        <div className="p-4 sm:p-6 lg:p-8">
+      {/* DOCUMENTAÇÃO: Conteúdo principal com margin-left no desktop para compensar sidebar fixa */}
+      {/* Ajuste para tablets: margin-left menor (ml-56) em tablets, maior (ml-64) em desktop */}
+      <main className="flex-1 overflow-y-auto bg-gray-900 md:ml-56 lg:ml-64">
+        {/* Ajuste para tablets: padding intermediário em tablets */}
+        <div className="p-4 md:p-5 lg:p-8">
           {activeSection === "polls" ? (
             <DashboardComponent polls={polls} user={user} />
           ) : (

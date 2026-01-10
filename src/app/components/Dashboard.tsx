@@ -585,32 +585,33 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
 
   return (
     <div className="dashboard-container">
-      {/* Título principal - Responsivo para mobile */}
-      {/* DOCUMENTAÇÃO: Título menor no mobile (text-2xl) e maior no desktop (text-3xl) */}
-      <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">
+      {/* Título principal - Responsivo para mobile/tablet/desktop */}
+      {/* DOCUMENTAÇÃO: Título menor no mobile (text-2xl), intermediário no tablet (text-2xl), maior no desktop (text-3xl) */}
+      <h2 className="text-2xl md:text-2xl lg:text-3xl font-bold mb-4 md:mb-5 lg:mb-6">
         Olá, {user?.displayName || "Empresa"}!
       </h2>
 
       {/* Plano Comercial */}
-      {/* DOCUMENTAÇÃO: Layout responsivo - coluna no mobile, linha no desktop */}
-      <div className="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md mb-4 sm:mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {/* DOCUMENTAÇÃO: Layout responsivo - coluna no mobile, linha em tablet/desktop */}
+      {/* Ajuste para tablets: padding intermediário */}
+      <div className="bg-gray-800 p-4 md:p-5 lg:p-6 rounded-lg shadow-md mb-4 md:mb-5 lg:mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
         <div className="w-full md:w-auto">
-          <h3 className="text-lg sm:text-xl font-semibold mb-1 sm:mb-0">Plano Comercial</h3>
-          <p className="text-sm sm:text-base text-gray-400">{activePollsCount} enquetes ativas</p>
+          <h3 className="text-lg md:text-lg lg:text-xl font-semibold mb-1 md:mb-0">Plano Comercial</h3>
+          <p className="text-sm md:text-sm lg:text-base text-gray-400">{activePollsCount} enquetes ativas</p>
         </div>
-        {/* DOCUMENTAÇÃO: Botões em coluna no mobile, linha no desktop */}
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+        {/* DOCUMENTAÇÃO: Botões em coluna no mobile, linha em tablet/desktop */}
+        <div className="flex flex-col sm:flex-row gap-2 md:gap-3 w-full md:w-auto">
           {user?.accountType === 'commercial' && user?.commercialName && (
             <button
               onClick={() => setShowQrCodeModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg transition duration-300 text-sm sm:text-base w-full sm:w-auto"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 md:py-2.5 lg:py-2.5 px-3 md:px-4 rounded-lg transition duration-300 text-xs md:text-sm lg:text-base w-full sm:w-auto"
             >
               Gerar QR Code
             </button>
           )}
           <button
             onClick={() => setShowCreatePollModal(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-lg transition duration-300 text-sm sm:text-base w-full sm:w-auto"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 md:py-2.5 lg:py-2.5 px-3 md:px-4 rounded-lg transition duration-300 text-xs md:text-sm lg:text-base w-full sm:w-auto"
           >
             Criar Enquete
           </button>
@@ -619,7 +620,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
             <button
               onClick={handleCancelSubscription}
               disabled={isCancelling}
-              className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-4 rounded-lg transition duration-300 text-sm sm:text-base w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 md:py-2.5 lg:py-2.5 px-3 md:px-4 rounded-lg transition duration-300 text-xs md:text-sm lg:text-base w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isCancelling ? "Cancelando..." : "Cancelar Assinatura"}
             </button>
@@ -628,18 +629,19 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       </div>
 
       {/* Minhas Enquetes */}
-      {/* DOCUMENTAÇÃO: Padding responsivo - menor no mobile */}
-      <div className="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md mb-4 sm:mb-6">
-        <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Minhas enquetes</h3>
+      {/* DOCUMENTAÇÃO: Padding responsivo - menor no mobile, intermediário no tablet, completo no desktop */}
+      <div className="bg-gray-800 p-4 md:p-5 lg:p-6 rounded-lg shadow-md mb-4 md:mb-5 lg:mb-6">
+        <h3 className="text-lg md:text-lg lg:text-xl font-semibold mb-3 md:mb-3.5 lg:mb-4">Minhas enquetes</h3>
         <div className="space-y-4">
           {polls.length === 0 ? (
-            <p className="text-gray-400 text-sm sm:text-base text-center py-4">
+            <p className="text-gray-400 text-sm md:text-sm lg:text-base text-center py-4">
               Você ainda não criou nenhuma enquete.
             </p>
           ) : (
             <>
               {/* DOCUMENTAÇÃO: Grid responsivo - 1 coluna no mobile, 2 no tablet, 3 no desktop */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {/* Ajuste para tablets: gap intermediário */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-3.5 lg:gap-4">
                 {polls.map((poll) => (
                   <div key={poll.id} className="relative">
                     <PollCard 
@@ -650,10 +652,10 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                       companyThemeColor={user.themeColor || undefined} // Passar o tema de cor da empresa para o PollCard, convertendo null para undefined
                     />
                     {/* Botão para ver resultados - Responsivo */}
-                    {/* DOCUMENTAÇÃO: Botão com texto menor no mobile */}
+                    {/* DOCUMENTAÇÃO: Botão com tamanho intermediário no tablet */}
                     <button
                       onClick={() => setSelectedPollForResults(selectedPollForResults?.id === poll.id ? null : poll)}
-                      className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-3 sm:px-4 rounded-lg transition-colors text-xs sm:text-sm"
+                      className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 md:py-2.5 lg:py-2.5 px-3 md:px-3.5 lg:px-4 rounded-lg transition-colors text-xs md:text-xs lg:text-sm"
                     >
                       {selectedPollForResults?.id === poll.id ? "Ocultar Resultados" : "Ver Resultados"}
                     </button>
@@ -663,7 +665,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
               {/* Exibir resultados da enquete selecionada */}
               {/* DOCUMENTAÇÃO: Margem responsiva */}
               {selectedPollForResults && (
-                <div className="mt-4 sm:mt-6">
+                <div className="mt-4 md:mt-5 lg:mt-6">
                   <PollResults poll={selectedPollForResults} />
                 </div>
               )}
@@ -673,20 +675,20 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       </div>
 
       {/* Estatísticas */}
-      {/* DOCUMENTAÇÃO: Cards de estatísticas responsivos - padding e texto ajustados para mobile */}
-      <div className="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md mb-4 sm:mb-6">
-        <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Estatísticas</h3>
-        {/* DOCUMENTAÇÃO: Grid mantém 2 colunas mas com gap menor no mobile */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <div className="bg-gray-700 p-3 sm:p-4 rounded-lg text-center">
-            <p className="text-xl sm:text-2xl font-bold mb-1">{totalMonthlyEngagement}</p>
-            <p className="text-gray-400 text-xs sm:text-sm leading-tight">
+      {/* DOCUMENTAÇÃO: Cards de estatísticas responsivos - padding e texto ajustados para mobile/tablet/desktop */}
+      <div className="bg-gray-800 p-4 md:p-5 lg:p-6 rounded-lg shadow-md mb-4 md:mb-5 lg:mb-6">
+        <h3 className="text-lg md:text-lg lg:text-xl font-semibold mb-3 md:mb-3.5 lg:mb-4">Estatísticas</h3>
+        {/* DOCUMENTAÇÃO: Grid mantém 2 colunas mas com gap intermediário no tablet */}
+        <div className="grid grid-cols-2 gap-3 md:gap-3.5 lg:gap-4">
+          <div className="bg-gray-700 p-3 md:p-3.5 lg:p-4 rounded-lg text-center">
+            <p className="text-xl md:text-xl lg:text-2xl font-bold mb-1">{totalMonthlyEngagement}</p>
+            <p className="text-gray-400 text-xs md:text-xs lg:text-sm leading-tight">
               Engajamento total neste mês
             </p>
           </div>
-          <div className="bg-gray-700 p-3 sm:p-4 rounded-lg text-center">
-            <p className="text-xl sm:text-2xl font-bold mb-1">{averageVotesPerPoll.toFixed(1)}</p>
-            <p className="text-gray-400 text-xs sm:text-sm leading-tight">
+          <div className="bg-gray-700 p-3 md:p-3.5 lg:p-4 rounded-lg text-center">
+            <p className="text-xl md:text-xl lg:text-2xl font-bold mb-1">{averageVotesPerPoll.toFixed(1)}</p>
+            <p className="text-gray-400 text-xs md:text-xs lg:text-sm leading-tight">
               Média de votos por enquete
             </p>
           </div>
@@ -695,13 +697,14 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
 
       {/* Personalização */}
       {/* DOCUMENTAÇÃO: Seção de personalização com padding e espaçamentos responsivos */}
-      <div className="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md">
-        <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Personalização</h3>
+      {/* Ajuste para tablets: padding intermediário */}
+      <div className="bg-gray-800 p-4 md:p-5 lg:p-6 rounded-lg shadow-md">
+        <h3 className="text-lg md:text-lg lg:text-xl font-semibold mb-3 md:mb-3.5 lg:mb-4">Personalização</h3>
         <div className="space-y-4">
           {/* Seção de upload de imagem */}
-          {/* DOCUMENTAÇÃO: Layout responsivo - imagem e inputs ajustados para mobile */}
-          <div className="flex flex-col items-center mb-4 sm:mb-6">
-            <div className="mb-3 sm:mb-4">
+          {/* DOCUMENTAÇÃO: Layout responsivo - imagem e inputs ajustados para mobile/tablet/desktop */}
+          <div className="flex flex-col items-center mb-4 md:mb-5 lg:mb-6">
+            <div className="mb-3 md:mb-3.5 lg:mb-4">
               <ExpandableImage
                 src={imagePreviewUrl || user?.photoURL || "/logoPrincipal.png"}
                 alt="Pré-visualização do Avatar"
@@ -711,7 +714,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                 showBorder={true}
               />
             </div>
-            <label htmlFor="profile-image-upload" className="block text-gray-400 mb-2 text-sm sm:text-base">
+            <label htmlFor="profile-image-upload" className="block text-gray-400 mb-2 text-sm md:text-sm lg:text-base">
               Alterar Imagem de Perfil
             </label>
             <input
@@ -719,7 +722,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
               type="file"
               accept={ACCEPTED_IMAGE_TYPES.join(", ")}
               onChange={handleImageChange}
-              className="w-full max-w-sm px-3 sm:px-4 py-2 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white text-sm sm:text-base file:mr-2 sm:file:mr-4 file:py-1.5 sm:file:py-2 file:px-3 sm:file:px-4 file:rounded-full file:border-0 file:text-xs sm:file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
+              className="w-full max-w-sm px-3 md:px-3.5 lg:px-4 py-2 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white text-sm md:text-sm lg:text-base file:mr-2 md:file:mr-3 lg:file:mr-4 file:py-1.5 md:file:py-1.5 lg:file:py-2 file:px-3 md:file:px-3.5 lg:file:px-4 file:rounded-full file:border-0 file:text-xs md:file:text-xs lg:file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
             />
             {uploadingImage && (
               <div className="flex items-center justify-center p-2 mt-2">
@@ -738,9 +741,9 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
           </div>
 
           {/* Seção de upload de imagem de banner */}
-          {/* DOCUMENTAÇÃO: Input de banner responsivo */}
-          <div className="flex flex-col items-center mb-4 sm:mb-6">
-            <label htmlFor="banner-image-upload" className="block text-gray-400 mb-2 text-sm sm:text-base">
+          {/* DOCUMENTAÇÃO: Input de banner responsivo - ajuste para tablets */}
+          <div className="flex flex-col items-center mb-4 md:mb-5 lg:mb-6">
+            <label htmlFor="banner-image-upload" className="block text-gray-400 mb-2 text-sm md:text-sm lg:text-base">
               Alterar Imagem do Banner
             </label>
             <input
