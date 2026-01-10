@@ -1,9 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Comment } from "../types/poll";
 import CommentForm from "./CommentForm";
 import { useAuth } from "@/app/context/AuthContext";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faHeart } from '@fortawesome/free-solid-svg-icons';
+import { db } from "@/lib/firebase";
+import { doc, updateDoc, increment, arrayUnion, arrayRemove } from "firebase/firestore";
 
 // Função auxiliar para formatar o tempo como "há X tempo"
 const formatTimeAgo = (timestamp: number) => {
@@ -41,6 +45,78 @@ export default function CommentComponent({
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [showReplies, setShowReplies] = useState(true);
   const { user, isMasterUser } = useAuth();
+  
+  // Estados locais para Optimistic UI de Likes (simples - apenas curtir)
+  const [likes, setLikes] = useState(comment.likes || 0);
+  const [likedBy, setLikedBy] = useState<string[]>(comment.likedBy || []);
+
+  // Sincronizar estados locais se o comentário mudar
+  useEffect(() => {
+    setLikes(comment.likes || 0);
+    setLikedBy(comment.likedBy || []);
+  }, [comment.likes, comment.likedBy]);
+
+  // ============================================
+  // FUNÇÃO: HANDLE LIKE (Curtir comentário)
+  // ============================================
+  // OBJETIVO: Permite usuário curtir/descurtir comentário
+  // FUNCIONAMENTO:
+  //   1. Verifica se usuário está logado
+  //   2. Atualiza estado local (Optimistic UI)
+  //   3. Atualiza Firestore (increment/arrayUnion ou arrayRemove)
+  //   4. Em caso de erro, reverte estado local
+  // SIMPLICIDADE: Apenas curtir (sem dislike), mesma lógica das enquetes
+  // ============================================
+  const handleLike = async () => {
+    if (!user) {
+      // Não exibir prompt - apenas não fazer nada se não estiver logado
+      return;
+    }
+
+    const commentRef = doc(db, "polls", comment.pollId, "comments", comment.id);
+    const hasLiked = likedBy.includes(user.uid);
+
+    // Optimistic Update - atualiza UI imediatamente
+    if (hasLiked) {
+      setLikes(prev => prev - 1);
+      setLikedBy(prev => prev.filter(id => id !== user.uid));
+    } else {
+      setLikes(prev => prev + 1);
+      setLikedBy(prev => [...prev, user.uid]);
+    }
+
+    try {
+      if (hasLiked) {
+        // Descurtir - remove do array e decrementa contador
+        await updateDoc(commentRef, {
+          likes: increment(-1),
+          likedBy: arrayRemove(user.uid),
+        });
+      } else {
+        // Curtir - adiciona no array e incrementa contador
+        await updateDoc(commentRef, {
+          likes: increment(1),
+          likedBy: arrayUnion(user.uid),
+        });
+      }
+    } catch (error: any) {
+      console.error("Erro ao curtir comentário:", error);
+      
+      // Se erro de permissão, não mostrar erro (regras do Firestore vão tratar)
+      if (error?.code === 'permission-denied') {
+        return;
+      }
+      
+      // Reverter Optimistic Update em caso de erro
+      if (hasLiked) {
+        setLikes(prev => prev + 1);
+        setLikedBy(prev => [...prev, user.uid]);
+      } else {
+        setLikes(prev => prev - 1);
+        setLikedBy(prev => prev.filter(id => id !== user.uid));
+      }
+    }
+  };
 
   const handleReplySubmit = async (text: string) => {
     await onAddReply(comment.id, text);
@@ -69,6 +145,20 @@ export default function CommentComponent({
         </p>
 
         <div className="flex items-center space-x-3 mt-2 text-sm flex-wrap">
+          {/* Botão de curtir comentário */}
+          <button
+            onClick={handleLike}
+            className={`p-1 rounded-full transition-colors duration-200 flex items-center gap-1 ${
+              user && likedBy.includes(user.uid)
+                ? "text-red-500 hover:text-red-600"
+                : "text-zinc-400 hover:text-red-500"
+            }`}
+            aria-label="Curtir Comentário"
+          >
+            <FontAwesomeIcon icon={faHeart} size="sm" />
+            {likes > 0 && <span className="text-xs">{likes}</span>}
+          </button>
+
           <button
             onClick={() => setShowReplyForm(!showReplyForm)}
             className="text-blue-500 hover:underline"

@@ -283,7 +283,7 @@ export default function EnquetesPage() {
   const displayedPolls = polls.filter(poll => !podiumPolls.some(p => p.id === poll.id));
 
   return (
-    <main className="min-h-screen w-full px-4 py-24 bg-white dark:bg-zinc-900">
+    <main className="min-h-screen w-full px-4 py-24">
       <div className="max-w-7xl mx-auto"> 
         {deleteFeedbackMessage && (
           <div className={`p-3 rounded-md text-white mt-4 ${deleteFeedbackType === "success" ? "bg-green-500" : "bg-red-500"}`}>

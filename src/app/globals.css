@@ -4,8 +4,57 @@
 @tailwind utilities;
 
 @layer base {
+  /* ============================================
+     DARK MODE - CONFIGURAÇÃO BASE
+     ============================================
+     IMPORTANTE: O dark mode funciona através da classe 'dark' no elemento <html>
+     A classe é adicionada/removida via JavaScript no componente Header.tsx
+     
+     REGRA DE OURO:
+     - O body NÃO deve ter backgrounds conflitantes (bg-white/dark:bg-*)
+     - Containers grandes (<main>, <section>) NÃO devem ter bg-* que conflitem com o body
+     - O fundo do body vem APENAS do CSS abaixo
+     - Componentes individuais (cards, modais) podem ter seus próprios backgrounds
+     ============================================ */
+  
+  /* Estilos padrão (light mode) - fundo branco */
   body {
-    @apply bg-white text-zinc-900 dark:bg-zinc-900 dark:text-white;
+    @apply min-h-screen bg-white transition-colors duration-300;
+    /* NOTA: Não definimos cor de texto aqui para evitar conflitos */
+    /* Cada elemento controla sua própria cor de texto */
+  }
+  
+  /* Estilos dark mode - aplica quando <html> tem classe 'dark' */
+  /* IMPORTANTE: A classe 'dark' é adicionada via JavaScript em Header.tsx */
+  html.dark body {
+    @apply bg-zinc-900;
+    color: #ffffff !important; /* Branco no dark mode - apenas para textos sem classe específica */
+  }
+  
+  /* ============================================
+     CLASSES CUSTOMIZADAS PARA TEXTOS DE BOAS-VINDAS
+     ============================================
+     Estas classes garantem que os textos da página inicial alternem corretamente:
+     - Light mode: preto (#000000)
+     - Dark mode: branco/claro (#ffffff / #9ca3af)
+     ============================================ */
+  
+  /* Título principal - "Bem-vindo ao Poll App!" */
+  .welcome-text {
+    color: #000000 !important; /* Preto no light mode */
+  }
+  
+  html.dark .welcome-text {
+    color: #ffffff !important; /* Branco no dark mode */
+  }
+  
+  /* Subtítulos - textos descritivos abaixo do título */
+  .welcome-subtext {
+    color: #000000 !important; /* Preto no light mode */
+  }
+  
+  html.dark .welcome-subtext {
+    color: #9ca3af !important; /* zinc-400 (cinza claro) no dark mode */
   }
 }
 

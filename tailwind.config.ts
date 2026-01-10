@@ -1,7 +1,25 @@
 import type { Config } from "tailwindcss";
 
+// ============================================
+// CONFIGURAÇÃO TAILWIND CSS - DARK MODE
+// ============================================
+// IMPORTANTE: darkMode: "class" significa que o Tailwind aplica estilos dark:*
+// APENAS quando o elemento <html> tem a classe 'dark'
+//
+// COMO FUNCIONA:
+//   1. JavaScript adiciona/remove classe 'dark' no <html> (via Header.tsx)
+//   2. Tailwind detecta a classe e aplica estilos com prefixo 'dark:'
+//   3. Exemplo: className="bg-white dark:bg-zinc-900"
+//      - Sem classe 'dark': usa bg-white (branco)
+//      - Com classe 'dark': usa bg-zinc-900 (escuro)
+//
+// ALTERNATIVAS NÃO USADAS:
+//   - darkMode: "media" - respeitaria prefers-color-scheme (não queremos isso)
+//   - darkMode: false - desabilitaria dark mode completamente
+// ============================================
+
 const config: Config = {
-  darkMode: "class", // Enable dark mode based on the 'dark' class on the HTML element
+  darkMode: "class", // ✅ Habilita dark mode baseado na classe 'dark' no elemento <html>
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",

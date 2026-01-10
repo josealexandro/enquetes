@@ -127,7 +127,7 @@ export default function PollDetailClient({ pollId }: PollDetailClientProps) {
   if (!poll) return <p className="text-center mt-20">Enquete não encontrada.</p>;
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 py-24 bg-white dark:bg-zinc-900 pt-20">
+    <main className="min-h-screen flex items-center justify-center px-4 py-24 pt-20">
       <div className="max-w-2xl w-full">
         <PollCard poll={poll} onVote={handleVote} onDelete={handleDeletePoll} />
       </div>

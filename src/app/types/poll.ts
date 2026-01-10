@@ -14,6 +14,8 @@ export interface Comment {
   authorId: string; // Adicionar o ID do autor aqui
   text: string;
   timestamp: number; // Using timestamp for easy sorting
+  likes?: number; // Número de curtidas (opcional para compatibilidade com comentários antigos)
+  likedBy?: string[]; // Array de IDs dos usuários que curtiram (opcional para compatibilidade)
 }
 
 export interface Poll {

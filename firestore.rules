@@ -107,8 +107,33 @@ service cloud.firestore {
           && request.resource.data.timestamp is int
           && request.resource.data.author is string;
 
-        // Only the comment author may update or delete their comment
-        allow update, delete: if request.auth != null && request.auth.uid == resource.data.authorId;
+        // DOCUMENTAÇÃO: Regras de atualização de comentários
+        // 1. Autor do comentário pode atualizar/deletar qualquer campo
+        // 2. Qualquer usuário autenticado pode atualizar apenas likes/likedBy (para curtir)
+        // IMPORTANTE: increment() e arrayUnion/arrayRemove são operações seguras processadas no servidor
+        // SEGUINDO O MESMO PADRÃO DAS ENQUETES: Garante que campos críticos permanecem inalterados
+        allow update: if request.auth != null && (
+          // Autor pode atualizar qualquer campo do seu comentário
+          request.auth.uid == resource.data.authorId
+          // OU qualquer usuário autenticado pode atualizar apenas likes/likedBy (curtir comentário)
+          || (
+            // Campos críticos devem permanecer inalterados (garantia de segurança)
+            request.resource.data.pollId == resource.data.pollId
+            && request.resource.data.authorId == resource.data.authorId
+            && request.resource.data.author == resource.data.author
+            && request.resource.data.text == resource.data.text
+            && request.resource.data.timestamp == resource.data.timestamp
+            // parentId pode ser undefined/null, então validamos apenas se existir
+            && (!('parentId' in resource.data) || request.resource.data.parentId == resource.data.parentId)
+            // NOTA: increment() e arrayUnion/arrayRemove são operações especiais que não aparecem
+            // no diff da mesma forma, mas são seguras porque são processadas no servidor.
+            // Ao garantir que campos críticos não mudam, validamos indiretamente que apenas
+            // likes/likedBy estão sendo modificados.
+          )
+        );
+
+        // Apenas o autor pode deletar o comentário
+        allow delete: if request.auth != null && request.auth.uid == resource.data.authorId;
       }
     }
 

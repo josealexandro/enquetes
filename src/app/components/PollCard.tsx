@@ -333,6 +333,8 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
       authorEmail: user.email,
       text,
       timestamp: Date.now(),
+      likes: 0, // Inicializa contador de curtidas
+      likedBy: [], // Inicializa array de usuários que curtiram
     };
 
     const newComment = parentId
@@ -467,7 +469,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
                   ? "text-white" // If ranked, force white text for creator name
                   : (poll.isCommercial && companyThemeColor)
                     ? getContrastTextColor(companyThemeColor) // Use a função para cor do tema
-                    : (isExpanded ? "text-white" : textColorClass) // Otherwise, default logic
+                    : (isExpanded ? "text-white" : (textColorClass || "text-white")) // Otherwise, default logic - sempre branco se não tiver textColorClass
                 }
               `}
               style={{ 
@@ -523,7 +525,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
       <h2
         className={`text-2xl font-semibold max-w-full break-words overflow-hidden mb-4 word-break-break-word overflow-wrap-anywhere ${
           isExpanded ? "line-clamp-none" : "line-clamp-2"
-        } ${
+        }         ${
           (poll.isCommercial && companyThemeColor && !poll.rank)
             ? getContrastTextColor(companyThemeColor) // Use a função para cor do tema para o título
             : (isExpanded ? "text-white" : textColorClass)
@@ -646,7 +648,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
                                 ? "text-white" // If ranked, force white text for options
                                 : (poll.isCommercial && companyThemeColor)
                                   ? getContrastTextColor(companyThemeColor) // Use a função para cor do tema
-                                  : (isExpanded ? "text-white" : textColorClass) // Otherwise, default logic
+                                  : (isExpanded ? "text-white" : (textColorClass || "text-white")) // Otherwise, default logic - sempre branco se não tiver textColorClass
                               )
                         }`
                       }
@@ -658,7 +660,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
                         ? "text-white" // If ranked, force white text for vote count
                         : (poll.isCommercial && companyThemeColor)
                           ? getContrastTextColor(companyThemeColor) // Use a função para cor do tema
-                          : (isExpanded ? "text-white" : textColorClass) // Otherwise, default logic
+                          : (isExpanded ? "text-white" : (textColorClass || "text-white")) // Otherwise, default logic - sempre branco se não tiver textColorClass
                       }`
                     }>
                       {option.votes} votos ({percent}%)

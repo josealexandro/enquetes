@@ -22,43 +22,60 @@ interface HeaderProps {
 }
 
 export default function Header({ showLoginModal, setShowLoginModal, showSignupModal, setShowSignupModal }: HeaderProps) {
-  const [darkMode, setDarkMode] = useState(false); // Inicializa como false para evitar hidratação
-  const [mounted, setMounted] = useState(false); // Novo estado para controlar a montagem no cliente
+  // ============================================
+  // DARK MODE - ESTADOS E CONTROLE
+  // ============================================
+  const [darkMode, setDarkMode] = useState(false); // Estado do dark mode - inicializa como false (light mode)
+  const [mounted, setMounted] = useState(false); // Controla quando o componente foi montado no cliente (evita hidratação)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
   const [isAvatarExpanded, setIsAvatarExpanded] = useState(false); // Estado para controlar expansão do avatar
   const { user, logout /*, loading */ } = useAuth(); // Remover loading, pois não está sendo usado
   const router = useRouter(); // Inicializar useRouter
   // REMOVIDO: const { openLoginModal, openSignupModal } = useAuthModal();
 
-  // useEffect para inicializar e aplicar o tema
-  // DOCUMENTAÇÃO: O site sempre inicia em modo claro (branco) por padrão
-  // Só fica escuro se o usuário explicitamente escolher (salvo no localStorage)
+  // ============================================
+  // useEffect 1: INICIALIZAÇÃO DO TEMA
+  // ============================================
+  // OBJETIVO: Ler o localStorage e aplicar o tema salvo na primeira renderização
+  // EXECUÇÃO: Uma única vez na montagem do componente (dependências vazias [])
+  // LÓGICA:
+  //   1. Lê localStorage.getItem('theme')
+  //   2. Se for 'dark', adiciona classe 'dark' no <html> e atualiza estado
+  //   3. Se for 'light' ou null, remove classe 'dark' e salva 'light' como padrão
+  //   4. Marca componente como montado (mounted = true)
+  // ============================================
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Garantir que começa sem dark mode
-      document.documentElement.classList.remove("dark");
-      
       const savedTheme = localStorage.getItem('theme');
       
-      // Só ativa dark mode se o usuário tiver escolhido explicitamente
-      // Padrão sempre é light mode (branco)
+      // Só aplica dark mode se o usuário escolheu explicitamente
+      // Padrão sempre é light mode (não respeita prefers-color-scheme)
       if (savedTheme === 'dark') {
         setDarkMode(true);
-        document.documentElement.classList.add("dark");
+        document.documentElement.classList.add("dark"); // Adiciona classe 'dark' no <html>
       } else {
         setDarkMode(false);
-        document.documentElement.classList.remove("dark");
-        // Salvar light como padrão se não houver preferência
+        document.documentElement.classList.remove("dark"); // Remove classe 'dark' do <html>
+        // Salvar light como padrão se não houver preferência salva
         if (!savedTheme) {
           localStorage.setItem("theme", "light");
         }
       }
-      setMounted(true); // O componente foi montado no cliente
+      
+      setMounted(true); // Componente montado no cliente - permite renderização do ícone
     }
-  }, []); // Executar apenas uma vez na montagem do cliente
+  }, []); // Executar apenas uma vez na montagem
 
-  // useEffect para aplicar o tema quando darkMode mudar
-  // DOCUMENTAÇÃO: Aplica a classe 'dark' no HTML e salva no localStorage
+  // ============================================
+  // useEffect 2: APLICAR MUDANÇAS DO TEMA
+  // ============================================
+  // OBJETIVO: Aplicar mudanças quando o estado darkMode mudar (via toggle)
+  // EXECUÇÃO: Sempre que darkMode ou mounted mudar
+  // LÓGICA:
+  //   1. Se darkMode === true, adiciona classe 'dark' no <html> e salva 'dark' no localStorage
+  //   2. Se darkMode === false, remove classe 'dark' do <html> e salva 'light' no localStorage
+  // IMPORTANTE: Só executa após mounted === true para evitar conflitos na inicialização
+  // ============================================
   useEffect(() => {
     if (typeof window !== 'undefined' && mounted) {
       if (darkMode) {
@@ -69,25 +86,19 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
         localStorage.setItem("theme", "light");
       }
     }
-  }, [darkMode, mounted]); // Reage às mudanças no darkMode
+  }, [darkMode, mounted]); // Reage às mudanças no darkMode (quando mounted === true)
 
-  // Função para alternar entre modo claro e escuro
-  // DOCUMENTAÇÃO: Alterna o estado darkMode e aplica a classe dark diretamente
+  // ============================================
+  // FUNÇÃO: TOGGLE DARK MODE
+  // ============================================
+  // OBJETIVO: Alternar entre light e dark mode quando o usuário clica no botão
+  // FUNCIONAMENTO:
+  //   - Apenas alterna o estado darkMode (true <-> false)
+  //   - O useEffect 2 detecta a mudança e aplica as mudanças (classe + localStorage)
+  // SIMPLICIDADE: Não aplica mudanças diretamente aqui - deixa o useEffect fazer isso
+  // ============================================
   const toggleDarkMode = () => {
-    setDarkMode((prevMode) => {
-      const newMode = !prevMode;
-      // Aplicar a classe dark imediatamente quando o usuário clica
-      if (typeof window !== 'undefined') {
-        if (newMode) {
-          document.documentElement.classList.add("dark");
-          localStorage.setItem("theme", "dark");
-        } else {
-          document.documentElement.classList.remove("dark");
-          localStorage.setItem("theme", "light");
-        }
-      }
-      return newMode;
-    });
+    setDarkMode((prevMode) => !prevMode);
   };
 
   const handleLoginSuccess = () => {
@@ -115,9 +126,9 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
   return (
     <header className="w-full bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white py-1 px-6 fixed top-0 z-50 shadow-md transition-colors duration-300">
       <nav className="max-w-7xl mx-auto flex justify-between items-center">
-          <Link href="/" className="hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300">
+        <Link href="/" className="hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300">
             <Image src="/logoHome.png" alt="Logo do Aplicativo de Enquetes" width={120} height={40} objectFit="contain" className="dark:brightness-0 dark:invert" />
-          </Link>
+        </Link>
 
         {/* Mobile menu button */}
         <div className="flex items-center md:hidden">
@@ -193,6 +204,14 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
               </motion.button>
             </>
           )}
+          {/* ============================================
+              BOTÃO TOGGLE DARK MODE
+              ============================================
+              - Mostra ícone de Sol (faSun) quando darkMode === true (modo escuro ativo)
+              - Mostra ícone de Lua (faMoon) quando darkMode === false (modo claro ativo)
+              - Só renderiza ícone após mounted === true para evitar flash durante hidratação
+              - Classes Tailwind: text-zinc-900 (preto) / dark:text-white (branco no dark mode)
+              ============================================ */}
           <motion.button
             onClick={toggleDarkMode}
             className="text-zinc-900 dark:text-white p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors duration-300"

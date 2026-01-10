@@ -44,9 +44,9 @@ const getTextColorClass = (rank: number) => {
     case 1:
     case 2:
     case 3:
-      return "text-black"; // Cor do texto para cards ranqueados
+      return "text-black"; // Cor do texto para cards ranqueados (têm fundo claro/colorido)
     default:
-      return "dark:text-white"; // Cor padrão do texto para cards não ranqueados
+      return "text-white"; // Cor padrão do texto para cards não ranqueados (têm fundo escuro)
   }
 };
 

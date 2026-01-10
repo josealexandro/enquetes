@@ -12,7 +12,7 @@ export const DEFAULT_PLANS: Plan[] = [
     originalPrice: 2990, // R$ 29,90 em centavos (valor cortado para parecer promoção)
     currency: "BRL",
     billingPeriod: "monthly",
-    // DOCUMENTAÇÃO: Price ID do Stripe - produto criado manualmente no dashboard
+    // DOCUMENTAÇÃO: Price ID do Stripe - produto criado manualmente no dashboard (modo LIVE)
     stripePriceId: "price_1SngyARt7Er6J4QoDYzgDQUK",
     trialDays: 7,
     limits: {
@@ -41,7 +41,7 @@ export const DEFAULT_PLANS: Plan[] = [
     originalPrice: 5990, // R$ 59,90 em centavos (valor cortado para parecer promoção)
     currency: "BRL",
     billingPeriod: "monthly",
-    // DOCUMENTAÇÃO: Price ID do Stripe - produto criado manualmente no dashboard
+    // DOCUMENTAÇÃO: Price ID do Stripe - produto criado manualmente no dashboard (modo LIVE)
     stripePriceId: "price_1Snh17Rt7Er6J4QoCdFLrWTs",
     trialDays: 7,
     limits: {
@@ -71,7 +71,7 @@ export const DEFAULT_PLANS: Plan[] = [
     originalPrice: 11990, // R$ 119,90 em centavos (valor cortado para parecer promoção)
     currency: "BRL",
     billingPeriod: "monthly",
-    // DOCUMENTAÇÃO: Price ID do Stripe - produto criado manualmente no dashboard
+    // DOCUMENTAÇÃO: Price ID do Stripe - produto criado manualmente no dashboard (modo LIVE)
     stripePriceId: "price_1Snh22Rt7Er6J4QoK3ycCCp8",
     trialDays: 14,
     limits: {
