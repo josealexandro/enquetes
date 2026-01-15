@@ -206,17 +206,6 @@ const PollDetailPage: React.FC<PollDetailPageProps> = ({ params }) => { // Alter
         return poll; // Reverter para estado original
       });
     }
-      // Disparar a animação de coração na posição do clique
-
-      setFeedbackMessage("Voto registrado com sucesso!");
-      setFeedbackType("success");
-      setTimeout(() => setFeedbackMessage(null), 3000);
-    } catch (error) {
-      console.error("Erro ao registrar voto:", error);
-      setFeedbackMessage("Erro ao registrar voto. Tente novamente.");
-      setFeedbackType("error");
-      setTimeout(() => setFeedbackMessage(null), 3000);
-    }
   };
 
   if (loadingPoll) {
