@@ -139,12 +139,27 @@ export async function POST(request: NextRequest) {
       // Ainda não atingiu o limite base (pode criar sem consumir crédito)
       canCreate = true;
       shouldUseCredit = false;
-    } else if (pollsCreated < pollsLimit && hasExtraCredit) {
-      // Atingiu o limite base, mas ainda tem crédito avulso disponível
-      canCreate = true;
-      shouldUseCredit = true;
+    } else if (hasReachedBaseLimit) {
+      // Atingiu o limite base - precisa de crédito para criar mais
+      if (hasExtraCredit) {
+        // Tem crédito disponível - pode criar, mas DEVE consumir o crédito
+        // Verificar se ainda não atingiu o limite total (base + créditos já consumidos)
+        const remainingCredits = extraPollsAvailable;
+        const effectiveLimit = baseLimit + remainingCredits;
+        
+        if (pollsCreated < effectiveLimit) {
+          canCreate = true;
+          shouldUseCredit = true;
+        } else {
+          // Já usou todos os créditos disponíveis
+          canCreate = false;
+        }
+      } else {
+        // Não tem crédito disponível
+        canCreate = false;
+      }
     } else {
-      // Atingiu o limite total (base + créditos) ou não tem créditos
+      // Não deveria chegar aqui, mas por segurança
       canCreate = false;
     }
 
