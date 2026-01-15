@@ -135,15 +135,16 @@ export async function POST(request: NextRequest) {
     let canCreate = false;
     let shouldUseCredit = false;
 
-    if (pollsCreated < pollsLimit) {
-      // Ainda não atingiu o limite total (incluindo créditos)
+    if (pollsCreated < baseLimit) {
+      // Ainda não atingiu o limite base (pode criar sem consumir crédito)
       canCreate = true;
-    } else if (hasReachedBaseLimit && hasExtraCredit) {
-      // Atingiu o limite base, mas tem crédito avulso
+      shouldUseCredit = false;
+    } else if (pollsCreated < pollsLimit && hasExtraCredit) {
+      // Atingiu o limite base, mas ainda tem crédito avulso disponível
       canCreate = true;
       shouldUseCredit = true;
     } else {
-      // Atingiu o limite e não tem créditos
+      // Atingiu o limite total (base + créditos) ou não tem créditos
       canCreate = false;
     }
 
