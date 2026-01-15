@@ -49,18 +49,23 @@ export async function ensureDefaultPlans() {
   try {
     // DOCUMENTAÇÃO: Atualiza os planos no Firestore com os dados mais recentes (incluindo originalPrice)
     // Usa merge: true para atualizar campos existentes e adicionar novos campos sem perder dados
+    // IMPORTANTE: Garante que isActive seja sempre true para todos os planos padrão
     const tasks = DEFAULT_PLANS.map(async (plan) => {
       try {
         const ref = doc(getPlansCollection(), plan.id);
+        // Garantir que isActive seja sempre true para planos padrão
+        const planData = { ...plan, isActive: true };
         // DOCUMENTAÇÃO: merge: true garante que campos novos (como originalPrice) sejam adicionados
-        await setDoc(ref, plan, { merge: true });
+        await setDoc(ref, planData, { merge: true });
+        console.log(`[ensureDefaultPlans] Plano ${plan.id} atualizado com isActive: true`);
       } catch (error) {
-        console.error(`[ensureDefaultPlans] Erro ao criar plano ${plan.id}:`, error);
+        console.error(`[ensureDefaultPlans] Erro ao criar/atualizar plano ${plan.id}:`, error);
         // Continua com os outros planos mesmo se um falhar
       }
     });
 
     await Promise.all(tasks);
+    console.log("[ensureDefaultPlans] Todos os planos padrão foram atualizados no Firestore");
   } catch (error) {
     console.error("[ensureDefaultPlans] Erro geral:", error);
     throw error;
@@ -69,17 +74,47 @@ export async function ensureDefaultPlans() {
 
 export async function listPlans(): Promise<Plan[]> {
   try {
+    // Tentar buscar planos com filtro de isActive (requer índice composto)
+    const plansQuery = query(
+      getPlansCollection(), 
+      where("isActive", "==", true),
+      orderBy("sortOrder", "asc")
+    );
+    const snapshot = await getDocs(plansQuery);
+    if (snapshot.size > 0) {
+      // DOCUMENTAÇÃO: Retorna planos ativos do Firestore (já atualizados por ensureDefaultPlans)
+      const plans = snapshot.docs.map((docSnap) => docSnap.data() as Plan);
+      console.log(`[listPlans] Encontrados ${plans.length} planos ativos no Firestore`);
+      return plans;
+    }
+    // Se não encontrou planos ativos, tentar buscar todos e filtrar
+    console.warn("[listPlans] Nenhum plano ativo encontrado com filtro, tentando buscar todos...");
+  } catch (error) {
+    // Erro pode ser por falta de índice composto - tentar fallback
+    console.warn("[listPlans] Erro ao buscar planos com filtro (pode ser índice composto):", error);
+  }
+  
+  // Fallback: buscar todos os planos e filtrar no código
+  try {
     const plansQuery = query(getPlansCollection(), orderBy("sortOrder", "asc"));
     const snapshot = await getDocs(plansQuery);
-    if (!snapshot.size) {
-      return DEFAULT_PLANS;
+    if (snapshot.size > 0) {
+      const allPlans = snapshot.docs.map((docSnap) => docSnap.data() as Plan);
+      // Filtrar planos ativos manualmente (isActive !== false garante que undefined também passa)
+      const activePlans = allPlans.filter(plan => plan.isActive !== false);
+      console.log(`[listPlans] Fallback: encontrados ${allPlans.length} planos, ${activePlans.length} ativos`);
+      
+      if (activePlans.length > 0) {
+        return activePlans;
+      }
     }
-    // DOCUMENTAÇÃO: Retorna planos do Firestore (já atualizados por ensureDefaultPlans)
-    return snapshot.docs.map((docSnap) => docSnap.data() as Plan);
-  } catch (error) {
-    console.error("listPlans fallback to DEFAULT_PLANS:", error);
-    return DEFAULT_PLANS;
+  } catch (fallbackError) {
+    console.error("[listPlans] Fallback também falhou:", fallbackError);
   }
+  
+  // Último recurso: retornar planos padrão (todos ativos)
+  console.warn("[listPlans] Retornando planos padrão do código");
+  return DEFAULT_PLANS;
 }
 
 export async function getSubscriptionByCompany(companyId: string) {
