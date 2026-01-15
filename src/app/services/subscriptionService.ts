@@ -398,6 +398,9 @@ export interface LogSubscriptionChangeInput {
  * @param input - Dados da mudança a ser registrada
  */
 export async function logSubscriptionChange(input: LogSubscriptionChangeInput) {
+  // Criar createdAt com o tipo apropriado dependendo do contexto
+  const createdAt = adminDb ? admin.firestore.Timestamp.now() : Timestamp.now();
+  
   const auditData: any = {
     id: "", // Será definido abaixo
     subscriptionId: input.subscriptionId,
@@ -408,8 +411,8 @@ export async function logSubscriptionChange(input: LogSubscriptionChangeInput) {
     fromStatus: input.fromStatus,
     toStatus: input.toStatus,
     notes: input.notes,
-    createdAt: adminDb ? admin.firestore.Timestamp.now() : Timestamp.now(),
-  } satisfies SubscriptionAudit;
+    createdAt: createdAt as any, // Usar 'as any' para evitar conflito de tipos entre Admin SDK e Client SDK
+  };
 
   // Usar Admin SDK se disponível (contexto de backend/webhook)
   if (adminDb) {
