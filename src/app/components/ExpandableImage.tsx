@@ -18,7 +18,7 @@ export default function ExpandableImage({
   src,
   alt,
   defaultSize = 96,
-  expandedSize = 256,
+  expandedSize = 512, // Aumentado de 256 para 512px para melhor qualidade
   className = "",
   borderColor = "white",
   showBorder = true,
@@ -41,8 +41,12 @@ export default function ExpandableImage({
     return `border-4 ${colorMap[borderColor] || 'border-white'}`;
   };
 
+  // Verificar se a imagem vem do Firebase Storage (contém 'firebasestorage' ou 'googleapis')
+  const isFirebaseImage = src?.includes('firebasestorage') || src?.includes('googleapis') || src?.includes('firebase');
+  
+  // Tamanho do container quando expandido (deve corresponder exatamente ao expandedSize para evitar distorção)
   const size = isExpanded 
-    ? { width: '192px', height: '192px', minWidth: '192px', minHeight: '192px' }
+    ? { width: `${expandedSize}px`, height: `${expandedSize}px`, minWidth: `${expandedSize}px`, minHeight: `${expandedSize}px` }
     : { width: `${defaultSize}px`, height: `${defaultSize}px`, minWidth: `${defaultSize}px`, minHeight: `${defaultSize}px` };
 
   return (
@@ -74,6 +78,8 @@ export default function ExpandableImage({
         height={isExpanded ? expandedSize : defaultSize}
         className="w-full h-full object-cover"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
+        quality={100} // Qualidade máxima para melhor nitidez
+        unoptimized={isFirebaseImage} // Desabilitar otimização para imagens do Firebase Storage
       />
     </div>
   );

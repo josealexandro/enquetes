@@ -38,7 +38,7 @@ export default function Footer() {
         <div className="col-span-1">
           <h4 className="text-lg font-semibold mb-4">Sobre Nós</h4>
           <p className="text-zinc-400 text-sm">
-            {dataToUse?.aboutUs || "Crie e participe de enquetes de forma rápida e fácil. Sua opinião importa!"}
+            {dataToUse?.aboutUs || `Tomar decisões no achismo custa caro. Foi a partir dessa constatação que criamos nossa plataforma. Somos uma solução digital focada em validação de decisões, criada para ajudar pessoas e empresas a transformarem opiniões em dados claros e acionáveis. Em vez de depender de suposições, nossa tecnologia permite testar ideias, medir preferências e entender cenários antes de agir.`}
           </p>
         </div>
 

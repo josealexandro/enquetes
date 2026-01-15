@@ -15,6 +15,8 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { adminDb } from "@/lib/firebase-admin";
+import * as admin from "firebase-admin";
 
 // Validar se Firebase está configurado
 if (!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) {
@@ -387,14 +389,18 @@ export async function listPaymentsBySubscription(subscriptionId: string) {
 export async function getPollsLimitForCompany(companyId: string): Promise<number> {
   const subscription = await getSubscriptionByCompany(companyId);
   
-  // Obter créditos avulsos do documento do usuário
+  // Obter créditos avulsos e tipo de conta do documento do usuário
   const userRef = doc(db, "users", companyId);
   const userSnap = await getDoc(userRef);
-  const extraPolls = userSnap.exists() ? (userSnap.data()?.extraPollsAvailable ?? 0) : 0;
+  const userData = userSnap.exists() ? userSnap.data() : null;
+  const extraPolls = userData?.extraPollsAvailable ?? 0;
+  const accountType = userData?.accountType ?? 'personal';
 
-  // Sem assinatura ativa → limite fixo (2) + avulsos
+  // Sem assinatura ativa → limite fixo baseado no tipo de conta + avulsos
   if (!subscription || subscription.status !== "ACTIVE") {
-    return 2 + extraPolls; 
+    // Contas comerciais têm apenas 1 enquete gratuita, contas pessoais têm 2
+    const freeLimit = accountType === 'commercial' ? 1 : 2;
+    return freeLimit + extraPolls; 
   }
 
   // Com assinatura ativa → limite do plano + avulsos
@@ -458,7 +464,25 @@ export async function countPollsCreatedInCurrentPeriod(companyId: string): Promi
   // IMPORTANTE: Contar de poll_creation_logs em vez de polls existentes
   // Isso garante que o limite seja baseado em enquetes CRIADAS, não enquetes EXISTENTES
   // Assim, mesmo que o usuário exclua uma enquete, o limite continua sendo respeitado
+  // 
+  // SEGURANÇA: NUNCA fazer fallback para contar enquetes existentes, pois isso permite bypass
+  // ao deletar enquetes. Se houver erro, retornar erro ou valor seguro, mas nunca contar
+  // enquetes existentes.
+  //
+  // Usar Admin SDK quando disponível (backend) para garantir funcionamento mesmo sem request.auth
   try {
+    // Tentar usar Admin SDK primeiro (se disponível - backend)
+    if (adminDb) {
+      const logsCollection = adminDb.collection("poll_creation_logs");
+      const snapshot = await logsCollection
+        .where("userId", "==", companyId)
+        .where("createdAt", ">=", admin.firestore.Timestamp.fromDate(periodStart.toDate()))
+        .where("createdAt", "<=", admin.firestore.Timestamp.fromDate(periodEnd.toDate()))
+        .get();
+      return snapshot.size;
+    }
+
+    // Fallback para Client SDK (frontend ou se Admin SDK não disponível)
     const logsCollection = collection(db, "poll_creation_logs");
     const logsQuery = query(
       logsCollection,
@@ -470,24 +494,18 @@ export async function countPollsCreatedInCurrentPeriod(companyId: string): Promi
     const snapshot = await getDocs(logsQuery);
     return snapshot.size;
   } catch (error: any) {
-    // Se houver erro ao contar logs (ex: índice composto não criado), fazer fallback
-    // para contar enquetes existentes (comportamento antigo)
-    console.warn("Erro ao contar logs de criação, usando fallback (enquetes existentes):", error);
-    try {
-      const pollsCollection = collection(db, "polls");
-      const pollsQuery = query(
-        pollsCollection,
-        where("creator.id", "==", companyId),
-        where("createdAt", ">=", periodStart),
-        where("createdAt", "<=", periodEnd)
-      );
-      const snapshot = await getDocs(pollsQuery);
-      return snapshot.size;
-    } catch (fallbackError: any) {
-      // Se o fallback também falhar, retornar 0 para não bloquear criação
-      console.error("Erro ao contar enquetes criadas no período (fallback também falhou):", fallbackError);
-      return 0;
-    }
+    // REMOVIDO: Fallback perigoso que contava enquetes existentes
+    // Isso permitia bypass ao deletar enquetes
+    // 
+    // Se houver erro ao contar logs, logar o erro e retornar um valor seguro
+    // que bloqueia criação (retornar um número alto) para garantir segurança
+    console.error("[countPollsCreatedInCurrentPeriod] Erro ao contar logs de criação:", error);
+    console.error("[countPollsCreatedInCurrentPeriod] Retornando valor alto para bloquear criação por segurança");
+    
+    // Retornar um número alto o suficiente para bloquear criação
+    // Isso garante que se houver problema técnico, o sistema fica seguro (bloqueia)
+    // em vez de inseguro (permite bypass)
+    return 999; // Valor alto para garantir bloqueio em caso de erro
   }
 }
 

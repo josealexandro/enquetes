@@ -133,22 +133,24 @@ export default function CommentComponent({
       }}
     >
       <div className="border-l border-zinc-700/40">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          <span className="font-medium text-zinc-200">{comment.author}</span>{" "}
-          <span className="text-xs text-zinc-500">
-            • {formatTimeAgo(comment.timestamp)}
-          </span>
-        </p>
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <span className="font-medium text-zinc-200">{comment.author}</span>{" "}
+              <span className="text-xs text-zinc-500">
+                • {formatTimeAgo(comment.timestamp)}
+              </span>
+            </p>
 
-        <p className="text-zinc-100 mt-1 break-words whitespace-normal">
-          {comment.text}
-        </p>
+            <p className="text-zinc-100 mt-1 break-words whitespace-normal">
+              {comment.text}
+            </p>
+          </div>
 
-        <div className="flex items-center space-x-3 mt-2 text-sm flex-wrap">
-          {/* Botão de curtir comentário */}
+          {/* Botão de curtir comentário - ao lado do texto */}
           <button
             onClick={handleLike}
-            className={`p-1 rounded-full transition-colors duration-200 flex items-center gap-1 ${
+            className={`p-1.5 rounded-full transition-colors duration-200 flex items-center gap-1 shrink-0 self-start mt-1 ${
               user && likedBy.includes(user.uid)
                 ? "text-red-500 hover:text-red-600"
                 : "text-zinc-400 hover:text-red-500"
@@ -156,9 +158,11 @@ export default function CommentComponent({
             aria-label="Curtir Comentário"
           >
             <FontAwesomeIcon icon={faHeart} size="sm" />
-            {likes > 0 && <span className="text-xs">{likes}</span>}
+            {likes > 0 && <span className="text-xs font-medium min-w-[1rem] text-center">{likes}</span>}
           </button>
+        </div>
 
+        <div className="flex items-center space-x-3 mt-2 text-sm flex-wrap">
           <button
             onClick={() => setShowReplyForm(!showReplyForm)}
             className="text-blue-500 hover:underline"

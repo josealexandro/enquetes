@@ -21,6 +21,7 @@ export default function DashboardPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [polls, setPolls] = useState<Poll[]>([]); // Estado para armazenar as enquetes
   const [activeSection, setActiveSection] = useState<"polls" | "subscription">("polls");
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   useEffect(() => {
     if (!loading && (!user || user.accountType !== 'commercial')) {
@@ -106,8 +107,40 @@ export default function DashboardPage() {
     <div className="flex h-screen bg-gray-900 text-white">
       <Suspense fallback={null}>
         {/* DOCUMENTAÇÃO: Componente para gerenciar pagamentos */}
-        <DashboardPaymentHandler />
+        <DashboardPaymentHandler 
+          onPaymentSuccess={() => {
+            setShowSuccessMessage(true);
+            // Ocultar mensagem após 5 segundos
+            setTimeout(() => {
+              setShowSuccessMessage(false);
+            }, 5000);
+          }}
+        />
       </Suspense>
+
+      {/* Mensagem de sucesso do pagamento */}
+      {showSuccessMessage && (
+        <div className="fixed top-4 right-4 z-50 animate-fade-in max-w-md w-[calc(100%-2rem)] sm:w-auto">
+          <div className="bg-green-500 text-white px-4 sm:px-6 py-4 rounded-lg shadow-lg flex items-start gap-3">
+            <svg className="w-6 h-6 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-base">Plano assinado com sucesso!</p>
+              <p className="text-sm text-green-100 mt-1">Sua assinatura está ativa e você já pode usar todos os recursos.</p>
+            </div>
+            <button
+              onClick={() => setShowSuccessMessage(false)}
+              className="flex-shrink-0 text-white hover:text-green-100 transition-colors ml-2"
+              aria-label="Fechar mensagem"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Botão para abrir/fechar a sidebar em mobile */}
       {/* DOCUMENTAÇÃO: Botão hamburger visível apenas no mobile */}

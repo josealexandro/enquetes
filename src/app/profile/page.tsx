@@ -8,12 +8,17 @@ import { updateProfile, updatePassword, getAuth, reauthenticateWithCredential, E
 import Notification from "../components/Notification";
 import { db } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import Image from "next/image";
 
 export default function ProfilePage() {
   const { user, loading: authLoading, firebaseAuthUser } = useAuth();
   const router = useRouter();
 
   const [displayName, setDisplayName] = useState(user?.displayName || "");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
@@ -34,36 +39,119 @@ export default function ProfilePage() {
     }
   }, [user, authLoading, router]);
 
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validar tipo de arquivo
+      if (!file.type.startsWith('image/')) {
+        setNotificationMessage("Por favor, selecione uma imagem válida.");
+        setNotificationType("error");
+        setTimeout(() => setNotificationMessage(null), 3000);
+        return;
+      }
+
+      // Validar tamanho (5MB máximo)
+      if (file.size > 5 * 1024 * 1024) {
+        setNotificationMessage("A imagem deve ter no máximo 5MB.");
+        setNotificationType("error");
+        setTimeout(() => setNotificationMessage(null), 3000);
+        return;
+      }
+
+      setAvatarFile(file);
+      
+      // Criar preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firebaseAuthUser || !user) return;
 
     setLoading(true);
+    setUploadingAvatar(false);
     setNotificationMessage(null);
 
     try {
-      // Atualizar displayName no Firebase Auth
+      let avatarUrl: string | null = user.avatarUrl || firebaseAuthUser.photoURL || null;
+
+      // Upload de avatar se houver arquivo selecionado
+      if (avatarFile) {
+        setUploadingAvatar(true);
+        try {
+          const storage = getStorage();
+          // Usar timestamp no nome do arquivo para evitar sobrescrever
+          const timestamp = Date.now();
+          const fileName = `${timestamp}-${avatarFile.name}`;
+          const avatarRef = ref(storage, `avatars/${user.uid}/${fileName}`);
+          
+          // Upload do arquivo
+          const snapshot = await uploadBytes(avatarRef, avatarFile, {
+            contentType: avatarFile.type || 'image/png'
+          });
+          
+          // Obter URL do arquivo
+          avatarUrl = await getDownloadURL(snapshot.ref);
+          setUploadingAvatar(false);
+        } catch (uploadError: any) {
+          setUploadingAvatar(false);
+          console.error("Erro ao fazer upload do avatar:", uploadError);
+          setNotificationMessage(`Erro ao fazer upload da imagem: ${uploadError.message}`);
+          setNotificationType("error");
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Preparar dados para atualização
+      const updateData: { displayName?: string; photoURL?: string | null } = {};
+      const firestoreUpdateData: { displayName?: string; avatarUrl?: string | null } = {};
+
+      // Atualizar displayName
       if (displayName !== firebaseAuthUser.displayName) {
-        await updateProfile(firebaseAuthUser, { displayName });
-        // Atualizar também no Firestore, se o usuário tiver um documento
+        updateData.displayName = displayName;
+        firestoreUpdateData.displayName = displayName;
+      }
+
+      // Atualizar avatar se houver mudança
+      if (avatarUrl && avatarUrl !== (user.avatarUrl || firebaseAuthUser.photoURL)) {
+        updateData.photoURL = avatarUrl;
+        firestoreUpdateData.avatarUrl = avatarUrl;
+      }
+
+      // Atualizar Firebase Auth
+      if (Object.keys(updateData).length > 0) {
+        await updateProfile(firebaseAuthUser, updateData);
+      }
+
+      // Atualizar Firestore
+      if (Object.keys(firestoreUpdateData).length > 0) {
         try {
           const userDocRef = doc(db, "users", user.uid);
-          await updateDoc(userDocRef, { displayName });
+          await updateDoc(userDocRef, firestoreUpdateData);
         } catch (firestoreError: any) {
           // Se falhar ao atualizar no Firestore mas o Auth foi atualizado, não mostrar erro
-          // O perfil do Auth já foi atualizado com sucesso
           if (firestoreError?.code !== 'permission-denied') {
             console.error("Erro ao atualizar perfil no Firestore:", firestoreError);
           }
         }
       }
+
+      // Limpar estados do avatar
+      setAvatarFile(null);
+      setAvatarPreview(null);
+
       setNotificationMessage("Perfil atualizado com sucesso!");
       setNotificationType("success");
     } catch (error: any) {
       console.error("Erro ao atualizar perfil:", error);
       
       // Se o erro for de permissão, não mostrar erro ao usuário
-      // O perfil pode ter sido atualizado no Auth mesmo com erro no Firestore
       if (error?.code === 'permission-denied') {
         setNotificationMessage("Perfil atualizado com sucesso!");
         setNotificationType("success");
@@ -73,6 +161,7 @@ export default function ProfilePage() {
       }
     } finally {
       setLoading(false);
+      setUploadingAvatar(false);
     }
   };
 
@@ -139,6 +228,42 @@ export default function ProfilePage() {
       <div className="w-full max-w-md bg-zinc-800 p-8 rounded-lg shadow-lg mb-8">
         <h2 className="text-2xl font-semibold mb-6">Informações do Perfil</h2>
         <form onSubmit={handleUpdateProfile} className="space-y-4">
+          {/* Foto de Perfil */}
+          <div>
+            <label htmlFor="avatar" className="block text-zinc-300 text-sm font-bold mb-2">
+              Foto de Perfil
+            </label>
+            <div className="flex items-center gap-4 mb-4">
+              {/* Avatar atual ou preview */}
+              {(avatarPreview || user?.avatarUrl || firebaseAuthUser?.photoURL) && (
+                <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-zinc-600">
+                  <Image
+                    src={avatarPreview || user?.avatarUrl || firebaseAuthUser?.photoURL || ""}
+                    alt="Avatar"
+                    fill
+                    className="object-cover"
+                    sizes="80px"
+                  />
+                </div>
+              )}
+              <div className="flex-1">
+                <input
+                  type="file"
+                  id="avatar"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="block w-full text-sm text-zinc-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
+                  disabled={loading || uploadingAvatar}
+                />
+                <p className="text-xs text-zinc-400 mt-1">Formatos aceitos: JPG, PNG, GIF (máx. 5MB)</p>
+              </div>
+            </div>
+            {uploadingAvatar && (
+              <p className="text-sm text-blue-400 mb-2">Enviando imagem...</p>
+            )}
+          </div>
+
+          {/* Nome de Exibição */}
           <div>
             <label htmlFor="displayName" className="block text-zinc-300 text-sm font-bold mb-2">
               Nome de Exibição
@@ -154,10 +279,10 @@ export default function ProfilePage() {
           </div>
           <button
             type="submit"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-            disabled={loading}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full"
+            disabled={loading || uploadingAvatar}
           >
-            {loading ? "Salvando..." : "Salvar Alterações"}
+            {loading || uploadingAvatar ? "Salvando..." : "Salvar Alterações"}
           </button>
         </form>
       </div>

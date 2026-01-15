@@ -294,7 +294,7 @@ export default function EnquetesPage() {
         {/* Seção do Pódio de Enquetes */}
         {podiumPolls.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mb-10 pt-6 text-center relative z-30">Mais Votadas</h2>
+            <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mb-16 pt-6 text-center relative z-30">Mais Votadas</h2>
             <div className="relative z-0 pt-4">
               <PollPodium polls={podiumPolls} onVote={handleVote} onDelete={handleDeletePoll} />
             </div>

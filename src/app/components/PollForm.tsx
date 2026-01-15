@@ -2,12 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-// import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Importar Firebase Storage
-import { v4 as uuidv4 } from "uuid"; // Importar uuidv4
 import { useAuth } from "@/app/context/AuthContext";
-import { getPollsLimitForCompany, countPollsCreatedInCurrentPeriod, recordPollCreation } from "@/app/services/subscriptionService"; // Importar funções de limite
 import { useRouter } from "next/navigation";
 
 interface PollFormProps {
@@ -24,7 +19,7 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
   const [isBuyingPoll, setIsBuyingPoll] = useState(false); // Novo estado para controlar o loading da compra
   // const [imageFile, setImageFile] = useState<File | null>(null); // Estado para o arquivo de imagem
   // const [uploadingImage, setUploadingImage] = useState(false); // Estado para o status do upload da imagem
-  const { user, updateUserDocument } = useAuth();
+  const { user, refreshUserData } = useAuth();
   const router = useRouter();
 
   // Adicionar aqui a declaração de extraPollsCount
@@ -150,58 +145,8 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
       setFeedbackType("error");
       return;
     }
-    
-    // Verificar o limite de enquetes por mês e créditos avulsos
-    if (user.uid) {
-      try {
-        const pollsLimit = await getPollsLimitForCompany(user.uid);
-        const pollsCreated = await countPollsCreatedInCurrentPeriod(user.uid);
-        const hasExtraCredit = (user.extraPollsAvailable && user.extraPollsAvailable > 0) || false;
-        const extraPollsCount = user.extraPollsAvailable || 0;
 
-        // Se atingiu o limite e não tem créditos avulsos, bloquear criação
-        if (pollsLimit !== null && pollsCreated >= pollsLimit && !hasExtraCredit) {
-          setFeedbackMessage("Você atingiu o limite de enquetes para o seu plano neste mês. Compre um crédito avulso para postar mais enquetes.");
-          setFeedbackType("error");
-          return;
-        }
-        
-        // Se atingiu o limite, mas tem créditos avulsos, usar um crédito
-        if (pollsLimit !== null && pollsCreated >= pollsLimit && hasExtraCredit && user.uid) {
-          await updateUserDocument(user.uid, { extraPollsAvailable: user.extraPollsAvailable! - 1 });
-          setFeedbackMessage(`Crédito de enquete avulsa utilizado com sucesso! Você tem ${extraPollsCount - 1} créditos restantes. Você pode criar sua enquete agora.`);
-          setFeedbackType("success");
-          // Não dar return aqui para permitir a criação da enquete
-        }
-      } catch (limitError) {
-        // Não bloquear a criação se houver erro ao verificar limites
-        console.error("Erro ao verificar limites de enquetes:", limitError);
-      }
-    }
-
-    // let imageUrl: string | undefined = undefined; // Inicializa imageUrl como undefined
-
-    // if (isCommercial && imageFile) {
-    //   setUploadingImage(true); // Inicia o estado de upload
-    //   try {
-    //     const storage = getStorage();
-    //     const imageRef = ref(storage, `poll_images/${uuidv4()}-${imageFile.name}`);
-    //     await uploadBytes(imageRef, imageFile);
-    //     imageUrl = await getDownloadURL(imageRef);
-    //     setFeedbackMessage("Imagem enviada com sucesso!");
-    //     setFeedbackType("success");
-    //   } catch (error) {
-    //     console.error("Erro ao fazer upload da imagem:", error);
-    //     setFeedbackMessage("Erro ao fazer upload da imagem.");
-    //     setFeedbackType("error");
-    //     setUploadingImage(false); // Garante que o estado de upload seja resetado em caso de erro
-    //     return; // Interrompe o envio da enquete se o upload da imagem falhar
-    //   } finally {
-    //     setUploadingImage(false); // Finaliza o estado de upload, seja com sucesso ou erro
-    //     // Continue com o restante da lógica de criação da enquete
-    //   }
-    // }
-
+    // CRIAR ENQUETE NO BACKEND (validação e criação segura)
     try {
       if (!user || !user.uid) {
         setFeedbackMessage("Erro: Usuário não autenticado. Por favor, faça login novamente.");
@@ -209,90 +154,62 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
         setTimeout(() => setFeedbackMessage(null), 3000);
         return;
       }
-      
-      const pollsCollectionRef = collection(db, "polls");
-      
+
       // Preparar dados do criador da enquete
-      // Se for comercial, usar commercialName como nome principal, senão usar displayName ou email
       const creatorData = {
-        name: (isCommercial && user.commercialName) 
-          ? user.commercialName 
+        name: (isCommercial && user.commercialName)
+          ? user.commercialName
           : (user.displayName || user.email || "Usuário Logado"),
-        // Priorizar avatarUrl do Firestore (perfil atualizado), senão usar photoURL do Firebase Auth
         avatarUrl: (user as any).avatarUrl || user.photoURL || "https://www.gravatar.com/avatar/?d=mp",
         id: user.uid,
         ...(user.commercialName && { commercialName: user.commercialName }),
         ...(user.themeColor && { themeColor: user.themeColor }),
       };
-      
-      // Preparar dados da enquete para criação no Firestore
-      const pollData = {
-        title: trimmedTitle,
-        options: filteredOptions.map(optionText => ({ id: uuidv4(), text: optionText, votes: 0 })),
-        category: category,
-        creator: creatorData,
-        createdAt: serverTimestamp(),
-        isCommercial: isCommercial,
-        commentCount: 0,
-        likes: 0,
-        likedBy: [],
-        dislikes: 0,
-        dislikedBy: [],
-        // ...(imageUrl && { imageUrl }), // Adiciona imageUrl apenas se existir
-      };
-      
-      // Criar a enquete no Firestore
-      const newPollRef = await addDoc(pollsCollectionRef, pollData);
 
-      /**
-       * Registrar a criação no log para controle de limites
-       * 
-       * IMPORTANTE: Este log é usado para contar enquetes CRIADAS, não enquetes EXISTENTES.
-       * Isso garante que o limite seja respeitado mesmo se o usuário excluir enquetes.
-       * 
-       * EXEMPLO:
-       * - Limite: 2 enquetes por mês
-       * - Usuário cria 2 enquetes → 2 logs criados
-       * - Usuário exclui 1 enquete → ainda tem 2 logs (limite respeitado)
-       * - Usuário tenta criar 3ª enquete → bloqueado (limite atingido)
-       * 
-       * Se este log não for criado, o sistema fará fallback para contar enquetes existentes,
-       * mas o ideal é que o log seja criado para garantir o controle correto de limites.
-       */
-      try {
-        await recordPollCreation(user.uid, newPollRef.id);
-      } catch (logError) {
-        // Erro ao criar log não deve impedir a criação da enquete
-        // O log é importante para o limite, mas não é crítico para a funcionalidade básica
-        console.error("Erro ao registrar log de criação (não crítico):", logError);
+      // Chamar API route para criar enquete (tudo validado no backend)
+      const response = await fetch("/api/polls/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: user.uid,
+          title: trimmedTitle,
+          options: filteredOptions,
+          category: category,
+          isCommercial: isCommercial,
+          creatorData: creatorData,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setFeedbackMessage(data.message || "Erro ao criar enquete. Tente novamente.");
+        setFeedbackType("error");
+        setTimeout(() => setFeedbackMessage(null), 5000);
+        return;
+      }
+
+      // Atualizar dados do usuário para refletir créditos atualizados (se houver)
+      if (data.creditsRemaining !== undefined) {
+        await refreshUserData();
       }
 
       // Mostrar mensagem de sucesso e limpar o formulário
-      setFeedbackMessage("Enquete criada com sucesso!");
+      setFeedbackMessage(data.message || "Enquete criada com sucesso!");
       setFeedbackType("success");
-      
+
       setTitle("");
       setOptions(["", ""]);
       setCategory("Geral");
-      
+
       // Limpar mensagem após 3 segundos e chamar callback
       setTimeout(() => {
         setFeedbackMessage(null);
         onPollCreated?.();
       }, 3000);
     } catch (error: any) {
-      // Tratar erros na criação da enquete
-      if (error?.isNonCritical) {
-        // Erro não crítico (ex: log de criação), ignorar
-        return;
-      }
-      
-      // Verificar se é erro de permissão
-      if (error?.code === 'permission-denied' || error?.message?.includes('permission') || error?.message?.includes('Permission')) {
-        setFeedbackMessage("Erro de permissão: Verifique se você está logado e se as regras do Firestore foram atualizadas. Se o problema persistir, entre em contato com o suporte.");
-      } else {
-        setFeedbackMessage(error?.message || "Erro ao criar enquete. Tente novamente.");
-      }
+      console.error("Erro ao criar enquete:", error);
+      setFeedbackMessage(error?.message || "Erro ao criar enquete. Tente novamente.");
       setFeedbackType("error");
       setTimeout(() => setFeedbackMessage(null), 5000);
     }
@@ -315,7 +232,7 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
         </div>
       )}
 
-      {feedbackType === "error" && feedbackMessage?.includes("limite") && extraPollsCount === 0 && (
+      {feedbackType === "error" && feedbackMessage?.includes("limite") && extraPollsCount === 0 && user?.accountType !== 'commercial' && (
         <motion.button
           type="button"
           onClick={handleBuySinglePoll}

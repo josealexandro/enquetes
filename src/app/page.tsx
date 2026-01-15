@@ -525,17 +525,17 @@ export default function Home() {
         )}
 
         <p className="text-sm mt-2 welcome-subtext">
-          Crie enquetes e envie para outras pessoas.
+        Transforme a voz do cliente em decisões baseadas em dados.
         </p>
         <p className="text-sm mt-2 welcome-subtext">
-          Um sistema profissional para sua empresa ouvir clientes e obter confiança
+          Um sistema profissional para sua empresa ouvir clientes e obter insights valiosos
         </p>
       </div>
 
       {/* Novo Pódio de Enquetes no Topo */}
       {podiumPolls.length > 0 && (
         <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-4xl flex flex-col items-center gap-8 px-4">
-          <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-6 mb-6">Mais Votadas</h2> {/* Ajustado mt-12 para mt-6 */}
+          <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mt-6 mb-16">Mais Votadas</h2> {/* Ajustado mb-6 para mb-16 */}
           <PollPodium 
             polls={podiumPolls}
             onVote={handleVote}
