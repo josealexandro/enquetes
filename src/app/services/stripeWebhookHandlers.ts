@@ -11,6 +11,7 @@ import {
   // Removendo getPlanById (não utilizada neste arquivo)
 } from "@/app/services/subscriptionService";
 import { SubscriptionStatus } from "@/app/types/subscription"; // Importando SubscriptionStatus
+import { adminDb } from "@/lib/firebase-admin"; // Importar adminDb para verificação
 
 // Interface estendida para lidar com propriedades que podem não estar na tipagem padrão do Stripe
 interface StripeSubscriptionExtended extends Stripe.Subscription {
@@ -38,52 +39,69 @@ interface StripeSubscriptionExtended extends Stripe.Subscription {
  * @param session - Sessão de checkout do Stripe
  */
 export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
-  const { metadata, amount_total } = session; // Removendo stripeSubscriptionId
+  console.log(`[handleCheckoutSessionCompleted] Iniciando processamento da sessão ${session.id}`);
+  const { metadata, amount_total } = session;
+
+  console.log(`[handleCheckoutSessionCompleted] Metadata recebido:`, JSON.stringify(metadata));
 
   if (!metadata || !metadata.companyId || !metadata.companyName) {
-    console.error("Metadata da sessão de checkout incompleto:", metadata);
+    console.error("[handleCheckoutSessionCompleted] ERRO: Metadata da sessão de checkout incompleto:", metadata);
     throw new Error("Metadata da sessão de checkout incompleto.");
   }
 
   const { companyId, companyName } = metadata;
   const amount = amount_total ?? 0;
+  console.log(`[handleCheckoutSessionCompleted] Processando para companyId: ${companyId}, amount: ${amount}`);
 
   // Lógica para pagamentos avulsos (crédito de enquete)
   // NOTA: addPollCreditToCompany usa Admin SDK automaticamente quando executado no backend
   if (metadata.type === "single_poll_credit") {
+    console.log(`[handleCheckoutSessionCompleted] Processando crédito avulso para ${companyId}`);
     await addPollCreditToCompany(companyId);
-    // Opcional: registrar o pagamento como um pagamento avulso separado, se necessário
-    console.log(`Crédito de enquete avulsa adicionado para a empresa ${companyId} via Checkout Session ${session.id}`);
+    console.log(`[handleCheckoutSessionCompleted] Crédito de enquete avulsa adicionado para a empresa ${companyId} via Checkout Session ${session.id}`);
     return; // Finaliza o processamento para este tipo de evento
   }
 
   // Lógica existente para assinaturas
-  if (!metadata.planId) { // Agora, planId é esperado apenas para assinaturas
-    console.error("Metadata da sessão de checkout de assinatura incompleto: planId ausente.", metadata);
+  if (!metadata.planId) {
+    console.error("[handleCheckoutSessionCompleted] ERRO: Metadata da sessão de checkout de assinatura incompleto: planId ausente.", metadata);
     throw new Error("Metadata da sessão de checkout de assinatura incompleto.");
   }
 
-  const { planId } = metadata; // Obtem planId aqui, pois ele é específico para assinaturas
+  const { planId } = metadata;
+  console.log(`[handleCheckoutSessionCompleted] Processando assinatura: planId=${planId}, companyId=${companyId}`);
+  
+  // Verificar se Admin SDK está disponível
+  if (!adminDb) {
+    console.error("[handleCheckoutSessionCompleted] ERRO CRÍTICO: Admin SDK não está disponível! Verifique FIREBASE_ADMIN_PRIVATE_KEY na Vercel.");
+    throw new Error("Admin SDK não está disponível. Verifique as variáveis de ambiente.");
+  }
   
   // NOTA: Todas as operações abaixo usam Admin SDK automaticamente quando executadas no backend
   // (createSubscription, switchSubscriptionPlan, updateSubscriptionStatus, recordPayment)
+  console.log(`[handleCheckoutSessionCompleted] Buscando assinatura existente para ${companyId}`);
   let subscription = await getSubscriptionByCompany(companyId);
 
   if (!subscription) {
+    console.log(`[handleCheckoutSessionCompleted] Assinatura não existe. Criando nova assinatura para ${companyId}`);
     // Criar nova assinatura (usa Admin SDK automaticamente)
-    await createSubscription({
+    const subscriptionId = await createSubscription({
       companyId,
       companyName,
       planId,
       paymentMethod: "stripe",
       status: "ACTIVE",
     });
+    console.log(`[handleCheckoutSessionCompleted] Assinatura criada com ID: ${subscriptionId}`);
+    
     subscription = await getSubscriptionByCompany(companyId);
     if (!subscription) {
-      console.error("Falha ao criar assinatura após checkout session:", session.id);
+      console.error("[handleCheckoutSessionCompleted] ERRO: Falha ao criar assinatura após checkout session:", session.id);
       throw new Error("Não foi possível criar a assinatura após o checkout");
     }
+    console.log(`[handleCheckoutSessionCompleted] Assinatura confirmada no banco: ${subscription.id}, status: ${subscription.status}`);
   } else {
+    console.log(`[handleCheckoutSessionCompleted] Assinatura já existe (ID: ${subscription.id}). Atualizando plano e status.`);
     // Se já existe, atualiza o plano e status (para o caso de troca de plano)
     // Usa Admin SDK automaticamente
     await switchSubscriptionPlan({
@@ -92,15 +110,19 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
       actorId: "stripe_webhook",
       actorName: "Stripe Webhook",
     });
+    console.log(`[handleCheckoutSessionCompleted] Plano atualizado para ${planId}`);
+    
     await updateSubscriptionStatus(subscription.id, "ACTIVE", {
       actorId: "stripe_webhook",
       actorName: "Stripe Webhook",
       notes: `Plano atualizado via Checkout Session ${session.id}`,
     });
+    console.log(`[handleCheckoutSessionCompleted] Status atualizado para ACTIVE`);
   }
 
   // Registra o pagamento (se for a primeira fatura, já é paga aqui)
   // Usa Admin SDK automaticamente
+  console.log(`[handleCheckoutSessionCompleted] Registrando pagamento: subscriptionId=${subscription.id}, amount=${amount}`);
   await recordPayment({
     subscriptionId: subscription.id,
     invoiceId: session.id, // ID da sessão de checkout
@@ -111,8 +133,9 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
     paidAt: new Date(),
     rawPayload: session as unknown as Record<string, unknown>,
   });
+  console.log(`[handleCheckoutSessionCompleted] Pagamento registrado com sucesso`);
 
-  console.log("Assinatura e pagamento processados via Stripe Checkout Session:", session.id);
+  console.log(`[handleCheckoutSessionCompleted] SUCESSO: Assinatura e pagamento processados via Stripe Checkout Session ${session.id}`);
 }
 
 /**
