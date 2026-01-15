@@ -161,7 +161,6 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
       return;
     }
 
-    const pollRef = doc(db, "polls", poll.id);
     const hasLiked = likedBy.includes(user.uid);
     const hasDisliked = dislikedBy.includes(user.uid);
 
@@ -188,31 +187,32 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
     }
 
     try {
-      if (hasLiked) {
-        await updateDoc(pollRef, {
-          likes: increment(-1),
-          likedBy: arrayRemove(user.uid),
-        });
-      } else {
-        await updateDoc(pollRef, {
-          likes: increment(1),
-          likedBy: arrayUnion(user.uid),
-          ...(hasDisliked
-            ? {
-                dislikes: increment(-1),
-                dislikedBy: arrayRemove(user.uid),
-              }
-            : {}),
-        });
+      // Usar API route com Admin SDK
+      const response = await fetch("/api/polls/like", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pollId: poll.id,
+          userId: user.uid,
+          action: hasLiked ? "unlike" : "like",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Erro ao curtir/descurtir enquete.");
+      }
+
+      // Atualizar com dados do servidor
+      if (data.data) {
+        setLikes(data.data.likes || 0);
+        setLikedBy(data.data.likedBy || []);
+        setDislikes(data.data.dislikes || 0);
+        setDislikedBy(data.data.dislikedBy || []);
       }
     } catch (error: any) {
       console.error("Erro ao curtir/descurtir enquete:", error);
-      
-      // Se o erro for de permissão, não mostrar erro ao usuário
-      // O onSnapshot vai atualizar se funcionou
-      if (error?.code === 'permission-denied') {
-        return;
-      }
       
       // Revert Optimistic Update on error
       if (hasLiked) {
@@ -226,6 +226,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
             setDislikedBy(prev => [...prev, user.uid]);
         }
       }
+      
       alert("Erro ao curtir/descurtir enquete. Tente novamente.");
     }
   };
@@ -237,7 +238,6 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
       return;
     }
 
-    const pollRef = doc(db, "polls", poll.id);
     const hasLiked = likedBy.includes(user.uid);
     const hasDisliked = dislikedBy.includes(user.uid);
 
@@ -255,31 +255,32 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
     }
 
     try {
-      if (hasDisliked) {
-        await updateDoc(pollRef, {
-          dislikes: increment(-1),
-          dislikedBy: arrayRemove(user.uid),
-        });
-      } else {
-        await updateDoc(pollRef, {
-          dislikes: increment(1),
-          dislikedBy: arrayUnion(user.uid),
-          ...(hasLiked
-            ? {
-                likes: increment(-1),
-                likedBy: arrayRemove(user.uid),
-              }
-            : {}),
-        });
+      // Usar API route com Admin SDK
+      const response = await fetch("/api/polls/like", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pollId: poll.id,
+          userId: user.uid,
+          action: hasDisliked ? "undislike" : "dislike",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Erro ao descurtir enquete.");
+      }
+
+      // Atualizar com dados do servidor
+      if (data.data) {
+        setLikes(data.data.likes || 0);
+        setLikedBy(data.data.likedBy || []);
+        setDislikes(data.data.dislikes || 0);
+        setDislikedBy(data.data.dislikedBy || []);
       }
     } catch (error: any) {
       console.error("Erro ao descurtir enquete:", error);
-      
-      // Se o erro for de permissão, não mostrar erro ao usuário
-      // O onSnapshot vai atualizar se funcionou
-      if (error?.code === 'permission-denied') {
-        return;
-      }
       
       // Revert Optimistic Update
       if (hasDisliked) {

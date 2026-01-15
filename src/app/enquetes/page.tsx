@@ -212,7 +212,6 @@ export default function EnquetesPage() {
     const pollToUpdate = polls.find(p => p.id === pollId) || podiumPolls.find(p => p.id === pollId);
     if (!pollToUpdate) return;
 
-    const isOwner = pollToUpdate.creator.id === user.uid;
     const updatedOptions = pollToUpdate.options.map(option =>
       option.id === optionId ? { ...option, votes: option.votes + 1 } : option
     );
@@ -226,26 +225,40 @@ export default function EnquetesPage() {
     if (podiumPolls.some(p => p.id === pollId)) setPodiumPolls(prev => updateList(prev));
 
     try {
-      const pollRef = doc(db, "polls", pollId);
-      
-      // Se for o dono, pode atualizar options e votedBy juntos
-      if (isOwner) {
-        await updateDoc(pollRef, { 
-          options: updatedOptions, 
-          votedBy: arrayUnion(user.uid) 
-        });
-      } else {
-        // Se não for o dono, atualizar options e votedBy juntos
-        // As regras do Firestore validam que apenas uma opção teve seu voto incrementado
-        await updateDoc(pollRef, { 
-          options: updatedOptions, 
-          votedBy: arrayUnion(user.uid) 
-        });
+      // Usar API route com Admin SDK
+      const response = await fetch("/api/polls/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pollId,
+          optionId,
+          userId: user.uid,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Erro ao registrar voto.");
       }
-    } catch (error) {
+
+      // Atualizar com dados do servidor
+      if (data.data) {
+        const updateListWithServerData = (list: Poll[]) => list.map(p => 
+          p.id === pollId ? { ...p, options: data.data.options, votedBy: data.data.votedBy } : p
+        );
+        if (polls.some(p => p.id === pollId)) setPolls(prev => updateListWithServerData(prev));
+        if (podiumPolls.some(p => p.id === pollId)) setPodiumPolls(prev => updateListWithServerData(prev));
+      }
+    } catch (error: any) {
       console.error("Erro ao votar:", error);
-      alert("Erro ao registrar voto. Tente novamente.");
-      // Reverter seria ideal aqui, mas omitido para brevidade
+      alert(error.message || "Erro ao registrar voto. Tente novamente.");
+      // Reverter atualização otimista
+      const revertList = (list: Poll[]) => list.map(p => 
+        p.id === pollId ? pollToUpdate : p
+      );
+      if (polls.some(p => p.id === pollId)) setPolls(prev => revertList(prev));
+      if (podiumPolls.some(p => p.id === pollId)) setPodiumPolls(prev => revertList(prev));
     }
   };
 

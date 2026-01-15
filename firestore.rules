@@ -87,6 +87,8 @@ service cloud.firestore {
             && request.resource.data.creator == resource.data.creator
             && request.resource.data.createdAt == resource.data.createdAt
             && request.resource.data.isCommercial == resource.data.isCommercial
+            // Allow likes/dislikes/likedBy/dislikedBy to be updated
+            // These fields can use increment() and arrayUnion/arrayRemove which are safe server-side operations
         )
       );
 

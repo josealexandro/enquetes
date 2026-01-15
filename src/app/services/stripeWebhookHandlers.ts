@@ -19,6 +19,24 @@ interface StripeSubscriptionExtended extends Stripe.Subscription {
   // Removido cancel_at_period_end, pois já existe em Stripe.Subscription
 }
 
+/**
+ * Handler para o evento checkout.session.completed do Stripe
+ * 
+ * IMPORTANTE: Esta função é executada no backend (API route) e todas as operações
+ * de escrita no Firestore usam Admin SDK automaticamente através das funções do
+ * subscriptionService, que detectam o contexto e usam Admin SDK quando disponível.
+ * 
+ * Isso garante que os webhooks funcionem corretamente mesmo sem regras permissivas
+ * do Firestore, pois o Admin SDK bypassa todas as regras de segurança.
+ * 
+ * Fluxo:
+ * 1. Valida metadata da sessão
+ * 2. Se for crédito avulso: adiciona crédito via addPollCreditToCompany (Admin SDK)
+ * 3. Se for assinatura: cria/atualiza assinatura via createSubscription/switchSubscriptionPlan (Admin SDK)
+ * 4. Registra pagamento via recordPayment (Admin SDK)
+ * 
+ * @param session - Sessão de checkout do Stripe
+ */
 export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   const { metadata, amount_total } = session; // Removendo stripeSubscriptionId
 
@@ -31,6 +49,7 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
   const amount = amount_total ?? 0;
 
   // Lógica para pagamentos avulsos (crédito de enquete)
+  // NOTA: addPollCreditToCompany usa Admin SDK automaticamente quando executado no backend
   if (metadata.type === "single_poll_credit") {
     await addPollCreditToCompany(companyId);
     // Opcional: registrar o pagamento como um pagamento avulso separado, se necessário
@@ -46,9 +65,12 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
 
   const { planId } = metadata; // Obtem planId aqui, pois ele é específico para assinaturas
   
+  // NOTA: Todas as operações abaixo usam Admin SDK automaticamente quando executadas no backend
+  // (createSubscription, switchSubscriptionPlan, updateSubscriptionStatus, recordPayment)
   let subscription = await getSubscriptionByCompany(companyId);
 
   if (!subscription) {
+    // Criar nova assinatura (usa Admin SDK automaticamente)
     await createSubscription({
       companyId,
       companyName,
@@ -63,6 +85,7 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
     }
   } else {
     // Se já existe, atualiza o plano e status (para o caso de troca de plano)
+    // Usa Admin SDK automaticamente
     await switchSubscriptionPlan({
       subscriptionId: subscription.id,
       newPlanId: planId,
@@ -77,6 +100,7 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
   }
 
   // Registra o pagamento (se for a primeira fatura, já é paga aqui)
+  // Usa Admin SDK automaticamente
   await recordPayment({
     subscriptionId: subscription.id,
     invoiceId: session.id, // ID da sessão de checkout
@@ -91,6 +115,18 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
   console.log("Assinatura e pagamento processados via Stripe Checkout Session:", session.id);
 }
 
+/**
+ * Handler para o evento invoice.paid do Stripe
+ * 
+ * IMPORTANTE: Esta função é executada no backend (API route) e todas as operações
+ * de escrita no Firestore usam Admin SDK automaticamente através das funções do
+ * subscriptionService, que detectam o contexto e usam Admin SDK quando disponível.
+ * 
+ * NOTA: Esta função depende de invoice.metadata.companyId. Se o metadata não estiver
+ * presente, a função retorna silenciosamente (não lança erro).
+ * 
+ * @param invoice - Invoice do Stripe que foi paga
+ */
 export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const { customer: stripeCustomerId, total, status, id: invoiceId } = invoice;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -144,6 +180,23 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   console.log("Invoice paga processada:", invoiceId);
 }
 
+/**
+ * Handler para o evento customer.subscription.updated do Stripe
+ * 
+ * IMPORTANTE: Esta função é executada no backend (API route) e todas as operações
+ * de escrita no Firestore usam Admin SDK automaticamente através das funções do
+ * subscriptionService, que detectam o contexto e usam Admin SDK quando disponível.
+ * 
+ * Esta função atualiza:
+ * - Status da assinatura (via updateSubscriptionStatus - Admin SDK)
+ * - Período atual (currentPeriodStart/End - via updateSubscriptionPeriodAndCancellation - Admin SDK)
+ * - Status de cancelamento (cancelAtPeriodEnd - via updateSubscriptionPeriodAndCancellation - Admin SDK)
+ * 
+ * NOTA: Esta função depende de subscription.metadata.companyId. Se o metadata não estiver
+ * presente, a função retorna silenciosamente (não lança erro).
+ * 
+ * @param stripeSubscription - Assinatura do Stripe que foi atualizada
+ */
 export async function handleCustomerSubscriptionUpdated(stripeSubscription: Stripe.Subscription) {
   // Usando a interface estendida para acessar as propriedades
   const sub = stripeSubscription as StripeSubscriptionExtended;

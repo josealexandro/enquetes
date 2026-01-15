@@ -157,7 +157,20 @@ export interface CreateSubscriptionInput {
   pendingInvoiceId?: string;
 }
 
+/**
+ * Cria uma nova assinatura no Firestore
+ * 
+ * IMPORTANTE: Esta função detecta automaticamente o contexto:
+ * - Se Admin SDK estiver disponível (backend/webhooks): usa Admin SDK (bypassa regras do Firestore)
+ * - Se não estiver disponível (frontend): usa Client SDK (respeita regras do Firestore)
+ * 
+ * Isso garante que webhooks do Stripe funcionem corretamente mesmo sem regras permissivas.
+ * 
+ * @param input - Dados da assinatura a ser criada
+ * @returns ID da assinatura criada
+ */
 export async function createSubscription(input: CreateSubscriptionInput) {
+  // Buscar dados do plano (sempre usa Client SDK para leitura, pois é seguro)
   const planRef = doc(getPlansCollection(), input.planId);
   const planDoc = await getDoc(planRef);
 
@@ -167,17 +180,22 @@ export async function createSubscription(input: CreateSubscriptionInput) {
     if (!planData) {
       throw new Error("Plano selecionado não encontrado.");
     }
-    await setDoc(planRef, planData, { merge: true });
+    // Se Admin SDK disponível, usar para criar plano (webhook context)
+    if (adminDb) {
+      await adminDb.doc(`plans/${input.planId}`).set(planData, { merge: true });
+    } else {
+      await setDoc(planRef, planData, { merge: true });
+    }
   } else {
     planData = planDoc.data() as Plan;
   }
+
   const now = Timestamp.now();
   const periodLengthInDays = planData.billingPeriod === "monthly" ? 30 : 365;
   const status = input.status ?? (planData.trialDays ? "TRIALING" : "AWAITING_CONFIRMATION");
 
-  const subscriptionRef = doc(getSubscriptionsCollection());
   const subscriptionData = {
-    id: subscriptionRef.id,
+    id: "", // Será definido abaixo
     companyId: input.companyId,
     companyName: input.companyName,
     planId: planData.id,
@@ -190,21 +208,36 @@ export async function createSubscription(input: CreateSubscriptionInput) {
       limits: planData.limits,
     },
     status,
-    startDate: now,
-    currentPeriodStart: now,
-    currentPeriodEnd: Timestamp.fromMillis(
-      now.toMillis() + periodLengthInDays * 24 * 60 * 60 * 1000
-    ),
+    startDate: adminDb ? admin.firestore.Timestamp.now() : now,
+    currentPeriodStart: adminDb ? admin.firestore.Timestamp.now() : now,
+    currentPeriodEnd: adminDb
+      ? admin.firestore.Timestamp.fromMillis(now.toMillis() + periodLengthInDays * 24 * 60 * 60 * 1000)
+      : Timestamp.fromMillis(now.toMillis() + periodLengthInDays * 24 * 60 * 60 * 1000),
     cancelAtPeriodEnd: false,
-    // Firestore não aceita "undefined" como valor de campo.
     paymentMethod: input.paymentMethod ?? null,
     pendingInvoiceId: input.pendingInvoiceId ?? null,
   };
 
-  await setDoc(subscriptionRef, subscriptionData);
+  let subscriptionId: string;
+
+  // Usar Admin SDK se disponível (contexto de backend/webhook)
+  if (adminDb) {
+    const subscriptionDocRef = adminDb.collection("subscriptions").doc();
+    subscriptionId = subscriptionDocRef.id;
+    subscriptionData.id = subscriptionId;
+    await subscriptionDocRef.set(subscriptionData);
+    console.log(`[createSubscription] Assinatura criada via Admin SDK: ${subscriptionId}`);
+  } else {
+    // Fallback para Client SDK (contexto de frontend)
+    const subscriptionRef = doc(getSubscriptionsCollection());
+    subscriptionId = subscriptionRef.id;
+    subscriptionData.id = subscriptionId;
+    await setDoc(subscriptionRef, subscriptionData);
+    console.log(`[createSubscription] Assinatura criada via Client SDK: ${subscriptionId}`);
+  }
 
   await logSubscriptionChange({
-    subscriptionId: subscriptionRef.id,
+    subscriptionId,
     actorId: input.companyId,
     actorName: input.companyName,
     toPlan: planData.slug,
@@ -212,32 +245,64 @@ export async function createSubscription(input: CreateSubscriptionInput) {
     notes: "Assinatura criada via dashboard.",
   });
 
-  return subscriptionRef.id;
+  return subscriptionId;
 }
 
+/**
+ * Atualiza o status de uma assinatura no Firestore
+ * 
+ * IMPORTANTE: Esta função detecta automaticamente o contexto:
+ * - Se Admin SDK estiver disponível (backend/webhooks): usa Admin SDK (bypassa regras do Firestore)
+ * - Se não estiver disponível (frontend): usa Client SDK (respeita regras do Firestore)
+ * 
+ * Isso garante que webhooks do Stripe funcionem corretamente mesmo sem regras permissivas.
+ * 
+ * @param subscriptionId - ID da assinatura a ser atualizada
+ * @param status - Novo status da assinatura
+ * @param options - Opções adicionais (notas, ator, invoiceId)
+ */
 export async function updateSubscriptionStatus(
   subscriptionId: string,
   status: SubscriptionStatus,
   options?: { notes?: string; actorId?: string; actorName?: string; invoiceId?: string }
 ) {
+  let currentStatus: SubscriptionStatus;
+  let subscriptionData: Subscription | null = null;
+
+  // Buscar assinatura atual (sempre usa Client SDK para leitura, pois é seguro)
   const subscriptionRef = doc(getSubscriptionsCollection(), subscriptionId);
   const subscriptionSnap = await getDoc(subscriptionRef);
 
   if (!subscriptionSnap.exists()) {
     throw new Error("Assinatura não encontrada.");
-  } 
+  }
 
-  await setDoc(
-    subscriptionRef,
-    { status, pendingInvoiceId: options?.invoiceId ?? null },
-    { merge: true }
-  );
+  subscriptionData = subscriptionSnap.data() as Subscription;
+  currentStatus = subscriptionData.status;
+
+  // Usar Admin SDK se disponível (contexto de backend/webhook)
+  if (adminDb) {
+    const subscriptionDocRef = adminDb.doc(`subscriptions/${subscriptionId}`);
+    await subscriptionDocRef.update({
+      status,
+      pendingInvoiceId: options?.invoiceId ?? null,
+    });
+    console.log(`[updateSubscriptionStatus] Status atualizado via Admin SDK: ${subscriptionId} -> ${status}`);
+  } else {
+    // Fallback para Client SDK (contexto de frontend)
+    await setDoc(
+      subscriptionRef,
+      { status, pendingInvoiceId: options?.invoiceId ?? null },
+      { merge: true }
+    );
+    console.log(`[updateSubscriptionStatus] Status atualizado via Client SDK: ${subscriptionId} -> ${status}`);
+  }
 
   await logSubscriptionChange({
     subscriptionId,
     actorId: options?.actorId ?? "system",
     actorName: options?.actorName ?? "Sistema",
-    fromStatus: (subscriptionSnap.data() as Subscription).status,
+    fromStatus: currentStatus,
     toStatus: status,
     notes: options?.notes,
   });
@@ -255,25 +320,59 @@ export interface RecordPaymentInput {
   rawPayload?: Record<string, unknown>;
 }
 
+/**
+ * Registra um pagamento no Firestore
+ * 
+ * IMPORTANTE: Esta função detecta automaticamente o contexto:
+ * - Se Admin SDK estiver disponível (backend/webhooks): usa Admin SDK (bypassa regras do Firestore)
+ * - Se não estiver disponível (frontend): usa Client SDK (respeita regras do Firestore)
+ * 
+ * Isso garante que webhooks do Stripe funcionem corretamente mesmo sem regras permissivas.
+ * 
+ * @param input - Dados do pagamento a ser registrado
+ * @returns ID do pagamento registrado
+ */
 export async function recordPayment(input: RecordPaymentInput) {
-  const paymentRef = doc(getPaymentsCollection());
-  const paymentData = {
-    id: paymentRef.id,
+  const paymentData: any = {
+    id: "", // Será definido abaixo
     subscriptionId: input.subscriptionId,
     invoiceId: input.invoiceId,
     amount: input.amount,
     currency: "BRL",
     status: input.status,
     gateway: input.gateway,
-    dueDate: Timestamp.fromDate(input.dueDate),
-    paidAt: input.paidAt ? Timestamp.fromDate(input.paidAt) : null,
+    dueDate: adminDb
+      ? admin.firestore.Timestamp.fromDate(input.dueDate)
+      : Timestamp.fromDate(input.dueDate),
+    paidAt: input.paidAt
+      ? adminDb
+        ? admin.firestore.Timestamp.fromDate(input.paidAt)
+        : Timestamp.fromDate(input.paidAt)
+      : null,
     failureReason: input.failureReason ?? null,
     rawPayload: input.rawPayload ?? null,
-    createdAt: Timestamp.now(),
+    createdAt: adminDb ? admin.firestore.Timestamp.now() : Timestamp.now(),
   };
 
-  await setDoc(paymentRef, paymentData);
-  return paymentRef.id;
+  let paymentId: string;
+
+  // Usar Admin SDK se disponível (contexto de backend/webhook)
+  if (adminDb) {
+    const paymentDocRef = adminDb.collection("payments").doc();
+    paymentId = paymentDocRef.id;
+    paymentData.id = paymentId;
+    await paymentDocRef.set(paymentData);
+    console.log(`[recordPayment] Pagamento registrado via Admin SDK: ${paymentId}`);
+  } else {
+    // Fallback para Client SDK (contexto de frontend)
+    const paymentRef = doc(getPaymentsCollection());
+    paymentId = paymentRef.id;
+    paymentData.id = paymentId;
+    await setDoc(paymentRef, paymentData);
+    console.log(`[recordPayment] Pagamento registrado via Client SDK: ${paymentId}`);
+  }
+
+  return paymentId;
 }
 
 export interface LogSubscriptionChangeInput {
@@ -287,10 +386,20 @@ export interface LogSubscriptionChangeInput {
   notes?: string;
 }
 
+/**
+ * Registra uma mudança de assinatura no log de auditoria
+ * 
+ * IMPORTANTE: Esta função detecta automaticamente o contexto:
+ * - Se Admin SDK estiver disponível (backend/webhooks): usa Admin SDK (bypassa regras do Firestore)
+ * - Se não estiver disponível (frontend): usa Client SDK (respeita regras do Firestore)
+ * 
+ * Isso garante que webhooks do Stripe funcionem corretamente mesmo sem regras permissivas.
+ * 
+ * @param input - Dados da mudança a ser registrada
+ */
 export async function logSubscriptionChange(input: LogSubscriptionChangeInput) {
-  const auditRef = doc(getAuditCollection());
-  const auditData = {
-    id: auditRef.id,
+  const auditData: any = {
+    id: "", // Será definido abaixo
     subscriptionId: input.subscriptionId,
     actorId: input.actorId,
     actorName: input.actorName,
@@ -299,10 +408,22 @@ export async function logSubscriptionChange(input: LogSubscriptionChangeInput) {
     fromStatus: input.fromStatus,
     toStatus: input.toStatus,
     notes: input.notes,
-    createdAt: Timestamp.now(),
+    createdAt: adminDb ? admin.firestore.Timestamp.now() : Timestamp.now(),
   } satisfies SubscriptionAudit;
 
-  await setDoc(auditRef, auditData);
+  // Usar Admin SDK se disponível (contexto de backend/webhook)
+  if (adminDb) {
+    const auditDocRef = adminDb.collection("subscription_audit").doc();
+    auditData.id = auditDocRef.id;
+    await auditDocRef.set(auditData);
+    console.log(`[logSubscriptionChange] Mudança registrada via Admin SDK: ${auditData.id}`);
+  } else {
+    // Fallback para Client SDK (contexto de frontend)
+    const auditRef = doc(getAuditCollection());
+    auditData.id = auditRef.id;
+    await setDoc(auditRef, auditData);
+    console.log(`[logSubscriptionChange] Mudança registrada via Client SDK: ${auditData.id}`);
+  }
 }
 
 export interface SwitchSubscriptionPlanInput {
@@ -312,7 +433,19 @@ export interface SwitchSubscriptionPlanInput {
   actorName: string;
 }
 
+/**
+ * Altera o plano de uma assinatura existente
+ * 
+ * IMPORTANTE: Esta função detecta automaticamente o contexto:
+ * - Se Admin SDK estiver disponível (backend/webhooks): usa Admin SDK (bypassa regras do Firestore)
+ * - Se não estiver disponível (frontend): usa Client SDK (respeita regras do Firestore)
+ * 
+ * Isso garante que webhooks do Stripe funcionem corretamente mesmo sem regras permissivas.
+ * 
+ * @param input - Dados para alteração do plano
+ */
 export async function switchSubscriptionPlan(input: SwitchSubscriptionPlanInput) {
+  // Buscar assinatura atual (sempre usa Client SDK para leitura, pois é seguro)
   const subscriptionRef = doc(getSubscriptionsCollection(), input.subscriptionId);
   const subscriptionSnap = await getDoc(subscriptionRef);
 
@@ -322,6 +455,7 @@ export async function switchSubscriptionPlan(input: SwitchSubscriptionPlanInput)
 
   const subscriptionData = subscriptionSnap.data() as Subscription;
 
+  // Buscar novo plano (sempre usa Client SDK para leitura)
   const newPlanRef = doc(getPlansCollection(), input.newPlanId);
   const planSnap = await getDoc(newPlanRef);
   let planData: Plan | undefined;
@@ -330,35 +464,48 @@ export async function switchSubscriptionPlan(input: SwitchSubscriptionPlanInput)
     if (!planData) {
       throw new Error("Novo plano não encontrado.");
     }
-    await setDoc(newPlanRef, planData, { merge: true });
+    // Se Admin SDK disponível, usar para criar plano (webhook context)
+    if (adminDb) {
+      await adminDb.doc(`plans/${input.newPlanId}`).set(planData, { merge: true });
+    } else {
+      await setDoc(newPlanRef, planData, { merge: true });
+    }
   } else {
     planData = planSnap.data() as Plan;
   }
-  const now = Timestamp.now();
+
+  const now = adminDb ? admin.firestore.Timestamp.now() : Timestamp.now();
   const periodLengthInDays = planData.billingPeriod === "monthly" ? 30 : 365;
 
-  await setDoc(
-    subscriptionRef,
-    {
-      planId: planData.id,
-      planSnapshot: {
-        slug: planData.slug,
-        name: planData.name,
-        price: planData.price,
-        currency: planData.currency,
-        billingPeriod: planData.billingPeriod,
-        limits: planData.limits,
-      },
-      status: "AWAITING_CONFIRMATION" as SubscriptionStatus,
-      currentPeriodStart: now,
-      currentPeriodEnd: Timestamp.fromMillis(
-        now.toMillis() + periodLengthInDays * 24 * 60 * 60 * 1000
-      ),
-      pendingInvoiceId: null,
-      cancelAtPeriodEnd: false,
+  const updateData = {
+    planId: planData.id,
+    planSnapshot: {
+      slug: planData.slug,
+      name: planData.name,
+      price: planData.price,
+      currency: planData.currency,
+      billingPeriod: planData.billingPeriod,
+      limits: planData.limits,
     },
-    { merge: true }
-  );
+    status: "AWAITING_CONFIRMATION" as SubscriptionStatus,
+    currentPeriodStart: now,
+    currentPeriodEnd: adminDb
+      ? admin.firestore.Timestamp.fromMillis(now.toMillis() + periodLengthInDays * 24 * 60 * 60 * 1000)
+      : Timestamp.fromMillis(now.toMillis() + periodLengthInDays * 24 * 60 * 60 * 1000),
+    pendingInvoiceId: null,
+    cancelAtPeriodEnd: false,
+  };
+
+  // Usar Admin SDK se disponível (contexto de backend/webhook)
+  if (adminDb) {
+    const subscriptionDocRef = adminDb.doc(`subscriptions/${input.subscriptionId}`);
+    await subscriptionDocRef.update(updateData);
+    console.log(`[switchSubscriptionPlan] Plano alterado via Admin SDK: ${input.subscriptionId}`);
+  } else {
+    // Fallback para Client SDK (contexto de frontend)
+    await setDoc(subscriptionRef, updateData, { merge: true });
+    console.log(`[switchSubscriptionPlan] Plano alterado via Client SDK: ${input.subscriptionId}`);
+  }
 
   await logSubscriptionChange({
     subscriptionId: input.subscriptionId,
@@ -509,9 +656,33 @@ export async function countPollsCreatedInCurrentPeriod(companyId: string): Promi
   }
 }
 
+/**
+ * Adiciona créditos de enquete avulsa para uma empresa/usuário
+ * 
+ * IMPORTANTE: Esta função detecta automaticamente o contexto:
+ * - Se Admin SDK estiver disponível (backend/webhooks): usa Admin SDK (bypassa regras do Firestore)
+ * - Se não estiver disponível (frontend): usa Client SDK (respeita regras do Firestore)
+ * 
+ * Isso garante que webhooks do Stripe funcionem corretamente mesmo sem regras permissivas.
+ * 
+ * @param companyId - ID da empresa/usuário
+ * @param amount - Quantidade de créditos a adicionar (padrão: 1)
+ */
 export async function addPollCreditToCompany(companyId: string, amount: number = 1) {
+  // Usar Admin SDK se disponível (contexto de backend/webhook)
+  if (adminDb) {
+    const userDocRef = adminDb.doc(`users/${companyId}`);
+    await userDocRef.update({
+      extraPollsAvailable: admin.firestore.FieldValue.increment(amount),
+    });
+    console.log(`[addPollCreditToCompany] Crédito adicionado via Admin SDK para ${companyId}`);
+    return;
+  }
+
+  // Fallback para Client SDK (contexto de frontend)
   const userRef = doc(db, "users", companyId);
   await updateDoc(userRef, { extraPollsAvailable: increment(amount) });
+  console.log(`[addPollCreditToCompany] Crédito adicionado via Client SDK para ${companyId}`);
 }
 
 // Registra a criação de uma enquete no log
@@ -539,7 +710,20 @@ export interface UpdateSubscriptionPeriodAndCancellationInput {
   cancelAtPeriodEnd: boolean;
 }
 
+/**
+ * Atualiza o período e status de cancelamento de uma assinatura
+ * 
+ * IMPORTANTE: Esta função detecta automaticamente o contexto:
+ * - Se Admin SDK estiver disponível (backend/webhooks): usa Admin SDK (bypassa regras do Firestore)
+ * - Se não estiver disponível (frontend): usa Client SDK (respeita regras do Firestore)
+ * 
+ * Isso garante que webhooks do Stripe funcionem corretamente mesmo sem regras permissivas.
+ * Esta função é chamada principalmente pelo webhook `customer.subscription.updated`.
+ * 
+ * @param input - Dados do período e cancelamento a serem atualizados
+ */
 export async function updateSubscriptionPeriodAndCancellation(input: UpdateSubscriptionPeriodAndCancellationInput) {
+  // Buscar assinatura (sempre usa Client SDK para leitura, pois é seguro)
   const subscriptionRef = doc(getSubscriptionsCollection(), input.subscriptionId);
   const subscriptionSnap = await getDoc(subscriptionRef);
 
@@ -547,15 +731,26 @@ export async function updateSubscriptionPeriodAndCancellation(input: UpdateSubsc
     throw new Error("Assinatura não encontrada para atualizar período/cancelamento.");
   }
 
-  await setDoc(
-    subscriptionRef,
-    {
-      currentPeriodStart: Timestamp.fromDate(input.currentPeriodStart),
-      currentPeriodEnd: Timestamp.fromDate(input.currentPeriodEnd),
-      cancelAtPeriodEnd: input.cancelAtPeriodEnd,
-    },
-    { merge: true }
-  );
+  const updateData = {
+    currentPeriodStart: adminDb
+      ? admin.firestore.Timestamp.fromDate(input.currentPeriodStart)
+      : Timestamp.fromDate(input.currentPeriodStart),
+    currentPeriodEnd: adminDb
+      ? admin.firestore.Timestamp.fromDate(input.currentPeriodEnd)
+      : Timestamp.fromDate(input.currentPeriodEnd),
+    cancelAtPeriodEnd: input.cancelAtPeriodEnd,
+  };
+
+  // Usar Admin SDK se disponível (contexto de backend/webhook)
+  if (adminDb) {
+    const subscriptionDocRef = adminDb.doc(`subscriptions/${input.subscriptionId}`);
+    await subscriptionDocRef.update(updateData);
+    console.log(`[updateSubscriptionPeriodAndCancellation] Período atualizado via Admin SDK: ${input.subscriptionId}`);
+  } else {
+    // Fallback para Client SDK (contexto de frontend)
+    await setDoc(subscriptionRef, updateData, { merge: true });
+    console.log(`[updateSubscriptionPeriodAndCancellation] Período atualizado via Client SDK: ${input.subscriptionId}`);
+  }
 
   await logSubscriptionChange({
     subscriptionId: input.subscriptionId,

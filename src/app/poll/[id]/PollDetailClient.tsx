@@ -77,25 +77,59 @@ export default function PollDetailClient({ pollId }: PollDetailClientProps) {
       return;
     }
 
+    // Verificar se já votou
+    if (poll.votedBy?.includes(user.uid)) {
+      alert("Você já votou nesta enquete.");
+      return;
+    }
+
     const optionIndex = poll.options.findIndex(opt => opt.id === optionId);
     if (optionIndex === -1) return;
 
+    // Atualização otimista
     const updatedOptions = [...poll.options];
     updatedOptions[optionIndex] = {
       ...updatedOptions[optionIndex],
       votes: updatedOptions[optionIndex].votes + 1,
     };
 
-    const updatedPoll = { ...poll, options: updatedOptions };
+    const updatedPoll = { 
+      ...poll, 
+      options: updatedOptions,
+      votedBy: [...(poll.votedBy || []), user.uid],
+    };
     setPoll(updatedPoll);
 
     try {
-      const pollRef = doc(db, "polls", pollId);
-      await updateDoc(pollRef, { options: updatedOptions });
-    } catch (error) {
+      // Usar API route com Admin SDK
+      const response = await fetch("/api/polls/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pollId,
+          optionId,
+          userId: user.uid,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Erro ao registrar voto.");
+      }
+
+      // Atualizar com dados do servidor
+      if (data.data) {
+        setPoll({
+          ...poll,
+          options: data.data.options,
+          votedBy: data.data.votedBy,
+        });
+      }
+    } catch (error: any) {
       console.error("Erro ao votar:", error);
-      alert("Erro ao registrar voto. Tente novamente.");
-      // Reverter o estado local se o voto falhar no Firestore
+      alert(error.message || "Erro ao registrar voto. Tente novamente.");
+      // Reverter o estado local se o voto falhar
       setPoll(poll);
     }
   };

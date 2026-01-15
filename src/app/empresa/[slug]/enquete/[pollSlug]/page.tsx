@@ -135,57 +135,77 @@ const PollDetailPage: React.FC<PollDetailPageProps> = ({ params }) => { // Alter
 
     if (!poll) return;
 
-    // Prevenção de voto duplicado para enquetes comerciais
+    // Prevenção de voto duplicado
     const hasVoted = poll.votedBy?.includes(user.uid);
-    if (poll.isCommercial && hasVoted) {
-      setFeedbackMessage("Você já votou nesta enquete comercial.");
+    if (hasVoted) {
+      setFeedbackMessage("Você já votou nesta enquete.");
       setFeedbackType("error");
       setTimeout(() => setFeedbackMessage(null), 3000);
       return;
     }
 
-    const pollRef = doc(db, "polls", poll.id);
-    const isOwner = poll.creator.id === user.uid;
+    // Atualização otimista
     const updatedOptions = poll.options.map((option) =>
       option.id === optionId ? { ...option, votes: option.votes + 1 } : option
     );
 
+    setPoll((prevPoll) => {
+      if (!prevPoll) return null;
+      const newVotedBy = user
+        ? [...(prevPoll.votedBy || []), user.uid]
+        : prevPoll.votedBy;
+      return {
+        ...prevPoll,
+        options: updatedOptions,
+        votedBy: newVotedBy,
+      };
+    });
+
     try {
-      // Se for o dono, pode atualizar options e votedBy juntos
-      if (isOwner) {
-        const updatedVotedBy = user
-          ? [...(poll.votedBy || []), user.uid]
-          : poll.votedBy;
-        
-        await updateDoc(pollRef, {
-          options: updatedOptions,
-          votedBy: updatedVotedBy,
-        });
-      } else {
-        // Se não for o dono, atualizar options e votedBy juntos
-        // As regras do Firestore validam que apenas uma opção teve seu voto incrementado
-        const updatedVotedBy = user
-          ? [...(poll.votedBy || []), user.uid]
-          : poll.votedBy;
-        
-        await updateDoc(pollRef, {
-          options: updatedOptions,
-          votedBy: updatedVotedBy,
+      // Usar API route com Admin SDK
+      const response = await fetch("/api/polls/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pollId: poll.id,
+          optionId,
+          userId: user.uid,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Erro ao registrar voto.");
+      }
+
+      // Atualizar com dados do servidor
+      if (data.data) {
+        setPoll((prevPoll) => {
+          if (!prevPoll) return null;
+          return {
+            ...prevPoll,
+            options: data.data.options,
+            votedBy: data.data.votedBy,
+          };
         });
       }
 
-      // Atualizar o estado local da enquete
+      setFeedbackMessage("Voto registrado com sucesso!");
+      setFeedbackType("success");
+      setTimeout(() => setFeedbackMessage(null), 3000);
+    } catch (error: any) {
+      console.error("Erro ao votar:", error);
+      setFeedbackMessage(error.message || "Erro ao registrar voto. Tente novamente.");
+      setFeedbackType("error");
+      setTimeout(() => setFeedbackMessage(null), 3000);
+      
+      // Reverter atualização otimista
       setPoll((prevPoll) => {
         if (!prevPoll) return null;
-        const newVotedBy = user
-          ? [...(prevPoll.votedBy || []), user.uid]
-          : prevPoll.votedBy;
-        return {
-          ...prevPoll,
-          options: updatedOptions,
-          votedBy: newVotedBy,
-        };
+        return poll; // Reverter para estado original
       });
+    }
       // Disparar a animação de coração na posição do clique
 
       setFeedbackMessage("Voto registrado com sucesso!");

@@ -460,44 +460,33 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       return;
     }
 
-    // Otimista: Atualiza a UI imediatamente
-    // Removido: setPolls para evitar conflitos com onSnapshot e simplificar o fluxo
-
     try {
-      const pollRef = doc(db, "polls", pollId);
-      const updatedOptionsForFirestore = pollToUpdate.options.map(option =>
-        option.id === optionId ? { ...option, votes: option.votes + 1 } : option
-      );
-      const updatedVotedByForFirestore = pollToUpdate.isCommercial && user
-        ? [...(pollToUpdate.votedBy || []), user.uid]
-        : pollToUpdate.votedBy;
-
-      await updateDoc(pollRef, {
-        options: updatedOptionsForFirestore,
-        ...(pollToUpdate.isCommercial && { votedBy: updatedVotedByForFirestore }),
+      // Usar API route com Admin SDK
+      const response = await fetch("/api/polls/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pollId,
+          optionId,
+          userId: user.uid,
+        }),
       });
 
-    } catch (error) {
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Erro ao registrar voto.");
+      }
+
+      // onSnapshot vai atualizar automaticamente, mas podemos mostrar feedback
+      setFeedbackMessage("Voto registrado com sucesso!");
+      setFeedbackType("success");
+      setTimeout(() => setFeedbackMessage(null), 3000);
+    } catch (error: any) {
       console.error("Erro ao votar:", error);
-      setFeedbackMessage("Erro ao registrar voto. Tente novamente.");
+      setFeedbackMessage(error.message || "Erro ao registrar voto. Tente novamente.");
       setFeedbackType("error");
       setTimeout(() => setFeedbackMessage(null), 3000);
-      // Reverter a UI se o voto falhar
-      // setUserPolls((prevPolls) => // Removido: setUserPolls será atualizado automaticamente via onSnapshot
-      //   prevPolls.map((poll) =>
-      //     poll.id === pollId
-      //       ? {
-      //           ...poll,
-      //           options: poll.options.map((option) =>
-      //             option.id === optionId
-      //               ? { ...option, votes: option.votes - 1 }
-      //               : option
-      //           ),
-      //           votedBy: poll.isCommercial && user ? (poll.votedBy || []).filter(uid => uid !== user.uid) : poll.votedBy,
-      //         }
-      //       : poll
-      //   )
-      // );
     }
   };
 
