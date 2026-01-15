@@ -29,10 +29,12 @@ export async function GET() {
     try {
       plans = await listPlans();
       console.log("[GET_PLANS] Planos encontrados:", plans.length);
+      console.log("[GET_PLANS] IDs dos planos:", plans.map(p => ({ id: p.id, name: p.name, isActive: p.isActive })));
     } catch (listError) {
       console.error("[GET_PLANS] Erro ao listar planos:", listError);
       // Usar planos padrão se houver erro ao listar
       plans = DEFAULT_PLANS;
+      console.log("[GET_PLANS] Usando planos padrão devido a erro:", DEFAULT_PLANS.map(p => ({ id: p.id, name: p.name })));
     }
     
     if (!plans || plans.length === 0) {
@@ -43,6 +45,16 @@ export async function GET() {
       );
     }
 
+    // Garantir que sempre retornamos pelo menos os planos padrão se a lista estiver vazia ou incompleta
+    if (plans.length < DEFAULT_PLANS.length) {
+      console.warn(`[GET_PLANS] Apenas ${plans.length} plano(s) encontrado(s), esperado ${DEFAULT_PLANS.length}. Retornando planos padrão.`);
+      return NextResponse.json(
+        { plans: DEFAULT_PLANS, message: "Retornando planos padrão devido a lista incompleta." },
+        { status: 200 }
+      );
+    }
+
+    console.log("[GET_PLANS] Retornando planos:", plans.map(p => p.id));
     return NextResponse.json({ plans }, { status: 200 });
   } catch (error) {
     console.error("[GET_PLANS] Erro crítico:", error);
