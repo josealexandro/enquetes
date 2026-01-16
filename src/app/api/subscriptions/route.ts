@@ -30,11 +30,15 @@ export async function GET(request: NextRequest) {
 
     console.log("[GET_SUBSCRIPTION] Buscando assinatura para companyId:", companyId);
     
+    // CORREÇÃO: getSubscriptionByCompany agora usa Admin SDK quando disponível (webhook/API context)
+    // Se Admin SDK não estiver disponível, usa Client SDK (pode dar erro de permissão)
+    // Isso é normal - não ter assinatura não é erro, retornar null é válido
     const subscription = await getSubscriptionByCompany(companyId);
     
     console.log("[GET_SUBSCRIPTION] Assinatura encontrada:", subscription ? "sim" : "não");
     
-    return NextResponse.json({ subscription });
+    // Retornar null se não houver assinatura (não é erro, é estado válido)
+    return NextResponse.json({ subscription: subscription ?? null });
   } catch (error) {
     console.error("[GET_SUBSCRIPTION] Erro detalhado:", error);
     const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";

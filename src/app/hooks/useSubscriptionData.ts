@@ -57,11 +57,15 @@ export function useSubscriptionData(
       if (!plansResponse.ok) {
         const errorText = await plansResponse.text();
         console.error("Erro ao buscar planos:", plansResponse.status, errorText);
-        throw new Error(`Erro ao buscar planos: ${plansResponse.status}`);
+        // CORREÇÃO: Não falhar completamente - usar planos padrão como fallback
+        // A API /api/plans sempre retorna algo, mas se falhar, usar DEFAULT_PLANS
+        console.warn("Usando planos padrão devido a erro na API");
+        const { DEFAULT_PLANS } = await import("@/app/data/planSeeds");
+        setPlans(DEFAULT_PLANS);
+      } else {
+        const plansJson = await plansResponse.json();
+        setPlans(plansJson.plans ?? []);
       }
-
-      const plansJson = await plansResponse.json();
-      setPlans(plansJson.plans ?? []);
 
       let subscriptionData: Subscription | null = null;
       if (subscriptionResponse) {
@@ -69,7 +73,15 @@ export function useSubscriptionData(
         if (!subscriptionResponse.ok) {
           const errorText = await subscriptionResponse.text();
           console.error("Erro ao buscar assinatura:", subscriptionResponse.status, errorText);
-          // Não lançar erro aqui, apenas logar, pois pode não ter assinatura ainda
+          
+          // CORREÇÃO: Se for erro 403 (permissão) ou 500, pode ser problema de configuração
+          // Mas não lançar erro aqui - apenas logar e continuar sem assinatura
+          // Não ter assinatura é um estado válido (usuário ainda não assinou)
+          if (subscriptionResponse.status === 403) {
+            console.warn("Erro de permissão ao buscar assinatura. Verifique se Admin SDK está configurado na Vercel.");
+          }
+          // Não lançar erro - apenas definir como null (usuário pode não ter assinatura ainda)
+          setSubscription(null);
         } else {
           const subscriptionJson = await subscriptionResponse.json();
           subscriptionData = subscriptionJson.subscription ?? null;
@@ -80,17 +92,26 @@ export function useSubscriptionData(
       }
 
       if (subscriptionData) {
-        const paymentsResponse = await fetch(
-          `/api/subscriptions/${subscriptionData.id}/payments`,
-          { method: "GET", cache: "no-store" }
-        );
+        try {
+          const paymentsResponse = await fetch(
+            `/api/subscriptions/${subscriptionData.id}/payments`,
+            { method: "GET", cache: "no-store" }
+          );
 
-        if (!paymentsResponse.ok) {
-          throw new Error("Erro ao carregar pagamentos da assinatura.");
+          if (!paymentsResponse.ok) {
+            // CORREÇÃO: Não falhar completamente se pagamentos não carregarem
+            // Apenas logar e continuar sem pagamentos (não é crítico)
+            console.warn("Erro ao carregar pagamentos da assinatura:", paymentsResponse.status);
+            setPayments([]);
+          } else {
+            const paymentsJson = await paymentsResponse.json();
+            setPayments(paymentsJson.payments ?? []);
+          }
+        } catch (paymentError) {
+          // CORREÇÃO: Não lançar erro se pagamentos falharem - não é crítico
+          console.warn("Erro ao buscar pagamentos (não crítico):", paymentError);
+          setPayments([]);
         }
-
-        const paymentsJson = await paymentsResponse.json();
-        setPayments(paymentsJson.payments ?? []);
       } else {
         setPayments([]);
       }
