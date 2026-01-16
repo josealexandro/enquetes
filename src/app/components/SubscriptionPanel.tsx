@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Timestamp } from "firebase/firestore";
 import { useSubscriptionData } from "@/app/hooks/useSubscriptionData";
 import {
@@ -239,6 +239,13 @@ const SubscriptionPanel = ({
 
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
+  
+  // Estado para contador de enquetes
+  const [pollsCount, setPollsCount] = useState<{
+    pollsLimit: number;
+    pollsCreated: number;
+    pollsRemaining: number;
+  } | null>(null);
 
   const currentStatus =
     subscription?.status && statusStyles[subscription.status]
@@ -249,6 +256,53 @@ const SubscriptionPanel = ({
     () => [...plans].sort((a, b) => a.sortOrder - b.sortOrder),
     [plans]
   );
+
+  // Buscar contador de enquetes quando companyId ou subscription mudar
+  useEffect(() => {
+    if (!companyId) return;
+
+    const fetchPollsCount = async () => {
+      try {
+        const response = await fetch(`/api/polls/count?companyId=${companyId}`, {
+          cache: "no-store",
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setPollsCount(data);
+        } else {
+          console.warn("Erro ao buscar contador de enquetes:", response.status);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar contador de enquetes:", error);
+      }
+    };
+
+    fetchPollsCount();
+    
+    // Atualizar a cada 10 segundos para manter sincronizado (atualiza mais rápido após criar enquete)
+    const interval = setInterval(fetchPollsCount, 10000);
+    
+    return () => clearInterval(interval);
+  }, [companyId, subscription]);
+  
+  // Função para atualizar contador manualmente (pode ser chamada após criar enquete)
+  const refreshPollsCount = async () => {
+    if (!companyId) return;
+    
+    try {
+      const response = await fetch(`/api/polls/count?companyId=${companyId}`, {
+        cache: "no-store",
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setPollsCount(data);
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar contador de enquetes:", error);
+    }
+  };
 
   const createOrSwitchSubscription = async (plan: Plan) => {
     const isSwitching = Boolean(subscription);
@@ -404,6 +458,57 @@ const SubscriptionPanel = ({
             <div>
               <p className="text-gray-400 mb-2">Limites do plano</p>
               {renderPlanLimits(subscription.planSnapshot.limits)}
+              
+              {/* EXIBIÇÃO DE ENQUETES RESTANTES */}
+              {pollsCount && (
+                <div className="mt-4 pt-4 border-t border-gray-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-gray-400">Uso do plano</p>
+                    <button
+                      onClick={refreshPollsCount}
+                      className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                      title="Atualizar contador"
+                    >
+                      Atualizar
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300 text-sm">Enquetes criadas:</span>
+                      <span className="text-white font-semibold">
+                        {pollsCount.pollsCreated} / {pollsCount.pollsLimit}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300 text-sm">Enquetes restantes:</span>
+                      <span className={`font-bold ${
+                        pollsCount.pollsRemaining === 0 
+                          ? "text-red-400" 
+                          : pollsCount.pollsRemaining <= 2 
+                          ? "text-yellow-400" 
+                          : "text-green-400"
+                      }`}>
+                        {pollsCount.pollsRemaining}
+                      </span>
+                    </div>
+                    {/* Barra de progresso visual */}
+                    <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
+                      <div
+                        className={`h-2 rounded-full transition-all ${
+                          pollsCount.pollsRemaining === 0
+                            ? "bg-red-500"
+                            : pollsCount.pollsRemaining <= 2
+                            ? "bg-yellow-500"
+                            : "bg-green-500"
+                        }`}
+                        style={{
+                          width: `${Math.min(100, (pollsCount.pollsCreated / pollsCount.pollsLimit) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
