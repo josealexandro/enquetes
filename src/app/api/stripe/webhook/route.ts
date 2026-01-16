@@ -40,6 +40,11 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       case "checkout.session.completed":
         console.log(`[WEBHOOK] Processando checkout.session.completed (ID: ${event.id})`);
+        console.log(`[WEBHOOK] Session data:`, JSON.stringify({
+          id: (event.data.object as Stripe.Checkout.Session).id,
+          metadata: (event.data.object as Stripe.Checkout.Session).metadata,
+          amount_total: (event.data.object as Stripe.Checkout.Session).amount_total,
+        }));
         await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
         console.log(`[WEBHOOK] checkout.session.completed processado com sucesso (ID: ${event.id})`);
         break;
@@ -60,15 +65,28 @@ export async function POST(req: NextRequest) {
         console.log(`[WEBHOOK] Evento não tratado: ${event.type} (ID: ${event.id})`);
     }
   } catch (error: any) {
-    console.error(`[WEBHOOK] ERRO ao processar evento ${event.type} (ID: ${event.id}):`, error);
-    console.error(`[WEBHOOK] Stack trace:`, error?.stack);
+    const errorMessage = error?.message || "Erro desconhecido";
+    const errorStack = error?.stack || "Sem stack trace";
+    
+    console.error(`[WEBHOOK] ERRO ao processar evento ${event.type} (ID: ${event.id}):`, errorMessage);
+    console.error(`[WEBHOOK] Stack trace:`, errorStack);
+    console.error(`[WEBHOOK] Error object:`, JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    
     // Retornar 500 para que o Stripe reenvie o evento
     return new NextResponse(
       JSON.stringify({ 
         error: "Erro ao processar evento",
-        message: error?.message || "Erro desconhecido"
+        message: errorMessage,
+        eventType: event.type,
+        eventId: event.id,
+        timestamp: new Date().toISOString()
       }), 
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
     );
   }
 

@@ -54,6 +54,14 @@ export interface Subscription {
   paymentMethod?: string;
   pendingInvoiceId?: string;
   notes?: string;
+  // DOCUMENTAÇÃO: IDs do Stripe para vincular assinatura interna com Stripe
+  // Esses campos são essenciais para:
+  // - Processar renovações mensais (invoice.paid)
+  // - Processar cancelamentos (customer.subscription.deleted)
+  // - Processar upgrades/downgrades (customer.subscription.updated)
+  // - Reprocessar eventos manualmente no Stripe Dashboard
+  stripeCustomerId?: string; // ID do customer no Stripe (ex: "cus_...")
+  stripeSubscriptionId?: string; // ID da subscription no Stripe (ex: "sub_...")
 }
 
 export type PaymentStatus =

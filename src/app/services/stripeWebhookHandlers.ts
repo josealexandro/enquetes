@@ -10,7 +10,7 @@ import {
   addPollCreditToCompany,
   // Removendo getPlanById (não utilizada neste arquivo)
 } from "@/app/services/subscriptionService";
-import { SubscriptionStatus } from "@/app/types/subscription"; // Importando SubscriptionStatus
+import { SubscriptionStatus, PlanSlug } from "@/app/types/subscription"; // Importando SubscriptionStatus e PlanSlug
 import { adminDb } from "@/lib/firebase-admin"; // Importar adminDb para verificação
 
 // Interface estendida para lidar com propriedades que podem não estar na tipagem padrão do Stripe
@@ -40,18 +40,23 @@ interface StripeSubscriptionExtended extends Stripe.Subscription {
  */
 export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   console.log(`[handleCheckoutSessionCompleted] Iniciando processamento da sessão ${session.id}`);
-  const { metadata, amount_total } = session;
+  const { metadata, amount_total, customer, subscription: stripeSubscriptionId } = session;
 
   console.log(`[handleCheckoutSessionCompleted] Metadata recebido:`, JSON.stringify(metadata));
 
-  if (!metadata || !metadata.companyId || !metadata.companyName) {
-    console.error("[handleCheckoutSessionCompleted] ERRO: Metadata da sessão de checkout incompleto:", metadata);
-    throw new Error("Metadata da sessão de checkout incompleto.");
+  // CORREÇÃO 1: companyName NÃO é obrigatório no Stripe, mesmo que enviemos no checkout
+  // O Stripe pode não preservar todos os metadados em alguns casos
+  // Webhook NUNCA deve falhar por dados opcionais - sempre usar valor padrão
+  if (!metadata || !metadata.companyId) {
+    console.error("[handleCheckoutSessionCompleted] ERRO: Metadata da sessão de checkout incompleto (companyId ausente):", metadata);
+    throw new Error("Metadata da sessão de checkout incompleto (companyId ausente).");
   }
 
-  const { companyId, companyName } = metadata;
+  const companyId = metadata.companyId as string;
+  // Usar valor padrão se companyName não vier no metadata (pode acontecer em alguns casos do Stripe)
+  const companyName = (metadata.companyName as string) ?? "Empresa sem nome";
   const amount = amount_total ?? 0;
-  console.log(`[handleCheckoutSessionCompleted] Processando para companyId: ${companyId}, amount: ${amount}`);
+  console.log(`[handleCheckoutSessionCompleted] Processando para companyId: ${companyId}, companyName: ${companyName}, amount: ${amount}`);
 
   // Lógica para pagamentos avulsos (crédito de enquete)
   // NOTA: addPollCreditToCompany usa Admin SDK automaticamente quando executado no backend
@@ -73,8 +78,58 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
   
   // Verificar se Admin SDK está disponível
   if (!adminDb) {
-    console.error("[handleCheckoutSessionCompleted] ERRO CRÍTICO: Admin SDK não está disponível! Verifique FIREBASE_ADMIN_PRIVATE_KEY na Vercel.");
-    throw new Error("Admin SDK não está disponível. Verifique as variáveis de ambiente.");
+    const errorMsg = "[handleCheckoutSessionCompleted] ERRO CRÍTICO: Admin SDK não está disponível! Verifique FIREBASE_ADMIN_PRIVATE_KEY na Vercel.";
+    console.error(errorMsg);
+    console.error("[handleCheckoutSessionCompleted] Variáveis de ambiente disponíveis:", {
+      hasProjectId: !!process.env.FIREBASE_ADMIN_PROJECT_ID,
+      hasClientEmail: !!process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+      hasPrivateKey: !!process.env.FIREBASE_ADMIN_PRIVATE_KEY,
+      hasNextPublicProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    });
+    throw new Error("Admin SDK não está disponível. Verifique FIREBASE_ADMIN_PRIVATE_KEY na Vercel.");
+  }
+  
+  // CORREÇÃO 2: Webhook NUNCA deve falhar por regra de negócio depois que o pagamento foi confirmado
+  // Se o plano não existir (renomeado, inativado, não inicializado), criar plano mínimo
+  // Regra de ouro: Pagamento confirmado → registrar → ativar algo mínimo → nunca 500
+  const { getPlanById } = await import("@/app/services/subscriptionService");
+  let plan = await getPlanById(planId);
+  
+  if (!plan) {
+    // Tentar buscar nos planos padrão (fallback)
+    const { DEFAULT_PLANS } = await import("@/app/data/planSeeds");
+    plan = DEFAULT_PLANS.find(p => p.id === planId) ?? null;
+    
+    if (!plan) {
+      console.warn(`[handleCheckoutSessionCompleted] AVISO: Plano não encontrado (${planId}). Criando plano mínimo para não perder o pagamento.`);
+      // Criar plano mínimo temporário para não perder o pagamento
+      // Isso garante que o webhook sempre processe com sucesso
+      // EXEMPLO: Se você precisar criar um plano dinâmico no futuro, use esta estrutura
+      plan = {
+        id: planId,
+        slug: "basic" as PlanSlug, // Usar slug padrão
+        name: `Plano ${planId}`,
+        description: "Plano criado automaticamente pelo webhook",
+        price: amount, // Usar valor pago como referência
+        currency: "BRL",
+        billingPeriod: "monthly",
+        limits: {
+          pollsPerMonth: 1, // Limite mínimo seguro
+          activePolls: 1,
+          commercialProfiles: 0,
+          teamMembers: 1,
+          storageMb: 100,
+        },
+        features: ["Plano criado automaticamente"],
+        isActive: true,
+        sortOrder: 99,
+      };
+      console.log(`[handleCheckoutSessionCompleted] Plano mínimo criado: ${plan.name}`);
+    } else {
+      console.log(`[handleCheckoutSessionCompleted] Plano encontrado nos planos padrão: ${plan.name}`);
+    }
+  } else {
+    console.log(`[handleCheckoutSessionCompleted] Plano encontrado: ${plan.name} (${plan.slug})`);
   }
   
   // NOTA: Todas as operações abaixo usam Admin SDK automaticamente quando executadas no backend
@@ -85,14 +140,22 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
   if (!subscription) {
     console.log(`[handleCheckoutSessionCompleted] Assinatura não existe. Criando nova assinatura para ${companyId}`);
     // Criar nova assinatura (usa Admin SDK automaticamente)
+    // CORREÇÃO 4: Salvar IDs do Stripe ao criar assinatura
+    // customer pode ser string (ID) ou objeto Customer - extrair ID corretamente
+    const stripeCustomerId = typeof customer === 'string' ? customer : customer?.id;
     const subscriptionId = await createSubscription({
       companyId,
       companyName,
       planId,
       paymentMethod: "stripe",
       status: "ACTIVE",
+      stripeCustomerId: stripeCustomerId ?? undefined,
+      stripeSubscriptionId: typeof stripeSubscriptionId === 'string' ? stripeSubscriptionId : undefined,
     });
-    console.log(`[handleCheckoutSessionCompleted] Assinatura criada com ID: ${subscriptionId}`);
+    console.log(`[handleCheckoutSessionCompleted] Assinatura criada com ID: ${subscriptionId}`, {
+      stripeCustomerId: stripeCustomerId ?? 'não disponível',
+      stripeSubscriptionId: typeof stripeSubscriptionId === 'string' ? stripeSubscriptionId : 'não disponível',
+    });
     
     subscription = await getSubscriptionByCompany(companyId);
     if (!subscription) {

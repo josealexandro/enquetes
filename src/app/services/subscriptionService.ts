@@ -190,6 +190,10 @@ export interface CreateSubscriptionInput {
   paymentMethod?: string;
   status?: SubscriptionStatus;
   pendingInvoiceId?: string;
+  // DOCUMENTAÇÃO: IDs do Stripe para vincular assinatura interna com Stripe
+  // Essenciais para processar renovações, cancelamentos e upgrades
+  stripeCustomerId?: string; // ID do customer no Stripe (ex: "cus_...")
+  stripeSubscriptionId?: string; // ID da subscription no Stripe (ex: "sub_...")
 }
 
 /**
@@ -251,6 +255,10 @@ export async function createSubscription(input: CreateSubscriptionInput) {
     cancelAtPeriodEnd: false,
     paymentMethod: input.paymentMethod ?? null,
     pendingInvoiceId: input.pendingInvoiceId ?? null,
+    // CORREÇÃO 4: Salvar IDs do Stripe para vincular assinatura interna com Stripe
+    // Essenciais para processar renovações (invoice.paid), cancelamentos e upgrades
+    stripeCustomerId: input.stripeCustomerId ?? null,
+    stripeSubscriptionId: input.stripeSubscriptionId ?? null,
   };
 
   let subscriptionId: string;
