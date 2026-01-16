@@ -257,7 +257,10 @@ const SubscriptionPanel = ({
     [plans]
   );
 
-  // Buscar contador de enquetes quando companyId ou subscription mudar
+  // OTIMIZAÇÃO DE CUSTO: Buscar contador apenas quando necessário
+  // - Quando a página carrega (companyId ou subscription muda)
+  // - Quando o usuário clica em "Atualizar"
+  // - NÃO fazer polling automático para evitar custos no Firebase
   useEffect(() => {
     if (!companyId) return;
 
@@ -278,15 +281,13 @@ const SubscriptionPanel = ({
       }
     };
 
+    // Buscar apenas uma vez quando companyId ou subscription mudar
+    // NÃO fazer polling automático para economizar leituras do Firestore
     fetchPollsCount();
-    
-    // Atualizar a cada 10 segundos para manter sincronizado (atualiza mais rápido após criar enquete)
-    const interval = setInterval(fetchPollsCount, 10000);
-    
-    return () => clearInterval(interval);
   }, [companyId, subscription]);
   
-  // Função para atualizar contador manualmente (pode ser chamada após criar enquete)
+  // Função para atualizar contador manualmente (chamada quando usuário clica em "Atualizar")
+  // EXEMPLO: Use esta função após criar uma enquete para atualizar o contador imediatamente
   const refreshPollsCount = async () => {
     if (!companyId) return;
     
@@ -467,11 +468,14 @@ const SubscriptionPanel = ({
                     <button
                       onClick={refreshPollsCount}
                       className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
-                      title="Atualizar contador"
+                      title="Atualizar contador agora"
                     >
-                      Atualizar
+                      🔄 Atualizar
                     </button>
                   </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Clique em "Atualizar" para ver o contador mais recente
+                  </p>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-gray-300 text-sm">Enquetes criadas:</span>
