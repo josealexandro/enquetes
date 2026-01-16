@@ -114,7 +114,7 @@ export const DEFAULT_PLANS: Plan[] = [
       "Ideal para testar o sistema",
       "Dashboard básico",
     ],
-    isActive: true,
+    isActive: false, // OCULTO: Plano de teste não deve aparecer no site
     sortOrder: 0, // Aparece primeiro na lista
   },
 ];

@@ -49,15 +49,16 @@ export async function ensureDefaultPlans() {
   try {
     // DOCUMENTAÇÃO: Atualiza os planos no Firestore com os dados mais recentes (incluindo originalPrice)
     // Usa merge: true para atualizar campos existentes e adicionar novos campos sem perder dados
-    // IMPORTANTE: Garante que isActive seja sempre true para todos os planos padrão
+    // IMPORTANTE: Respeita o isActive de cada plano (não força true para todos)
     const tasks = DEFAULT_PLANS.map(async (plan) => {
       try {
         const ref = doc(getPlansCollection(), plan.id);
-        // Garantir que isActive seja sempre true para planos padrão
-        const planData = { ...plan, isActive: true };
+        // Respeitar o isActive do plano (não forçar true)
+        // Planos padrão devem ter isActive definido explicitamente no planSeeds.ts
+        const planData = { ...plan };
         // DOCUMENTAÇÃO: merge: true garante que campos novos (como originalPrice) sejam adicionados
         await setDoc(ref, planData, { merge: true });
-        console.log(`[ensureDefaultPlans] Plano ${plan.id} atualizado com isActive: true`);
+        console.log(`[ensureDefaultPlans] Plano ${plan.id} atualizado com isActive: ${plan.isActive}`);
       } catch (error) {
         console.error(`[ensureDefaultPlans] Erro ao criar/atualizar plano ${plan.id}:`, error);
         // Continua com os outros planos mesmo se um falhar
@@ -84,8 +85,10 @@ export async function listPlans(): Promise<Plan[]> {
     if (snapshot.size > 0) {
       // DOCUMENTAÇÃO: Retorna planos ativos do Firestore (já atualizados por ensureDefaultPlans)
       const plans = snapshot.docs.map((docSnap) => docSnap.data() as Plan);
-      console.log(`[listPlans] Encontrados ${plans.length} planos ativos no Firestore`);
-      return plans;
+      // OCULTO: Filtrar plano de teste para não aparecer no site
+      const filteredPlans = plans.filter(plan => plan.id !== "plan_teste");
+      console.log(`[listPlans] Encontrados ${plans.length} planos ativos no Firestore, ${filteredPlans.length} após filtrar plano de teste`);
+      return filteredPlans;
     }
     // Se não encontrou planos ativos, tentar buscar todos e filtrar
     console.warn("[listPlans] Nenhum plano ativo encontrado com filtro, tentando buscar todos...");
@@ -102,10 +105,12 @@ export async function listPlans(): Promise<Plan[]> {
       const allPlans = snapshot.docs.map((docSnap) => docSnap.data() as Plan);
       // Filtrar planos ativos manualmente (isActive !== false garante que undefined também passa)
       const activePlans = allPlans.filter(plan => plan.isActive !== false);
-      console.log(`[listPlans] Fallback: encontrados ${allPlans.length} planos, ${activePlans.length} ativos`);
+      // OCULTO: Filtrar plano de teste para não aparecer no site
+      const filteredPlans = activePlans.filter(plan => plan.id !== "plan_teste");
+      console.log(`[listPlans] Fallback: encontrados ${allPlans.length} planos, ${activePlans.length} ativos, ${filteredPlans.length} após filtrar plano de teste`);
       
-      if (activePlans.length > 0) {
-        return activePlans;
+      if (filteredPlans.length > 0) {
+        return filteredPlans;
       }
     }
   } catch (fallbackError) {
@@ -114,7 +119,8 @@ export async function listPlans(): Promise<Plan[]> {
   
   // Último recurso: retornar planos padrão (todos ativos)
   console.warn("[listPlans] Retornando planos padrão do código");
-  return DEFAULT_PLANS;
+  // OCULTO: Filtrar plano de teste para não aparecer no site
+  return DEFAULT_PLANS.filter(plan => plan.id !== "plan_teste");
 }
 
 export async function getSubscriptionByCompany(companyId: string) {
