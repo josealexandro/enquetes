@@ -124,6 +124,45 @@ export async function getSubscriptionByCompany(companyId: string) {
       return null;
     }
 
+    // CORREÇÃO CRÍTICA: Usar Admin SDK quando disponível (contexto de webhook/backend)
+    // Admin SDK bypassa regras do Firestore e funciona em webhooks
+    if (adminDb) {
+      console.log(`[getSubscriptionByCompany] Usando Admin SDK para buscar assinatura (webhook context)`);
+      const snapshot = await adminDb
+        .collection("subscriptions")
+        .where("companyId", "==", companyId)
+        .limit(1)
+        .get();
+      
+      if (snapshot.empty) {
+        console.log(`[getSubscriptionByCompany] Nenhuma assinatura encontrada para companyId: ${companyId}`);
+        return null;
+      }
+
+      const doc = snapshot.docs[0];
+      const subscriptionData = doc.data();
+      
+      // Garantir que os campos obrigatórios existam
+      if (!subscriptionData) {
+        console.error("[getSubscriptionByCompany] Dados da assinatura vazios");
+        return null;
+      }
+
+      // Converter Timestamps do Admin SDK para formato compatível
+      const subscription: Subscription = {
+        ...subscriptionData,
+        id: doc.id,
+        startDate: subscriptionData.startDate,
+        currentPeriodStart: subscriptionData.currentPeriodStart,
+        currentPeriodEnd: subscriptionData.currentPeriodEnd,
+      } as Subscription;
+
+      console.log(`[getSubscriptionByCompany] Assinatura encontrada via Admin SDK: ${subscription.id}`);
+      return subscription;
+    }
+
+    // Fallback: Usar Client SDK (contexto de frontend)
+    console.log(`[getSubscriptionByCompany] Usando Client SDK para buscar assinatura (frontend context)`);
     const subscriptionQuery = query(
       getSubscriptionsCollection(),
       where("companyId", "==", companyId),
@@ -149,6 +188,7 @@ export async function getSubscriptionByCompany(companyId: string) {
     // Isso permite que a aplicação continue funcionando mesmo sem assinatura
     if (error?.code === 'permission-denied') {
       console.error("[getSubscriptionByCompany] Erro de permissão ao buscar assinatura:", error);
+      console.error("[getSubscriptionByCompany] Dica: Verifique se Admin SDK está configurado corretamente para webhooks");
       return null;
     }
     // Re-lançar outros erros para que possam ser tratados adequadamente
