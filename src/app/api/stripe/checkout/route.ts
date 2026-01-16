@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStripe } from "@/app/services/stripeService";
 import { getPlanById } from "@/app/services/subscriptionService"; // Assumindo que você tem um serviço para buscar planos
+import { adminDb } from "@/lib/firebase-admin";
+import * as admin from "firebase-admin";
 
 interface CreateCheckoutSessionBody {
   planId: string;
@@ -23,6 +25,58 @@ export async function POST(request: NextRequest) {
           error: "STRIPE_SECRET_KEY missing"
         },
         { status: 500 }
+      );
+    }
+
+    // VERIFICAÇÃO PREVENTIVA 1: Webhook secret deve estar configurado
+    // Sem isso, o webhook não consegue validar eventos e não ativa o plano
+    if (!process.env.STRIPE_WEBHOOK_SECRET) {
+      console.error("[STRIPE_CHECKOUT_POST] ERRO CRÍTICO: STRIPE_WEBHOOK_SECRET não configurada - webhook não funcionará");
+      return NextResponse.json(
+        { 
+          message: "Sistema temporariamente indisponível. Por favor, tente novamente em alguns minutos ou entre em contato com o suporte.",
+          error: "WEBHOOK_NOT_CONFIGURED",
+          hint: "Webhook não configurado - sistema não pode ativar planos após pagamento"
+        },
+        { status: 503 }
+      );
+    }
+
+    // VERIFICAÇÃO PREVENTIVA 2: Admin SDK deve estar disponível
+    // Sem isso, o webhook não consegue escrever no Firestore e não ativa o plano
+    if (!adminDb) {
+      console.error("[STRIPE_CHECKOUT_POST] ERRO CRÍTICO: Firebase Admin SDK não está disponível - webhook não conseguirá ativar plano");
+      return NextResponse.json(
+        { 
+          message: "Sistema temporariamente indisponível. Por favor, tente novamente em alguns minutos ou entre em contato com o suporte.",
+          error: "ADMIN_SDK_NOT_AVAILABLE",
+          hint: "Admin SDK não disponível - verifique FIREBASE_ADMIN_PRIVATE_KEY"
+        },
+        { status: 503 }
+      );
+    }
+
+    // VERIFICAÇÃO PREVENTIVA 3: Testar se consegue escrever no Firestore
+    // Isso garante que o webhook conseguirá ativar o plano após o pagamento
+    try {
+      const testRef = adminDb.collection("_health_check").doc("checkout_preflight");
+      await testRef.set({ 
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        test: true,
+        checkedAt: new Date().toISOString()
+      }, { merge: true });
+      // Deletar após 1 hora (limpeza automática)
+      await testRef.delete();
+      console.log("[STRIPE_CHECKOUT_POST] Teste de escrita no Firestore: OK");
+    } catch (error) {
+      console.error("[STRIPE_CHECKOUT_POST] ERRO CRÍTICO: Não consegue escrever no Firestore", error);
+      return NextResponse.json(
+        { 
+          message: "Sistema temporariamente indisponível. Por favor, tente novamente em alguns minutos ou entre em contato com o suporte.",
+          error: "FIREBASE_WRITE_FAILED",
+          hint: "Firestore não está acessível - webhook não conseguirá ativar plano"
+        },
+        { status: 503 }
       );
     }
 

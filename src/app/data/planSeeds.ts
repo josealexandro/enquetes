@@ -91,5 +91,31 @@ export const DEFAULT_PLANS: Plan[] = [
     isActive: true,
     sortOrder: 3,
   },
+  {
+    id: "plan_teste",
+    slug: "teste",
+    name: "Plano Teste",
+    description: "Plano de teste para validar o sistema de assinaturas e webhook.",
+    price: 200, // R$ 2,00 em centavos
+    currency: "BRL",
+    billingPeriod: "monthly",
+    // DOCUMENTAÇÃO: Price ID do Stripe - produto criado manualmente no dashboard (modo LIVE)
+    stripePriceId: "price_1SqHooRt7Er6J4QoqpxgECFm",
+    trialDays: 0,
+    limits: {
+      pollsPerMonth: 10, // 10 enquetes por mês
+      activePolls: 5,
+      commercialProfiles: 0,
+      teamMembers: 1,
+      storageMb: 100,
+    },
+    features: [
+      "10 enquetes por mês",
+      "Ideal para testar o sistema",
+      "Dashboard básico",
+    ],
+    isActive: true,
+    sortOrder: 0, // Aparece primeiro na lista
+  },
 ];
 

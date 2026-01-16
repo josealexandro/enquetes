@@ -1,6 +1,6 @@
 import { Timestamp } from "firebase/firestore";
 
-export type PlanSlug = "basic" | "medium" | "pro";
+export type PlanSlug = "basic" | "medium" | "pro" | "teste";
 
 export type BillingPeriod = "monthly" | "yearly";
 
