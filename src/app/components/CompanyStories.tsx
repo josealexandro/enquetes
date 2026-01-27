@@ -233,16 +233,28 @@ const CompanyStories: React.FC<CompanyStoriesProps> = ({ companyId }) => {
             if (a.createdAt) {
               if (typeof a.createdAt.toMillis === 'function') {
                 aTime = a.createdAt.toMillis();
-              } else if (a.createdAt._seconds) {
-                aTime = a.createdAt._seconds * 1000 + (a.createdAt._nanoseconds || 0) / 1000000;
+              } else if (typeof a.createdAt === 'object' && a.createdAt !== null) {
+                const createdAtObj = a.createdAt as any;
+                // Tentar _seconds primeiro (formato Admin SDK serializado)
+                if (createdAtObj._seconds !== undefined) {
+                  aTime = createdAtObj._seconds * 1000 + (createdAtObj._nanoseconds || 0) / 1000000;
+                } else if (createdAtObj.seconds !== undefined) {
+                  aTime = createdAtObj.seconds * 1000 + (createdAtObj.nanoseconds || 0) / 1000000;
+                }
               }
             }
             
             if (b.createdAt) {
               if (typeof b.createdAt.toMillis === 'function') {
                 bTime = b.createdAt.toMillis();
-              } else if (b.createdAt._seconds) {
-                bTime = b.createdAt._seconds * 1000 + (b.createdAt._nanoseconds || 0) / 1000000;
+              } else if (typeof b.createdAt === 'object' && b.createdAt !== null) {
+                const createdAtObj = b.createdAt as any;
+                // Tentar _seconds primeiro (formato Admin SDK serializado)
+                if (createdAtObj._seconds !== undefined) {
+                  bTime = createdAtObj._seconds * 1000 + (createdAtObj._nanoseconds || 0) / 1000000;
+                } else if (createdAtObj.seconds !== undefined) {
+                  bTime = createdAtObj.seconds * 1000 + (createdAtObj.nanoseconds || 0) / 1000000;
+                }
               }
             }
             
