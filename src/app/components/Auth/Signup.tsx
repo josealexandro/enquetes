@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
+import { BRAZIL_STATES, BRAZIL_REGIONS, getStatesByRegion } from "@/app/data/brazilLocations"; // Importar dados de localização
 
 interface SignupProps {
   onSwitchToLogin?: () => void;
@@ -18,6 +19,10 @@ export default function Signup({ onSwitchToLogin, onSignupSuccessWithAccountType
   const [commercialName, setCommercialName] = useState(""); // Novo estado para nome comercial
   const [accountType, setAccountType] = useState<'personal' | 'commercial'>('personal');
   const [avatarFile, setAvatarFile] = useState<File | null>(null); // Restaurado
+  // DOCUMENTAÇÃO: Campos de localização (opcionais)
+  const [region, setRegion] = useState<string>(""); // Região do Brasil
+  const [state, setState] = useState<string>(""); // Estado (sigla)
+  const [city, setCity] = useState<string>(""); // Cidade
   // REMOVIDO: const [brandName, setBrandName] = useState("");
   // REMOVIDO: const [logoUrl, setLogoUrl] = useState("");
   // REMOVIDO: const [brandColor1, setBrandColor1] = useState("");
@@ -27,6 +32,18 @@ export default function Signup({ onSwitchToLogin, onSignupSuccessWithAccountType
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { signup, signInWithGoogle } = useAuth(); // Usar o hook useAuth
+
+  // DOCUMENTAÇÃO: Filtrar estados baseado na região selecionada
+  const availableStates = useMemo(() => {
+    if (!region) return BRAZIL_STATES;
+    return getStatesByRegion(region);
+  }, [region]);
+
+  // DOCUMENTAÇÃO: Resetar estado quando região mudar
+  const handleRegionChange = (newRegion: string) => {
+    setRegion(newRegion);
+    setState(""); // Resetar estado quando região mudar
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,9 +81,17 @@ export default function Signup({ onSwitchToLogin, onSignupSuccessWithAccountType
       const finalDisplayName = accountType === 'personal' ? displayName : email; // Usar email como nome para contas comerciais
       const finalAvatarFile = accountType === 'personal' ? avatarFile : null; // Nulo para contas comerciais
 
-      await signup(email, password, finalDisplayName, accountType, 
+      await signup(
+        email, 
+        password, 
+        finalDisplayName, 
+        accountType, 
         accountType === 'commercial' ? commercialName : null, // Passar commercialName se for conta comercial
-        finalAvatarFile);
+        finalAvatarFile,
+        region.trim() || null, // DOCUMENTAÇÃO: Passar região (opcional)
+        city.trim() || null, // DOCUMENTAÇÃO: Passar cidade (opcional)
+        state.trim() || null // DOCUMENTAÇÃO: Passar estado (opcional)
+      );
       // Chamar a nova prop com o accountType
       onSignupSuccessWithAccountType?.(accountType);
     } catch (error: unknown) {
@@ -232,6 +257,54 @@ export default function Signup({ onSwitchToLogin, onSignupSuccessWithAccountType
               </svg>
             )}
           </button>
+        </div>
+
+        {/* DOCUMENTAÇÃO: Campos de localização (opcionais)
+            - Permite que o usuário informe sua região, estado e cidade
+            - Essas informações serão salvas no perfil e usadas nas enquetes criadas
+        */}
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Localização (opcional)
+          </label>
+          
+          {/* Região */}
+          <select
+            value={region}
+            onChange={(e) => handleRegionChange(e.target.value)}
+            className="w-full px-4 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white"
+          >
+            <option value="">Selecione a região</option>
+            {BRAZIL_REGIONS.map((reg) => (
+              <option key={reg} value={reg}>
+                {reg}
+              </option>
+            ))}
+          </select>
+
+          {/* Estado */}
+          <select
+            value={state}
+            onChange={(e) => setState(e.target.value)}
+            disabled={!region}
+            className="w-full px-4 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="">Selecione o estado</option>
+            {availableStates.map((st) => (
+              <option key={st.sigla} value={st.sigla}>
+                {st.nome} ({st.sigla})
+              </option>
+            ))}
+          </select>
+
+          {/* Cidade */}
+          <input
+            type="text"
+            placeholder="Cidade (opcional)"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            className="w-full px-4 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder-zinc-500 dark:placeholder-zinc-400"
+          />
         </div>
         
         {/* REMOVIDO: Campos para Conta Comercial */}

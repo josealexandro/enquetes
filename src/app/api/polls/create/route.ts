@@ -46,6 +46,10 @@ export async function POST(request: NextRequest) {
       category,
       isCommercial = false,
       creatorData,
+      // DOCUMENTAÇÃO: Campos de localização (opcionais)
+      region,
+      city,
+      state,
     } = body;
 
     // Validações básicas
@@ -244,6 +248,11 @@ export async function POST(request: NextRequest) {
       likedBy: [],
       dislikes: 0,
       dislikedBy: [],
+      // DOCUMENTAÇÃO: Campos de localização (opcionais - copiados do perfil do usuário)
+      // Se não fornecidos, a enquete não terá localização (compatível com enquetes antigas)
+      ...(region && typeof region === 'string' && region.trim() && { region: region.trim() }),
+      ...(city && typeof city === 'string' && city.trim() && { city: city.trim() }),
+      ...(state && typeof state === 'string' && state.trim() && { state: state.trim() }),
     };
 
     const newPollDoc = await pollsCollectionRef.add(pollData);

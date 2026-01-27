@@ -14,6 +14,7 @@ import { collection, query, orderBy, updateDoc, deleteDoc, doc, getDoc, Timestam
 import { useRouter } from 'next/navigation';
 import PollPodium from "./components/PollPodium";
 import slugify from "@/utils/slugify";
+import { BRAZIL_STATES } from "@/app/data/brazilLocations"; // Importar estados do Brasil para exibir nome completo
 
 export default function Home() {
   // Separação dos estados das enquetes
@@ -33,6 +34,11 @@ export default function Home() {
   const [deleteFeedbackMessage, setDeleteFeedbackMessage] = useState<string | null>(null);
   const [deleteFeedbackType, setDeleteFeedbackType] = useState<"success" | "error" | null>(null);
   const [activeFilter, setActiveFilter] = useState<"recent" | "trending" | "mine" | "public" | "commercial">("recent");
+  // DOCUMENTAÇÃO: Estado para filtro de cidade/localização
+  const [citySearchQuery, setCitySearchQuery] = useState<string>(""); // Texto digitado na busca de cidade
+  const [selectedCity, setSelectedCity] = useState<{ city: string; state: string } | null>(null); // Cidade selecionada para filtro
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false); // Controla visibilidade das sugestões
+  const citySearchRef = useRef<HTMLDivElement>(null); // Ref para detectar cliques fora do campo de busca
   const { user, isMasterUser } = useAuth();
   const [isClient, setIsClient] = useState(false);
   const [showPollForm, setShowPollForm] = useState(false);
@@ -46,15 +52,21 @@ export default function Home() {
     const creatorId = creatorData.id || data.createdBy;
 
     let creatorName = creatorData.name || creatorData.displayName || "Usuário Desconhecido";
-    let creatorAvatarUrl = creatorData.avatarUrl || creatorData.photoURL || "https://www.gravatar.com/avatar/?d=mp";
-    // Filtrar URLs de exemplo
-    if (creatorAvatarUrl.includes('example.com')) {
-      creatorAvatarUrl = "https://www.gravatar.com/avatar/?d=mp";
+    let creatorAvatarUrl = creatorData.avatarUrl || creatorData.photoURL || null;
+    // Filtrar URLs de exemplo ou strings vazias
+    if (!creatorAvatarUrl || creatorAvatarUrl === "" || creatorAvatarUrl.includes('example.com')) {
+      creatorAvatarUrl = null; // Marcar como null para buscar do documento do usuário
     }
     let creatorCommercialName = creatorData.commercialName || undefined;
     let creatorThemeColor = creatorData.themeColor || undefined;
 
-    const hasCompleteCreatorData = (creatorData.name || creatorData.displayName) && (creatorData.avatarUrl || creatorData.photoURL);
+    // DOCUMENTAÇÃO: Verificar se os dados do criador estão completos
+    // Considera completo apenas se tiver nome E avatarUrl válido (não vazio, não null, não exemplo)
+    const hasValidAvatar = creatorAvatarUrl && 
+                           creatorAvatarUrl !== "" && 
+                           !creatorAvatarUrl.includes('example.com') &&
+                           creatorAvatarUrl !== "https://www.gravatar.com/avatar/?d=mp";
+    const hasCompleteCreatorData = (creatorData.name || creatorData.displayName) && hasValidAvatar;
 
     // Se os dados do criador não estão completos na enquete, buscar do documento do usuário
     if (creatorId && !hasCompleteCreatorData) {
@@ -111,7 +123,7 @@ export default function Home() {
       creator: {
         id: creatorId,
         name: creatorName,
-        avatarUrl: creatorAvatarUrl,
+        avatarUrl: creatorAvatarUrl || "https://www.gravatar.com/avatar/?d=mp", // Garantir fallback se ainda estiver null
         commercialName: creatorCommercialName,
         themeColor: creatorThemeColor,
       }, // Sobrescreve qualquer creator que possa ter vindo do restData
@@ -266,9 +278,51 @@ export default function Home() {
     fetchInitialPolls();
   }, [fetchInitialPolls]);
 
-  // Filtros (Nota: Paginação implementada apenas para 'recent' por enquanto)
+  // DOCUMENTAÇÃO: Extrair cidades únicas das enquetes para sugestões
+  const availableCities = useMemo(() => {
+    const allPolls = [...publicPolls, ...commercialPolls];
+    const citySet = new Set<string>(); // Set para armazenar chaves únicas "city-state"
+    const cities: { city: string; state: string }[] = [];
+    
+    allPolls.forEach(poll => {
+      if (poll.city && poll.state) {
+        const key = `${poll.city.toLowerCase()}-${poll.state}`;
+        if (!citySet.has(key)) {
+          citySet.add(key);
+          cities.push({ city: poll.city, state: poll.state });
+        }
+      }
+    });
+    
+    // Ordenar alfabeticamente por cidade
+    cities.sort((a, b) => a.city.localeCompare(b.city));
+    
+    return cities;
+  }, [publicPolls, commercialPolls]);
+
+  // DOCUMENTAÇÃO: Filtrar sugestões de cidade baseado no texto digitado
+  const citySuggestions = useMemo(() => {
+    if (!citySearchQuery.trim()) return [];
+    
+    const queryLower = citySearchQuery.toLowerCase().trim();
+    return availableCities
+      .filter(({ city }) => city.toLowerCase().includes(queryLower))
+      .slice(0, 10); // Limitar a 10 sugestões
+  }, [citySearchQuery, availableCities]);
+
+  // DOCUMENTAÇÃO: Filtros (Nota: Paginação implementada apenas para 'recent' por enquanto)
+  // Inclui filtro por cidade se selecionada
   const filteredPublicPolls = useMemo(() => {
     let currentList = [...publicPolls];
+    
+    // DOCUMENTAÇÃO: Filtrar por cidade se selecionada
+    if (selectedCity) {
+      currentList = currentList.filter(p => 
+        p.city?.toLowerCase() === selectedCity.city.toLowerCase() && 
+        p.state === selectedCity.state
+      );
+    }
+    
     if (activeFilter === 'mine') {
       currentList = currentList.filter(p => user && p.creator.id === user.uid);
     }
@@ -281,10 +335,19 @@ export default function Home() {
       });
     }
     return currentList;
-  }, [publicPolls, activeFilter, user]);
+  }, [publicPolls, activeFilter, user, selectedCity]);
 
   const filteredCommercialPolls = useMemo(() => {
     let currentList = [...commercialPolls];
+    
+    // DOCUMENTAÇÃO: Filtrar por cidade se selecionada
+    if (selectedCity) {
+      currentList = currentList.filter(p => 
+        p.city?.toLowerCase() === selectedCity.city.toLowerCase() && 
+        p.state === selectedCity.state
+      );
+    }
+    
     if (activeFilter === 'mine') {
       currentList = currentList.filter(p => user && p.creator.id === user.uid);
     }
@@ -296,7 +359,7 @@ export default function Home() {
       });
     }
     return currentList;
-  }, [commercialPolls, activeFilter, user]);
+  }, [commercialPolls, activeFilter, user, selectedCity]);
 
 
   // Efeito para detectar cliques fora do formulário de enquete
@@ -317,6 +380,25 @@ export default function Home() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showPollForm]);
+
+  // DOCUMENTAÇÃO: Detectar cliques fora do campo de busca de cidade para fechar sugestões
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (citySearchRef.current && !citySearchRef.current.contains(event.target as Node)) {
+        setShowCitySuggestions(false);
+      }
+    }
+
+    if (showCitySuggestions) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showCitySuggestions]);
 
   // Recarrega as enquetes após criar uma nova enquete
   // Atualiza a lista de enquetes e o pódio para refletir a nova enquete criada
@@ -584,6 +666,80 @@ export default function Home() {
             )}
 
             <div className="flex flex-wrap space-x-2 sm:space-x-4 gap-y-4 mb-8 justify-center"> {/* Centralizar botões de filtro e permitir quebra de linha */}
+              {/* DOCUMENTAÇÃO: Campo de busca de cidade com sugestões */}
+              <div className="relative" ref={citySearchRef}>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Busque por cidade..."
+                    value={citySearchQuery}
+                    onChange={(e) => {
+                      setCitySearchQuery(e.target.value);
+                      setShowCitySuggestions(true);
+                      if (e.target.value.trim() === "") {
+                        setSelectedCity(null);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (citySearchQuery.trim() && citySuggestions.length > 0) {
+                        setShowCitySuggestions(true);
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-colors duration-300 ${
+                      selectedCity 
+                        ? "bg-green-600 text-white placeholder-white/70" 
+                        : "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 placeholder-zinc-500 dark:placeholder-zinc-400"
+                    } min-w-[200px] focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                  />
+                  {selectedCity && (
+                    <button
+                      onClick={() => {
+                        setSelectedCity(null);
+                        setCitySearchQuery("");
+                        setShowCitySuggestions(false);
+                      }}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white hover:text-zinc-200"
+                      title="Limpar filtro"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                
+                {/* DOCUMENTAÇÃO: Dropdown com sugestões de cidade */}
+                {showCitySuggestions && citySuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 mt-2 bg-white dark:bg-zinc-800 rounded-lg shadow-lg z-50 border border-zinc-300 dark:border-zinc-700 min-w-[250px] max-h-[300px] overflow-y-auto">
+                    <div className="p-2">
+                      {citySuggestions.map((suggestion, index) => {
+                        const stateName = BRAZIL_STATES.find(s => s.sigla === suggestion.state)?.nome || suggestion.state;
+                        return (
+                          <button
+                            key={`${suggestion.city}-${suggestion.state}-${index}`}
+                            onClick={() => {
+                              setSelectedCity(suggestion);
+                              setCitySearchQuery(`${suggestion.city} - ${stateName}`);
+                              setShowCitySuggestions(false);
+                            }}
+                            className="w-full text-left px-3 py-2 rounded text-sm text-zinc-700 dark:text-zinc-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
+                          >
+                            {suggestion.city} - {stateName}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                
+                {/* DOCUMENTAÇÃO: Mensagem quando não há sugestões */}
+                {showCitySuggestions && citySearchQuery.trim() && citySuggestions.length === 0 && (
+                  <div className="absolute top-full left-0 mt-2 bg-white dark:bg-zinc-800 rounded-lg shadow-lg z-50 border border-zinc-300 dark:border-zinc-700 min-w-[250px] p-4">
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                      Nenhuma cidade encontrada com "{citySearchQuery}"
+                    </p>
+                  </div>
+                )}
+              </div>
+              
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}

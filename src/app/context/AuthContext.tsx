@@ -25,6 +25,10 @@ interface UserDataToSave {
   createdAt: Timestamp | FieldValue; // serverTimestamp é um tipo complexo, mas por enquanto 'any' é aceitável aqui se for apenas para o tipo do FireStore
   themeColor?: string | null; // Adicionar themeColor
   extraPollsAvailable?: number; // Adicionar créditos de enquete avulsas
+  // DOCUMENTAÇÃO: Campos de localização (opcionais)
+  region?: string | null; // Região do Brasil (ex: "Sudeste", "Nordeste", etc.)
+  city?: string | null; // Cidade
+  state?: string | null; // Estado (sigla: "SP", "RJ", etc.)
 }
 
 export interface AuthContextType {
@@ -42,6 +46,10 @@ export interface AuthContextType {
     themeColor?: string | null; // Adicionar themeColor
     extraPollsAvailable?: number; // Novo campo para créditos de enquete avulsas
     bannerURL?: string | null; // Novo campo para URL do banner
+    // DOCUMENTAÇÃO: Campos de localização (opcionais)
+    region?: string | null; // Região do Brasil (ex: "Sudeste", "Nordeste", etc.)
+    city?: string | null; // Cidade
+    state?: string | null; // Estado (sigla: "SP", "RJ", etc.)
   }) | null; // O tipo de usuário agora é o User do Firebase
   firebaseAuthUser: User | null; // Novo campo para o objeto User original do Firebase Auth
   loading: boolean;
@@ -52,7 +60,10 @@ export interface AuthContextType {
   signup: (email: string, password: string, displayName: string,
     accountType: 'personal' | 'commercial',
     commercialName?: string | null, // Adicionar commercialName
-    avatarFile?: File | null
+    avatarFile?: File | null,
+    region?: string | null, // DOCUMENTAÇÃO: Região do Brasil (opcional)
+    city?: string | null, // DOCUMENTAÇÃO: Cidade (opcional)
+    state?: string | null // DOCUMENTAÇÃO: Estado (opcional)
   ) => Promise<void>;
   logout: () => Promise<void>;
   updateUserDocument: (uid: string, data: Record<string, unknown>) => Promise<void>; // Nova função
@@ -80,6 +91,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     themeColor?: string | null; // Adicionar themeColor
     extraPollsAvailable?: number; // Novo campo para créditos de enquete avulsas
     bannerURL?: string | null; // Novo campo para URL do banner
+    // DOCUMENTAÇÃO: Campos de localização (opcionais)
+    region?: string | null; // Região do Brasil (ex: "Sudeste", "Nordeste", etc.)
+    city?: string | null; // Cidade
+    state?: string | null; // Estado (sigla: "SP", "RJ", etc.)
   }) | null>(null);
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<User | null>(null); // Novo estado
   const [loading, setLoading] = useState(true);
@@ -115,6 +130,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
             themeColor: (userData?.themeColor as string | null) || null,
             bannerURL: (userData?.bannerURL as string | null) || null, // Adicionar bannerURL
             extraPollsAvailable: (userData?.extraPollsAvailable as number) || 0,
+            // DOCUMENTAÇÃO: Campos de localização (opcionais)
+            region: (userData?.region as string | null) || null,
+            city: (userData?.city as string | null) || null,
+            state: (userData?.state as string | null) || null,
           };
           setUser(customUser);
           setIsMasterUser(false); // Definir como false temporariamente
@@ -176,6 +195,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
           themeColor: (userData?.themeColor as string | null) || null,
           bannerURL: (userData?.bannerURL as string | null) || null, // Adicionar bannerURL
           extraPollsAvailable: (userData?.extraPollsAvailable as number) || 0,
+          // DOCUMENTAÇÃO: Campos de localização (opcionais)
+          region: (userData?.region as string | null) || null,
+          city: (userData?.city as string | null) || null,
+          state: (userData?.state as string | null) || null,
         };
         setUser(customUser);
         console.log("Dados do usuário atualizados:", customUser.displayName); // Log para debug
@@ -267,7 +290,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     displayName: string,
     accountType: 'personal' | 'commercial',
     commercialName?: string | null,
-    avatarFile?: File | null
+    avatarFile?: File | null,
+    region?: string | null, // DOCUMENTAÇÃO: Região do Brasil (opcional)
+    city?: string | null, // DOCUMENTAÇÃO: Cidade (opcional)
+    state?: string | null // DOCUMENTAÇÃO: Estado (opcional)
   ) => {
     setLoading(true);
     try {
@@ -283,6 +309,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         createdAt: serverTimestamp(), // Adicionar timestamp de criação
         themeColor: null, // Inicialmente nulo, pois não há um campo para tema na interface de cadastro
         extraPollsAvailable: 0, // Inicialmente 0, pois não há um campo para créditos na interface de cadastro
+        // DOCUMENTAÇÃO: Salvar localização se fornecida (opcional)
+        ...(region && { region: region }),
+        ...(city && { city: city }),
+        ...(state && { state: state }),
       };
 
       // Salvar o displayName e accountType no Firestore

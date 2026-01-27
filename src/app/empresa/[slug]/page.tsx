@@ -20,6 +20,7 @@ import CompanyRatingInput from "@/app/components/CompanyRatingInput"; // Importa
 import Notification from "@/app/components/Notification"; // Importar o novo componente de notificação
 import RatingSuccessAnimation from "@/app/components/RatingSuccessAnimation"; // Importar o novo componente de animação de estrelas
 import ExpandableImage from "@/app/components/ExpandableImage"; // Importar componente de imagem expansível
+import CompanyStories from "@/app/components/CompanyStories"; // Importar componente de stories
 
 interface CompanyProfilePageProps {
   params: Promise<{ slug: string }>; // Atualizado para Promise
@@ -108,13 +109,17 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
     const fetchCompanyAndPolls = async () => {
       setLoading(true);
       const fetchedCompany = await getCompanyData(slug);
-      console.log("Fetched company in useEffect:", fetchedCompany); // LOG DE DEBUG TEMPORÁRIO
+      console.log("[PAGE_SLUG] Fetched company in useEffect:", fetchedCompany); // LOG DE DEBUG TEMPORÁRIO
+      console.log("[PAGE_SLUG] Company ID que será passado para CompanyStories:", fetchedCompany?.id); // LOG DE DEBUG
       setCompany(fetchedCompany);
       setCompanyFooterData(fetchedCompany); // Definir os dados da empresa no contexto do rodapé
 
       if (fetchedCompany) {
         // DOCUMENTAÇÃO: onSnapshot atualiza dados da empresa em tempo real e sincroniza com o footer
         // Quando dados são salvos na dashboard, este listener atualiza automaticamente a página e o footer
+        // OTIMIZAÇÃO DE CUSTO: Mantido onSnapshot para dados críticos (empresa) pois é essencial para UX
+        // - Apenas 1 listener por visitante (baixo custo)
+        // - Atualiza apenas quando há mudanças reais (não faz polling constante)
         const companyDocRef = doc(db, "users", fetchedCompany.id);
         const unsubscribeCompany = onSnapshot(companyDocRef, (docSnap) => {
           if (docSnap.exists()) {
@@ -144,7 +149,10 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
         }, (error) => {
           console.error("Erro ao carregar dados da empresa:", error);
         });
-        // Adicionar listener para as avaliações da empresa
+        // DOCUMENTAÇÃO: Listener para avaliações da empresa
+        // OTIMIZAÇÃO DE CUSTO: Mantido onSnapshot para avaliações pois é crítico para UX
+        // - Avaliações são eventos raros (não geram muitas leituras)
+        // - Importante mostrar novas avaliações em tempo real
         const companyRatingsRef = collection(db, `users/${fetchedCompany.id}/ratings`);
         const unsubscribeRatings = onSnapshot(companyRatingsRef, (snapshot) => {
           const ratings = snapshot.docs.map(doc => doc.data().rating);
@@ -160,6 +168,10 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
           console.error("Erro ao carregar avaliações da empresa:", error);
         });
 
+        // DOCUMENTAÇÃO: Listener para enquetes da empresa
+        // OTIMIZAÇÃO DE CUSTO: Mantido onSnapshot para enquetes pois é crítico para UX
+        // - Votos e comentários devem aparecer em tempo real
+        // - Apenas 1 listener por visitante, atualiza apenas quando há mudanças
         const pollsCollection = collection(db, "polls");
         const q = query(pollsCollection, where("creator.id", "==", fetchedCompany.id));
 
@@ -349,50 +361,66 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
         </div>
       </div>
 
-      {/* Faixa Horizontal de Números de Impacto */}
-      <div className="w-full max-w-screen-xl mx-auto px-4 mb-8">
-        <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-md p-6 flex justify-around items-center flex-wrap gap-4">
-          <div className="text-center">
-            <motion.p
-              className="text-4xl font-extrabold text-indigo-600 dark:text-indigo-400"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-            >
-              {companyPolls.reduce((totalVotes, poll) => totalVotes + poll.options.reduce((sum, option) => sum + option.votes, 0), 0)}
-            </motion.p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">votos recebidos</p>
+      {/* DOCUMENTAÇÃO: Container com stories e avaliação lado a lado
+          - Stories à esquerda, avaliação à direita
+          - Layout responsivo: coluna no mobile, linha no desktop
+      */}
+      <div className="w-full max-w-screen-xl mx-auto px-4 mb-6">
+        <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
+          {/* DOCUMENTAÇÃO: Stories da empresa - lado esquerdo
+              - Exibe stories ativos (não expirados) em formato de bolhas circulares
+              - Layout horizontal com scroll lateral no mobile
+              - Componente isolado, não acoplado com outras funcionalidades
+              - IMPORTANTE: company.id deve ser o ID do documento em users/{id}
+              - Stories são armazenados em users/{companyId}/stories/{storyId}
+          */}
+          <div className="flex-1 w-full md:w-auto">
+            {company?.id && <CompanyStories companyId={company.id} />}
           </div>
-          <div className="text-center">
-            <motion.p
-              className="text-4xl font-extrabold text-indigo-600 dark:text-indigo-400"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.4 }}
-            >
-              {companyPolls.length}
-            </motion.p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">enquetes criadas</p>
-          </div>
-          <div className="text-center">
-            <motion.p
-              className="text-4xl font-extrabold text-indigo-600 dark:text-indigo-400"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.6 }}
-            >
-              {averageRating.toFixed(1)} {/* Exibir avaliação média dinâmica */}
-            </motion.p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">avaliação média ({totalRatings} {totalRatings === 1 ? 'voto' : 'votos'})</p> {/* Exibir total de avaliações */}
+
+          {/* DOCUMENTAÇÃO: Seção de Avaliação da Empresa - lado direito
+              - Exibe avaliação média junto com o formulário de avaliação
+              - Avaliação média é pública (todos podem ver)
+              - Formulário de avaliação: apenas para visitantes (não para o dono da empresa)
+              - O dono da empresa não pode se avaliar
+          */}
+          <div className="w-full md:w-auto md:min-w-[300px]">
+            {user?.uid !== company?.id && (
+              <div className="w-full">
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-4 text-center">Avalie esta empresa</h3>
+                
+                {/* DOCUMENTAÇÃO: Exibir avaliação média acima do formulário de avaliação */}
+                {totalRatings > 0 && (
+                  <div className="text-center mb-4">
+                    <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">
+                      {averageRating.toFixed(1)}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      avaliação média ({totalRatings} {totalRatings === 1 ? 'voto' : 'votos'})
+                    </p>
+                  </div>
+                )}
+                
+                {company.id && <CompanyRatingInput companyId={company.id} onRatingSubmitted={handleShowNotification} />}
+              </div>
+            )}
+            
+            {/* DOCUMENTAÇÃO: Exibir apenas avaliação média para o dono da empresa (sem formulário) */}
+            {user?.uid === company?.id && totalRatings > 0 && (
+              <div className="text-center">
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-4">Avaliação da Empresa</h3>
+                <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">
+                  {averageRating.toFixed(1)}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  avaliação média ({totalRatings} {totalRatings === 1 ? 'voto' : 'votos'})
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Seção de Avaliação da Empresa */}
-      <div className="w-full max-w-md mx-auto px-4 mb-8">
-        <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-4 text-center">Avalie esta empresa</h3>
-        {company.id && <CompanyRatingInput companyId={company.id} onRatingSubmitted={handleShowNotification} />}
-      </div>
 
       {companyPolls.length === 0 ? (
         <p className="text-center text-gray-600 text-lg">Nenhuma enquete encontrada para esta empresa.</p>

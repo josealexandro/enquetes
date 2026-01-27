@@ -39,6 +39,10 @@ export interface Poll {
   votedBy?: string[]; // Novo campo para armazenar os IDs dos usuários que já votaram
   rank?: number; // Novo campo para classificar as enquetes (1: ouro, 2: prata, 3: bronze)
   commentCount?: number; // Novo campo para armazenar o número total de comentários
+  // DOCUMENTAÇÃO: Campos de localização (opcionais para compatibilidade com enquetes antigas)
+  region?: string; // Região do Brasil (ex: "Sudeste", "Nordeste", etc.)
+  city?: string; // Cidade
+  state?: string; // Estado (sigla: "SP", "RJ", etc.)
   // imageUrl?: string; // Novo campo para a URL da imagem da enquete (opcional)
   // creatorId?: string; // Remover esta linha, pois o ID agora está dentro de 'creator'
 }

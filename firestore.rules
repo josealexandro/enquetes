@@ -15,6 +15,7 @@ service cloud.firestore {
 
       // DOCUMENTAÇÃO: Validação para criação de enquetes
       // Verifica se usuário está autenticado, se é o criador, e valida estrutura básica da enquete
+      // Campos opcionais de localização (region, city, state) são permitidos mas não obrigatórios
       allow create: if request.auth != null
         && request.auth.uid == request.resource.data.creator.id
         && request.resource.data.title is string
@@ -32,7 +33,20 @@ service cloud.firestore {
         && request.resource.data.options[1].text is string
         && request.resource.data.options[1].votes is number
         && request.resource.data.options[1].votes >= 0
-        && request.resource.data.creator.id is string;
+        && request.resource.data.creator.id is string
+        // DOCUMENTAÇÃO: Campos de localização são opcionais, mas se fornecidos devem ser strings válidas
+        && (
+          !('region' in request.resource.data) 
+          || (request.resource.data.region is string && request.resource.data.region.size() <= 50)
+        )
+        && (
+          !('city' in request.resource.data) 
+          || (request.resource.data.city is string && request.resource.data.city.size() <= 100)
+        )
+        && (
+          !('state' in request.resource.data) 
+          || (request.resource.data.state is string && request.resource.data.state.size() <= 2)
+        );
 
       // Allow the poll creator to update/delete the poll.
       // Additionally, allow any authenticated user to update only the `commentCount` field
@@ -87,8 +101,27 @@ service cloud.firestore {
             && request.resource.data.creator == resource.data.creator
             && request.resource.data.createdAt == resource.data.createdAt
             && request.resource.data.isCommercial == resource.data.isCommercial
+            // DOCUMENTAÇÃO: Campos de localização podem ser atualizados pelo criador
+            // (não validados aqui pois são opcionais e podem ser adicionados/removidos)
             // Allow likes/dislikes/likedBy/dislikedBy to be updated
             // These fields can use increment() and arrayUnion/arrayRemove which are safe server-side operations
+        )
+        // DOCUMENTAÇÃO: Permitir que o criador atualize campos de localização
+        || (
+            request.auth.uid == resource.data.creator.id
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['region', 'city', 'state'])
+            && (
+              !('region' in request.resource.data) 
+              || (request.resource.data.region is string && request.resource.data.region.size() <= 50)
+            )
+            && (
+              !('city' in request.resource.data) 
+              || (request.resource.data.city is string && request.resource.data.city.size() <= 100)
+            )
+            && (
+              !('state' in request.resource.data) 
+              || (request.resource.data.state is string && request.resource.data.state.size() <= 2)
+            )
         )
       );
 
@@ -151,7 +184,7 @@ service cloud.firestore {
       // Verifica apenas os campos que estão sendo alterados, não todos os campos do documento
       allow update: if request.auth != null && request.auth.uid == userId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'displayName', 'avatarUrl', 'accountType', 'commercialName', 'aboutUs', 'contactEmail', 'address', 'facebookUrl', 'instagramUrl', 'twitterUrl', 'themeColor', 'extraPollsAvailable', 'bannerURL'
+          'displayName', 'avatarUrl', 'accountType', 'commercialName', 'aboutUs', 'contactEmail', 'address', 'facebookUrl', 'instagramUrl', 'twitterUrl', 'themeColor', 'extraPollsAvailable', 'bannerURL', 'region', 'city', 'state'
         ])
         // individual field validations (if present)
         && (
@@ -196,6 +229,46 @@ service cloud.firestore {
             || request.resource.data.timestamp is int
           );
         allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId || request.auth.uid == resource.data.authorId;
+      }
+
+      // Stories subcollection for companies: temporary posts (24h) similar to Instagram stories
+      // DOCUMENTAÇÃO:
+      // - Apenas empresas com plano Medium ou Pro podem criar stories (validação na API route)
+      // - Máximo de 2 stories ativos por empresa (validação na API route)
+      // - Stories expiram automaticamente após 24 horas
+      // - Estrutura: users/{empresaId}/stories/{storyId}
+      match /stories/{storyId} {
+        // Qualquer pessoa pode ler stories (público)
+        allow read: if true;
+
+        // DOCUMENTAÇÃO: Criação de stories
+        // - Apenas empresa autenticada pode criar stories para seu próprio empresaId
+        // - Validação de assinatura (Medium/Pro) é feita na API route /api/stories
+        // - Validação de limite (máximo 2) é feita na API route
+        // - Campos obrigatórios: imageUrl, createdAt, expiresAt
+        // - Campo opcional: text (máximo 80 caracteres)
+        allow create: if request.auth != null
+          && request.auth.uid == userId
+          && request.resource.data.imageUrl is string
+          && request.resource.data.imageUrl.size() > 0
+          && request.resource.data.createdAt is timestamp
+          && request.resource.data.expiresAt is timestamp
+          && (
+            // text é opcional, mas se fornecido, deve ser string e ter no máximo 80 caracteres
+            !('text' in request.resource.data)
+            || (request.resource.data.text is string && request.resource.data.text.size() <= 80)
+          );
+
+        // DOCUMENTAÇÃO: Atualização de stories
+        // - Apenas a empresa dona pode atualizar seus stories
+        // - Por enquanto, não permitir atualização (stories são imutáveis após criação)
+        // - Se precisar permitir atualização no futuro, descomentar a linha abaixo
+        // allow update: if request.auth != null && request.auth.uid == userId;
+
+        // DOCUMENTAÇÃO: Exclusão de stories
+        // - Apenas a empresa dona pode deletar seus stories
+        // - Útil para permitir que empresas removam stories antes da expiração
+        allow delete: if request.auth != null && request.auth.uid == userId;
       }
     }
 

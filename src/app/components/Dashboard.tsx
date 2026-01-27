@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth, AuthContextType } from "../context/AuthContext";
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore (ainda necessária para update/delete)
-import { doc, updateDoc, deleteDoc } from "firebase/firestore"; // Importar doc, updateDoc e deleteDoc
+import { doc, updateDoc, deleteDoc } from "firebase/firestore"; // Importar doc, updateDoc e deleteDoc (deleteDoc usado apenas para enquetes, stories usa API route)
 import { updateProfile } from "firebase/auth"; // Importar updateProfile do Firebase Auth
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Importar Firebase Storage
 import PollForm from "./PollForm"; // Importar o PollForm
@@ -15,6 +15,9 @@ import slugify from "@/utils/slugify"; // Importar a função slugify
 import ExpandableImage from "./ExpandableImage"; // Importar componente de imagem expansível
 import QRCode from "react-qr-code"; // Importar QRCode
 import PollResults from "./PollResults"; // Importar componente de resultados de enquete
+import { Story } from "../types/story"; // Importar tipo Story
+import { CreateStoryInput } from "../types/story"; // Importar tipo CreateStoryInput
+import { BRAZIL_STATES, BRAZIL_REGIONS, getStatesByRegion } from "@/app/data/brazilLocations"; // Importar dados de localização
 // Removido: import { UserInfo, User } from "firebase/auth"; // Removido: UserInfo e User não são necessários aqui
 // Removido: import { AuthContextType } from "../context/AuthContext"; // Removido: AuthContextType não é necessário ser importado diretamente para o tipo CustomUser
 
@@ -66,6 +69,20 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
   const [editedInstagramUrl, setEditedInstagramUrl] = useState(user.instagramUrl || ""); // Antigo editedTwitterUrl
   const [editedTwitterUrl, setEditedTwitterUrl] = useState(user.twitterUrl || ""); // Antigo editedLinkedinUrl
   const [editedThemeColor, setEditedThemeColor] = useState(user.themeColor || "#6366f1"); // Novo estado para o tema de cor
+  // DOCUMENTAÇÃO: Estados para localização (opcionais)
+  const [editedRegion, setEditedRegion] = useState(user.region || "");
+  const [editedState, setEditedState] = useState(user.state || "");
+  const [editedCity, setEditedCity] = useState(user.city || "");
+  // DOCUMENTAÇÃO: Estados para gerenciar stories
+  const [stories, setStories] = useState<Story[]>([]); // Lista de stories ativos
+  const [showCreateStoryModal, setShowCreateStoryModal] = useState(false); // Controla modal de criação
+  const [newStoryImageUrl, setNewStoryImageUrl] = useState(""); // URL da imagem do novo story (para URL externa)
+  const [storyImageFile, setStoryImageFile] = useState<File | null>(null); // Arquivo de imagem para upload
+  const [storyImagePreviewUrl, setStoryImagePreviewUrl] = useState<string | null>(null); // Preview da imagem
+  const [newStoryText, setNewStoryText] = useState(""); // Texto do novo story (opcional)
+  const [creatingStory, setCreatingStory] = useState(false); // Estado de loading ao criar story
+  const [uploadingStoryImage, setUploadingStoryImage] = useState(false); // Estado de upload da imagem
+  const [storyFeedback, setStoryFeedback] = useState<{ message: string; type: "success" | "error" } | null>(null); // Feedback de criação
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
   const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -96,6 +113,10 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     if (user?.themeColor) { // Certifica-se de que user e themeColor existem antes de tentar slugify
       setEditedThemeColor(user.themeColor);
     }
+    // DOCUMENTAÇÃO: Inicializar campos de localização
+    setEditedRegion(user?.region || "");
+    setEditedState(user?.state || "");
+    setEditedCity(user?.city || "");
     if (user?.commercialName) {
       const publicPageSlug = slugify(user.commercialName);
       setCompanyPublicPageUrl(`${window.location.origin}/empresa/${publicPageSlug}`);
@@ -121,6 +142,42 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     };
 
     fetchSubscription();
+  }, [user]);
+
+  // DOCUMENTAÇÃO: Buscar stories ativos da empresa
+  // Todas as contas comerciais podem ter stories
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const fetchStories = async () => {
+      try {
+        const response = await fetch(`/api/stories?companyId=${user.uid}`, {
+          method: 'GET',
+          cache: 'no-store',
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.stories) {
+            setStories(data.stories);
+          } else {
+            setStories([]);
+          }
+        } else {
+          setStories([]);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar stories:", error);
+        setStories([]);
+      }
+    };
+
+    fetchStories();
+
+    // DOCUMENTAÇÃO: Atualizar stories a cada 5 minutos para remover expirados
+    // OTIMIZAÇÃO DE CUSTO: Intervalo aumentado de 1 minuto para 5 minutos para reduzir leituras do Firestore
+    const interval = setInterval(fetchStories, 300000); // 5 minutos (300000ms)
+    return () => clearInterval(interval);
   }, [user]);
 
   // Efeito para contar enquetes ativas e calcular estatísticas quando as enquetes do usuário são atualizadas
@@ -238,6 +295,10 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       twitterUrl?: string;
       themeColor?: string;
       bannerURL?: string;
+      // DOCUMENTAÇÃO: Campos de localização
+      region?: string;
+      city?: string;
+      state?: string;
     } = {};
 
     if (editedCompanyName.trim() !== (user.displayName || "")) {
@@ -278,6 +339,19 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     if (editedThemeColor !== (user.themeColor || "#6366f1")) {
       updateRequired = true; 
       updateData.themeColor = editedThemeColor; // Adicionar themeColor ao updateData
+    }
+    // DOCUMENTAÇÃO: Verificar se campos de localização foram alterados
+    if (editedRegion !== (user.region || "")) {
+      updateRequired = true;
+      updateData.region = editedRegion.trim() || undefined;
+    }
+    if (editedState !== (user.state || "")) {
+      updateRequired = true;
+      updateData.state = editedState.trim() || undefined;
+    }
+    if (editedCity !== (user.city || "")) {
+      updateRequired = true;
+      updateData.city = editedCity.trim() || undefined;
     }
 
     if (imageFile) {
@@ -393,6 +467,16 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       if (editedAddress !== (user.address || "")) {
         firestoreUpdateData.address = editedAddress;
       }
+      // DOCUMENTAÇÃO: Atualizar campos de localização se alterados
+      if (editedRegion !== (user.region || "")) {
+        firestoreUpdateData.region = editedRegion.trim() || null;
+      }
+      if (editedState !== (user.state || "")) {
+        firestoreUpdateData.state = editedState.trim() || null;
+      }
+      if (editedCity !== (user.city || "")) {
+        firestoreUpdateData.city = editedCity.trim() || null;
+      }
       if (editedFacebookUrl !== (user.facebookUrl || "")) {
         firestoreUpdateData.facebookUrl = editedFacebookUrl;
       }
@@ -404,6 +488,16 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       }
       if (editedThemeColor !== (user.themeColor || "#6366f1")) {
         firestoreUpdateData.themeColor = editedThemeColor;
+      }
+      // DOCUMENTAÇÃO: Atualizar campos de localização se alterados
+      if (editedRegion !== (user.region || "")) {
+        firestoreUpdateData.region = editedRegion.trim() || undefined;
+      }
+      if (editedState !== (user.state || "")) {
+        firestoreUpdateData.state = editedState.trim() || undefined;
+      }
+      if (editedCity !== (user.city || "")) {
+        firestoreUpdateData.city = editedCity.trim() || undefined;
       }
 
       // Só atualizar no Firestore se houver dados para atualizar
@@ -449,6 +543,193 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       setFeedbackType("error");
     } finally {
       setTimeout(() => setFeedbackMessage(null), 3000);
+    }
+  };
+
+  // DOCUMENTAÇÃO: Função para lidar com seleção de imagem do story
+  const handleStoryImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validar tipo de arquivo
+      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        setStoryFeedback({ message: "Tipo de arquivo não suportado. Use JPEG, PNG, GIF ou WebP.", type: "error" });
+        return;
+      }
+
+      // Validar tamanho do arquivo
+      if (file.size > MAX_FILE_SIZE) {
+        setStoryFeedback({ message: "Arquivo muito grande. Tamanho máximo: 5MB.", type: "error" });
+        return;
+      }
+
+      setStoryImageFile(file);
+      setStoryImagePreviewUrl(URL.createObjectURL(file)); // Preview instantâneo
+      setNewStoryImageUrl(""); // Limpar URL se houver
+      setStoryFeedback(null); // Limpar feedback anterior
+    } else {
+      setStoryImageFile(null);
+      setStoryImagePreviewUrl(null);
+    }
+  };
+
+  // DOCUMENTAÇÃO: Função para criar um novo story
+  // Valida assinatura ativa e limite (máximo 2) na API route
+  // Faz upload da imagem se um arquivo foi selecionado
+  const handleCreateStory = async () => {
+    if (!user?.uid) {
+      setStoryFeedback({ message: "Erro: Usuário não autenticado.", type: "error" });
+      return;
+    }
+
+    // DOCUMENTAÇÃO: Validação de plano removida - todas as contas comerciais podem criar stories
+    // Apenas verificar se está autenticado (já verificado acima)
+
+    // Validar que há imagem (arquivo ou URL)
+    if (!storyImageFile && !newStoryImageUrl.trim()) {
+      setStoryFeedback({ message: "Selecione uma imagem ou forneça uma URL.", type: "error" });
+      return;
+    }
+
+    if (newStoryText && newStoryText.length > 80) {
+      setStoryFeedback({ message: "O texto não pode ter mais de 80 caracteres.", type: "error" });
+      return;
+    }
+
+    setCreatingStory(true);
+    setStoryFeedback(null);
+
+    try {
+      let finalImageUrl = newStoryImageUrl.trim();
+
+      // DOCUMENTAÇÃO: Fazer upload da imagem se um arquivo foi selecionado
+      if (storyImageFile) {
+        setUploadingStoryImage(true);
+        try {
+          const storage = getStorage();
+          const imageRef = ref(storage, `story_images/${user.uid}-${uuidv4()}-${storyImageFile.name}`);
+          
+          // DOCUMENTAÇÃO: Incluir metadata com contentType para passar nas regras do Storage
+          const metadata = {
+            contentType: storyImageFile.type,
+          };
+          
+          await uploadBytes(imageRef, storyImageFile, metadata);
+          finalImageUrl = await getDownloadURL(imageRef);
+          setStoryFeedback({ message: "Imagem enviada com sucesso!", type: "success" });
+        } catch (error) {
+          console.error("Erro ao fazer upload da imagem:", error);
+          setStoryFeedback({ message: "Erro ao fazer upload da imagem. Verifique se as regras do Storage foram publicadas no Firebase Console.", type: "error" });
+          setUploadingStoryImage(false);
+          setCreatingStory(false);
+          return;
+        } finally {
+          setUploadingStoryImage(false);
+        }
+      }
+
+      // DOCUMENTAÇÃO: Criar story com a URL da imagem (upload ou externa)
+      const response = await fetch("/api/stories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: user.uid,
+          imageUrl: finalImageUrl,
+          text: newStoryText.trim() || undefined,
+        } as CreateStoryInput & { companyId: string }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao criar story.");
+      }
+
+      // Limpar formulário e fechar modal
+      setNewStoryImageUrl("");
+      setStoryImageFile(null);
+      setStoryImagePreviewUrl(null);
+      setNewStoryText("");
+      setShowCreateStoryModal(false);
+      setStoryFeedback({ message: "Story criado com sucesso! Ele expirará em 24 horas.", type: "success" });
+
+      // Atualizar lista de stories
+      const storiesResponse = await fetch(`/api/stories?companyId=${user.uid}`);
+      if (storiesResponse.ok) {
+        const storiesData = await storiesResponse.json();
+        if (storiesData.success && storiesData.stories) {
+          setStories(storiesData.stories);
+        }
+      }
+    } catch (error: any) {
+      console.error("Erro ao criar story:", error);
+      setStoryFeedback({ message: error.message || "Erro ao criar story. Tente novamente.", type: "error" });
+    } finally {
+      setCreatingStory(false);
+      setTimeout(() => setStoryFeedback(null), 5000);
+    }
+  };
+
+  // DOCUMENTAÇÃO: Função para deletar um story
+  // - Verifica autenticação do usuário
+  // - Usa API route DELETE /api/stories para deletar (usa Admin SDK, bypassa regras do Firestore)
+  // - Atualiza lista local após exclusão bem-sucedida
+  const handleDeleteStory = async (storyId: string) => {
+    if (!user?.uid) {
+      console.error("[handleDeleteStory] Usuário não autenticado");
+      setStoryFeedback({ 
+        message: "Você precisa estar autenticado para excluir stories.", 
+        type: "error" 
+      });
+      setTimeout(() => setStoryFeedback(null), 3000);
+      return;
+    }
+
+    if (!window.confirm("Tem certeza que deseja excluir este story?")) {
+      return;
+    }
+
+    try {
+      console.log("[handleDeleteStory] Tentando excluir story via API:", {
+        storyId,
+        userId: user.uid,
+      });
+
+      // DOCUMENTAÇÃO: Usar API route para deletar story
+      // A API route usa Admin SDK que bypassa regras do Firestore
+      const response = await fetch(`/api/stories?companyId=${user.uid}&storyId=${storyId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Erro ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || "Erro ao excluir story");
+      }
+
+      console.log("[handleDeleteStory] Story excluído com sucesso");
+      
+      // Atualizar lista local
+      setStories(stories.filter(s => s.id !== storyId));
+      setStoryFeedback({ message: "Story excluído com sucesso.", type: "success" });
+    } catch (error: any) {
+      console.error("[handleDeleteStory] Erro ao excluir story:", error);
+      
+      // Tratamento específico para erros
+      let errorMessage = "Erro ao excluir story. Tente novamente.";
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.code === "not-found") {
+        errorMessage = "Story não encontrado. Pode já ter sido excluído.";
+      }
+      
+      setStoryFeedback({ message: errorMessage, type: "error" });
+    } finally {
+      setTimeout(() => setStoryFeedback(null), 5000);
     }
   };
 
@@ -663,6 +944,240 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
         </div>
       </div>
 
+      {/* DOCUMENTAÇÃO: Seção de Stories
+          - Visível para todas as contas comerciais
+          - Todas as contas comerciais podem criar stories (Basic, Medium, Pro)
+          - Máximo de 2 stories ativos por empresa
+          - Stories expiram automaticamente após 24 horas
+          - Exibe stories ativos e permite criar/deletar
+      */}
+      {user?.accountType === 'commercial' && (
+        <div className="bg-gray-800 p-4 md:p-5 lg:p-6 rounded-lg shadow-md mb-4 md:mb-5 lg:mb-6">
+          <div className="flex justify-between items-center mb-3 md:mb-3.5 lg:mb-4">
+            <h3 className="text-lg md:text-lg lg:text-xl font-semibold">Stories</h3>
+            {/* DOCUMENTAÇÃO: Todas as contas comerciais podem criar stories */}
+            {subscription && (subscription.status === "ACTIVE" || subscription.status === "TRIALING") ? (
+              <button
+                onClick={() => setShowCreateStoryModal(true)}
+                disabled={stories.length >= 2}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 md:py-2.5 lg:py-2.5 px-3 md:px-4 rounded-lg transition duration-300 text-xs md:text-sm lg:text-base"
+              >
+                {stories.length >= 2 ? "Limite atingido (2 stories)" : "Criar Story"}
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setStoryFeedback({ 
+                    message: "Você precisa ter uma assinatura ativa para criar stories.", 
+                    type: "error" 
+                  });
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 md:py-2.5 lg:py-2.5 px-3 md:px-4 rounded-lg transition duration-300 text-xs md:text-sm lg:text-base"
+              >
+                Criar Story
+              </button>
+            )}
+          </div>
+          
+          {storyFeedback && (
+            <div className={`mb-4 p-3 rounded-md text-white ${
+              storyFeedback.type === "success" ? "bg-green-500" : "bg-red-500"
+            }`}>
+              {storyFeedback.message}
+            </div>
+          )}
+
+          {stories.length === 0 ? (
+            <p className="text-gray-400 text-sm md:text-sm lg:text-base text-center py-4">
+              Você ainda não criou nenhum story. Stories expiram após 24 horas.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {stories.map((story) => {
+                // DOCUMENTAÇÃO: Converter expiresAt para milissegundos
+                // Pode vir em diferentes formatos: Timestamp do Firestore, objeto com _seconds, ou número
+                let expiresAtMillis = 0;
+                if (story.expiresAt) {
+                  if (typeof story.expiresAt.toMillis === 'function') {
+                    // Formato Timestamp do Client SDK
+                    expiresAtMillis = story.expiresAt.toMillis();
+                  } else if (typeof story.expiresAt === 'object' && story.expiresAt !== null) {
+                    // Formato do Admin SDK ou objeto serializado
+                    const expiresAtObj = story.expiresAt as any;
+                    if (expiresAtObj._seconds !== undefined || expiresAtObj.seconds !== undefined) {
+                      const seconds = expiresAtObj._seconds || expiresAtObj.seconds || 0;
+                      const nanoseconds = expiresAtObj._nanoseconds || expiresAtObj.nanoseconds || 0;
+                      expiresAtMillis = seconds * 1000 + nanoseconds / 1000000;
+                    }
+                  } else if (typeof story.expiresAt === 'number') {
+                    // Já está em milissegundos
+                    expiresAtMillis = story.expiresAt;
+                  }
+                }
+                
+                const now = Date.now();
+                const hoursLeft = Math.max(0, (expiresAtMillis - now) / (1000 * 60 * 60));
+                
+                return (
+                  <div key={story.id} className="bg-gray-700 p-4 rounded-lg">
+                    <div className="relative w-full aspect-[9/16] max-h-64 mb-3 rounded-lg overflow-hidden">
+                      <Image
+                        src={story.imageUrl}
+                        alt={story.text || "Story"}
+                        fill
+                        className="object-cover"
+                        unoptimized={story.imageUrl?.includes('firebasestorage') || story.imageUrl?.includes('googleapis')}
+                      />
+                    </div>
+                    {story.text && (
+                      <p className="text-gray-300 text-sm mb-2 line-clamp-2">{story.text}</p>
+                    )}
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400 text-xs">
+                        Expira em: {hoursLeft > 0 ? `${Math.floor(hoursLeft)}h` : "Expirado"}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteStory(story.id)}
+                        className="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded transition"
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Modal para criar story */}
+          {showCreateStoryModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4">
+              <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full">
+                <h4 className="text-xl font-semibold mb-4">Criar Novo Story</h4>
+                
+                <div className="space-y-4">
+                  {/* DOCUMENTAÇÃO: Upload de imagem ou URL */}
+                  <div>
+                    <label className="block text-gray-400 mb-2 text-sm">
+                      Imagem do Story *
+                    </label>
+                    <div className="space-y-3">
+                      {/* Input de arquivo para upload */}
+                      <div>
+                        <label htmlFor="story-image-upload" className="block text-gray-400 mb-2 text-xs">
+                          Ou faça upload de uma imagem:
+                        </label>
+                        <input
+                          id="story-image-upload"
+                          type="file"
+                          accept={ACCEPTED_IMAGE_TYPES.join(", ")}
+                          onChange={handleStoryImageChange}
+                          className="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white text-sm file:mr-2 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
+                        />
+                        {uploadingStoryImage && (
+                          <div className="flex items-center justify-center p-2 mt-2">
+                            <svg className="animate-spin h-5 w-5 text-cyan-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span className="ml-2 text-cyan-500 text-xs">Enviando imagem...</span>
+                          </div>
+                        )}
+                        {storyImagePreviewUrl && (
+                          <div className="mt-3">
+                            <p className="text-gray-400 text-xs mb-2">Pré-visualização:</p>
+                            <div className="relative w-full aspect-[9/16] max-h-48 rounded-lg overflow-hidden border-2 border-indigo-500">
+                              <Image
+                                src={storyImagePreviewUrl}
+                                alt="Preview do Story"
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Separador OU */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-px bg-gray-600"></div>
+                        <span className="text-gray-500 text-xs">OU</span>
+                        <div className="flex-1 h-px bg-gray-600"></div>
+                      </div>
+
+                      {/* Input de URL (alternativa) */}
+                      <div>
+                        <label htmlFor="story-image-url" className="block text-gray-400 mb-2 text-xs">
+                          Ou forneça uma URL de imagem:
+                        </label>
+                        <input
+                          id="story-image-url"
+                          type="url"
+                          value={newStoryImageUrl}
+                          onChange={(e) => {
+                            setNewStoryImageUrl(e.target.value);
+                            setStoryImageFile(null);
+                            setStoryImagePreviewUrl(null);
+                          }}
+                          placeholder="https://exemplo.com/imagem.jpg"
+                          className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-400 mb-2 text-sm">
+                      Texto (opcional, máximo 80 caracteres)
+                    </label>
+                    <textarea
+                      value={newStoryText}
+                      onChange={(e) => setNewStoryText(e.target.value)}
+                      maxLength={80}
+                      rows={3}
+                      placeholder="Digite um texto curto..."
+                      className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    />
+                    <p className="text-gray-500 text-xs mt-1">
+                      {newStoryText.length}/80 caracteres
+                    </p>
+                  </div>
+
+                  {storyFeedback && storyFeedback.type === "error" && (
+                    <div className="p-3 rounded-md bg-red-500 text-white text-sm">
+                      {storyFeedback.message}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => {
+                      setShowCreateStoryModal(false);
+                      setNewStoryImageUrl("");
+                      setStoryImageFile(null);
+                      setStoryImagePreviewUrl(null);
+                      setNewStoryText("");
+                      setStoryFeedback(null);
+                    }}
+                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleCreateStory}
+                    disabled={creatingStory || uploadingStoryImage || (!storyImageFile && !newStoryImageUrl.trim())}
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white py-2 px-4 rounded-lg transition"
+                  >
+                    {uploadingStoryImage ? "Enviando imagem..." : creatingStory ? "Criando..." : "Criar Story"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Estatísticas */}
       {/* DOCUMENTAÇÃO: Cards de estatísticas responsivos - padding e texto ajustados para mobile/tablet/desktop */}
       <div className="bg-gray-800 p-4 md:p-5 lg:p-6 rounded-lg shadow-md mb-4 md:mb-5 lg:mb-6">
@@ -817,6 +1332,60 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                 className="w-full p-2.5 sm:p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base"
               />
             </div>
+            
+            {/* DOCUMENTAÇÃO: Campos de localização (opcionais)
+                - Permite que o usuário informe/edite sua região, estado e cidade
+                - Essas informações serão usadas nas enquetes criadas
+            */}
+            <div className="mt-3 sm:mt-4">
+              <label className="block text-gray-400 mb-2 text-sm sm:text-base">
+                Localização (opcional)
+              </label>
+              
+              {/* Região */}
+              <select
+                value={editedRegion}
+                onChange={(e) => {
+                  setEditedRegion(e.target.value);
+                  if (e.target.value !== editedRegion) {
+                    setEditedState(""); // Resetar estado quando região mudar
+                  }
+                }}
+                className="w-full p-2.5 sm:p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base mb-2"
+              >
+                <option value="">Selecione a região</option>
+                {BRAZIL_REGIONS.map((reg) => (
+                  <option key={reg} value={reg}>
+                    {reg}
+                  </option>
+                ))}
+              </select>
+
+              {/* Estado */}
+              <select
+                value={editedState}
+                onChange={(e) => setEditedState(e.target.value)}
+                disabled={!editedRegion}
+                className="w-full p-2.5 sm:p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base mb-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">Selecione o estado</option>
+                {getStatesByRegion(editedRegion).map((st) => (
+                  <option key={st.sigla} value={st.sigla}>
+                    {st.nome} ({st.sigla})
+                  </option>
+                ))}
+              </select>
+
+              {/* Cidade */}
+              <input
+                type="text"
+                placeholder="Cidade (opcional)"
+                value={editedCity}
+                onChange={(e) => setEditedCity(e.target.value)}
+                className="w-full p-2.5 sm:p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base"
+              />
+            </div>
+            
             <div className="mt-3 sm:mt-4">
               <label className="block text-gray-400 mb-2 text-sm sm:text-base">Redes Sociais</label>
               <input

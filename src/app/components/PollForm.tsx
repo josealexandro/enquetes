@@ -166,6 +166,14 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
         ...(user.themeColor && { themeColor: user.themeColor }),
       };
 
+      // DOCUMENTAÇÃO: Incluir localização do usuário na enquete (se disponível)
+      // A localização é copiada do perfil do usuário para a enquete
+      const pollLocation = {
+        ...(user.region && { region: user.region }),
+        ...(user.city && { city: user.city }),
+        ...(user.state && { state: user.state }),
+      };
+
       // Chamar API route para criar enquete (tudo validado no backend)
       const response = await fetch("/api/polls/create", {
         method: "POST",
@@ -177,6 +185,8 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
           category: category,
           isCommercial: isCommercial,
           creatorData: creatorData,
+          // DOCUMENTAÇÃO: Incluir localização na enquete (se o usuário tiver)
+          ...pollLocation,
         }),
       });
 

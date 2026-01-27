@@ -35,15 +35,21 @@ export default function EnquetesPage() {
     const creatorId = creatorData.id || data.createdBy;
 
     let creatorName = creatorData.name || creatorData.displayName || "Usuário Desconhecido";
-    let creatorAvatarUrl = creatorData.avatarUrl || creatorData.photoURL || "https://www.gravatar.com/avatar/?d=mp";
-    // Filtrar URLs de exemplo
-    if (creatorAvatarUrl.includes('example.com')) {
-      creatorAvatarUrl = "https://www.gravatar.com/avatar/?d=mp";
+    let creatorAvatarUrl = creatorData.avatarUrl || creatorData.photoURL || null;
+    // Filtrar URLs de exemplo ou strings vazias
+    if (!creatorAvatarUrl || creatorAvatarUrl === "" || creatorAvatarUrl.includes('example.com')) {
+      creatorAvatarUrl = null; // Marcar como null para buscar do documento do usuário
     }
     let creatorCommercialName = creatorData.commercialName || undefined;
     let creatorThemeColor = creatorData.themeColor || undefined;
 
-    const hasCompleteCreatorData = (creatorData.name || creatorData.displayName) && (creatorData.avatarUrl || creatorData.photoURL);
+    // DOCUMENTAÇÃO: Verificar se os dados do criador estão completos
+    // Considera completo apenas se tiver nome E avatarUrl válido (não vazio, não null, não exemplo)
+    const hasValidAvatar = creatorAvatarUrl && 
+                           creatorAvatarUrl !== "" && 
+                           !creatorAvatarUrl.includes('example.com') &&
+                           creatorAvatarUrl !== "https://www.gravatar.com/avatar/?d=mp";
+    const hasCompleteCreatorData = (creatorData.name || creatorData.displayName) && hasValidAvatar;
 
     if (creatorId && !hasCompleteCreatorData) {
       try {
@@ -89,7 +95,7 @@ export default function EnquetesPage() {
       creator: {
         id: creatorId,
         name: creatorName,
-        avatarUrl: creatorAvatarUrl,
+        avatarUrl: creatorAvatarUrl || "https://www.gravatar.com/avatar/?d=mp", // Garantir fallback se ainda estiver null
         commercialName: creatorCommercialName,
         themeColor: creatorThemeColor,
       },
