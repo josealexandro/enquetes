@@ -143,17 +143,23 @@ export async function POST(
       cancel_at_period_end: true,
     });
 
+    // Tipagem do Stripe pode retornar Stripe.Response<Stripe.Subscription> (nem sempre expõe campos diretamente no tipo)
+    const updatedSub = updatedSubscription as unknown as Stripe.Subscription;
+    const currentPeriodEnd = (updatedSub as any)?.current_period_end as number | undefined;
+
     console.log(`[CANCEL_SUBSCRIPTION] ✅ Assinatura cancelada com sucesso no Stripe:`, {
-      stripeSubscriptionId: updatedSubscription.id,
-      cancel_at_period_end: updatedSubscription.cancel_at_period_end,
-      current_period_end: new Date(updatedSubscription.current_period_end * 1000).toISOString(),
+      stripeSubscriptionId: updatedSub.id,
+      cancel_at_period_end: updatedSub.cancel_at_period_end,
+      current_period_end: typeof currentPeriodEnd === "number"
+        ? new Date(currentPeriodEnd * 1000).toISOString()
+        : "não disponível",
     });
 
     return NextResponse.json({ 
       ok: true,
       message: "Assinatura será cancelada ao final do período atual.",
-      stripeSubscriptionId: updatedSubscription.id,
-      cancelAtPeriodEnd: updatedSubscription.cancel_at_period_end,
+      stripeSubscriptionId: updatedSub.id,
+      cancelAtPeriodEnd: updatedSub.cancel_at_period_end,
     });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
