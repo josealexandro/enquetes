@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import type Stripe from "stripe";
 import { getStripe } from "@/app/services/stripeService";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+
+/** Busca assinatura no Stripe pelo metadata.companyId (fallback quando Firestore não tem stripeSubscriptionId). */
+async function findStripeSubscriptionByCompanyId(
+  stripe: Stripe,
+  companyId: string
+): Promise<Stripe.Subscription | null> {
+  const subscriptions = await stripe.subscriptions.list({ limit: 100 });
+  const found = subscriptions.data.find((sub) => sub.metadata?.companyId === companyId);
+  return found ?? null;
+}
 
 /**
  * DOCUMENTAÇÃO: API Route para cancelar assinatura
@@ -11,9 +22,9 @@ import { db } from "@/lib/firebase";
  * 
  * Fluxo:
  * 1. Busca a assinatura no Firestore pelo subscriptionId
- * 2. Busca a assinatura no Stripe usando o companyId do metadata
+ * 2. Busca a assinatura no Stripe: usa stripeSubscriptionId do Firestore quando disponível; senão lista por metadata.companyId
  * 3. Cancela a assinatura no Stripe (cancel_at_period_end = true)
- * 4. O webhook do Stripe atualiza automaticamente o Firestore
+ * 4. O webhook customer.subscription.updated atualiza cancelAtPeriodEnd no Firestore; ao fim do período, customer.subscription.deleted define status CANCELED
  */
 export async function POST(
   request: NextRequest,
@@ -35,6 +46,7 @@ export async function POST(
 
     const subscription = subscriptionSnap.data();
     const companyId = subscription?.companyId;
+    const stripeSubscriptionIdFromFirestore = subscription?.stripeSubscriptionId as string | undefined;
 
     if (!companyId) {
       return NextResponse.json(
@@ -43,16 +55,27 @@ export async function POST(
       );
     }
 
-    // 2. Buscar assinatura no Stripe usando o companyId do metadata
     const stripe = getStripe();
-    const subscriptions = await stripe.subscriptions.list({
-      limit: 100,
-    });
+    let stripeSubscription: Stripe.Subscription | null;
 
-    // Encontrar a assinatura do Stripe que corresponde ao companyId
-    const stripeSubscription = subscriptions.data.find(
-      (sub) => sub.metadata?.companyId === companyId
-    );
+    // Preferir stripeSubscriptionId do Firestore (mais confiável, evita paginação e ambiguidade)
+    if (stripeSubscriptionIdFromFirestore) {
+      try {
+        const sub = await stripe.subscriptions.retrieve(stripeSubscriptionIdFromFirestore);
+        if (sub.status === "canceled") {
+          return NextResponse.json(
+            { message: "Assinatura já está cancelada no Stripe." },
+            { status: 400 }
+          );
+        }
+        stripeSubscription = sub;
+      } catch (e) {
+        console.warn("[CANCEL_SUBSCRIPTION] stripeSubscriptionId do Firestore inválido, buscando por companyId:", e);
+        stripeSubscription = await findStripeSubscriptionByCompanyId(stripe, companyId);
+      }
+    } else {
+      stripeSubscription = await findStripeSubscriptionByCompanyId(stripe, companyId);
+    }
 
     if (!stripeSubscription) {
       return NextResponse.json(

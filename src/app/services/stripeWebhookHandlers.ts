@@ -328,6 +328,45 @@ export async function handleCustomerSubscriptionUpdated(stripeSubscription: Stri
   console.log("Assinatura Stripe atualizada no Firestore:", stripeSubscriptionId);
 }
 
+/**
+ * Handler para o evento customer.subscription.deleted do Stripe
+ *
+ * Chamado quando a assinatura é efetivamente encerrada (ex.: ao fim do período após cancel_at_period_end).
+ * Atualiza o Firestore para status CANCELED e remove cancelAtPeriodEnd.
+ */
+export async function handleCustomerSubscriptionDeleted(stripeSubscription: Stripe.Subscription) {
+  const sub = stripeSubscription as StripeSubscriptionExtended;
+  const { id: stripeSubscriptionId, metadata } = sub;
+
+  if (!metadata || !metadata.companyId) {
+    console.warn("Metadata da assinatura Stripe incompleto para subscription.deleted:", stripeSubscriptionId);
+    return;
+  }
+
+  const companyId = metadata.companyId as string;
+  const subscription = await getSubscriptionByCompany(companyId);
+
+  if (!subscription) {
+    console.warn("Assinatura não encontrada para companyId em subscription.deleted:", companyId);
+    return;
+  }
+
+  await updateSubscriptionStatus(subscription.id, "CANCELED", {
+    actorId: "stripe_webhook",
+    actorName: "Stripe Webhook",
+    notes: "Assinatura encerrada no Stripe (customer.subscription.deleted).",
+  });
+
+  await updateSubscriptionPeriodAndCancellation({
+    subscriptionId: subscription.id,
+    currentPeriodStart: new Date((sub.current_period_start ?? 0) * 1000),
+    currentPeriodEnd: new Date((sub.current_period_end ?? 0) * 1000),
+    cancelAtPeriodEnd: false,
+  });
+
+  console.log("Assinatura Stripe marcada como CANCELED no Firestore:", stripeSubscriptionId);
+}
+
 // Helper para mapear status do Stripe para o seu sistema
 function mapStripeSubscriptionStatusToSubscriptionStatus(stripeStatus: Stripe.Subscription.Status): SubscriptionStatus { // Alterado tipo de retorno para SubscriptionStatus
   switch (stripeStatus) {

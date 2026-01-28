@@ -36,6 +36,7 @@ O evento `checkout.session.completed` não está sendo enviado pelo Stripe, ent�
      - ✅ `checkout.session.completed`
      - ✅ `invoice.paid`
      - ✅ `customer.subscription.updated`
+     - ✅ `customer.subscription.deleted` (para marcar assinatura como CANCELED quando o período terminar)
 
 5. Clique em **"Add endpoint"** (Adicionar endpoint)
 
@@ -59,6 +60,7 @@ O evento `checkout.session.completed` não está sendo enviado pelo Stripe, ent�
      - ✅ `checkout.session.completed`
      - ✅ `invoice.paid`
      - ✅ `customer.subscription.updated`
+     - ✅ `customer.subscription.deleted`
    - Se algum estiver faltando, adicione
 
    **c) Signing secret:**
@@ -114,7 +116,7 @@ Após configurar, verifique:
 
 - ✅ Webhook configurado no Stripe Dashboard (modo LIVE)
 - ✅ URL correta: `https://seu-dominio.vercel.app/api/stripe/webhook`
-- ✅ Eventos selecionados: `checkout.session.completed`, `invoice.paid`, `customer.subscription.updated`
+- ✅ Eventos selecionados: `checkout.session.completed`, `invoice.paid`, `customer.subscription.updated`, `customer.subscription.deleted`
 - ✅ `STRIPE_WEBHOOK_SECRET` configurado na Vercel
 - ✅ Novo deploy feito na Vercel (para aplicar a variável)
 

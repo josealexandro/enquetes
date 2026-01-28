@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe"; // Importando apenas os tipos do Stripe
-import { handleCheckoutSessionCompleted, handleInvoicePaid, handleCustomerSubscriptionUpdated } from "@/app/services/stripeWebhookHandlers";
+import { handleCheckoutSessionCompleted, handleInvoicePaid, handleCustomerSubscriptionUpdated, handleCustomerSubscriptionDeleted } from "@/app/services/stripeWebhookHandlers";
 import { getStripe } from "@/app/services/stripeService"; // Importando a função para obter a instância
 
 const webhookSecret: string = process.env.STRIPE_WEBHOOK_SECRET!;
@@ -59,6 +59,12 @@ export async function POST(req: NextRequest) {
         console.log(`[WEBHOOK] Processando customer.subscription.updated (ID: ${event.id})`);
         await handleCustomerSubscriptionUpdated(event.data.object as Stripe.Subscription);
         console.log(`[WEBHOOK] customer.subscription.updated processado com sucesso (ID: ${event.id})`);
+        break;
+
+      case "customer.subscription.deleted":
+        console.log(`[WEBHOOK] Processando customer.subscription.deleted (ID: ${event.id})`);
+        await handleCustomerSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        console.log(`[WEBHOOK] customer.subscription.deleted processado com sucesso (ID: ${event.id})`);
         break;
 
       default:
