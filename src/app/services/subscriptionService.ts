@@ -74,6 +74,10 @@ export async function ensureDefaultPlans() {
 }
 
 export async function listPlans(): Promise<Plan[]> {
+  // Por padrão, ocultamos o plano de teste. Para testes de cancelamento em produção,
+  // permita exibir definindo SHOW_TEST_PLAN=true nas variáveis de ambiente.
+  const showTestPlan = process.env.SHOW_TEST_PLAN === "true";
+
   try {
     // Tentar buscar planos com filtro de isActive (requer índice composto)
     const plansQuery = query(
@@ -85,8 +89,8 @@ export async function listPlans(): Promise<Plan[]> {
     if (snapshot.size > 0) {
       // DOCUMENTAÇÃO: Retorna planos ativos do Firestore (já atualizados por ensureDefaultPlans)
       const plans = snapshot.docs.map((docSnap) => docSnap.data() as Plan);
-      // OCULTO: Filtrar plano de teste para não aparecer no site
-      const filteredPlans = plans.filter(plan => plan.id !== "plan_teste");
+      // OCULTO por padrão: Filtrar plano de teste para não aparecer no site
+      const filteredPlans = showTestPlan ? plans : plans.filter(plan => plan.id !== "plan_teste");
       console.log(`[listPlans] Encontrados ${plans.length} planos ativos no Firestore, ${filteredPlans.length} após filtrar plano de teste`);
       return filteredPlans;
     }
@@ -105,8 +109,8 @@ export async function listPlans(): Promise<Plan[]> {
       const allPlans = snapshot.docs.map((docSnap) => docSnap.data() as Plan);
       // Filtrar planos ativos manualmente (isActive !== false garante que undefined também passa)
       const activePlans = allPlans.filter(plan => plan.isActive !== false);
-      // OCULTO: Filtrar plano de teste para não aparecer no site
-      const filteredPlans = activePlans.filter(plan => plan.id !== "plan_teste");
+      // OCULTO por padrão: Filtrar plano de teste para não aparecer no site
+      const filteredPlans = showTestPlan ? activePlans : activePlans.filter(plan => plan.id !== "plan_teste");
       console.log(`[listPlans] Fallback: encontrados ${allPlans.length} planos, ${activePlans.length} ativos, ${filteredPlans.length} após filtrar plano de teste`);
       
       if (filteredPlans.length > 0) {
@@ -119,8 +123,8 @@ export async function listPlans(): Promise<Plan[]> {
   
   // Último recurso: retornar planos padrão (todos ativos)
   console.warn("[listPlans] Retornando planos padrão do código");
-  // OCULTO: Filtrar plano de teste para não aparecer no site
-  return DEFAULT_PLANS.filter(plan => plan.id !== "plan_teste");
+  // OCULTO por padrão: Filtrar plano de teste para não aparecer no site
+  return showTestPlan ? DEFAULT_PLANS : DEFAULT_PLANS.filter(plan => plan.id !== "plan_teste");
 }
 
 export async function getSubscriptionByCompany(companyId: string) {

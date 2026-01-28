@@ -124,20 +124,71 @@ export async function POST(
     }
 
     const stripe = getStripe();
+
+    // Se a assinatura no Firestore ainda não tem stripeSubscriptionId (casos antigos),
+    // tentamos resolver automaticamente via email do usuário (sem edição manual no banco).
+    let stripeSubscriptionIdResolved = stripeSubscriptionIdFromFirestore;
+
+    if (!stripeSubscriptionIdResolved && adminDb) {
+      try {
+        const userSnap = await adminDb.collection("users").doc(companyId).get();
+        const email = (userSnap.exists ? (userSnap.data() as any)?.email : undefined) as string | undefined;
+
+        if (email) {
+          console.log(`[CANCEL_SUBSCRIPTION] Tentando resolver stripeSubscriptionId via email do usuário: ${email}`);
+          const customers = await stripe.customers.search({
+            query: `email:'${email.replace(/'/g, "\\'")}'`,
+            limit: 1,
+          });
+
+          const customerId = customers.data[0]?.id;
+          if (customerId) {
+            const subs = await stripe.subscriptions.list({ customer: customerId, limit: 10 });
+            const candidate = subs.data.find((s) =>
+              s.status === "active" || s.status === "trialing" || s.status === "past_due"
+            );
+
+            if (candidate) {
+              stripeSubscriptionIdResolved = candidate.id;
+              console.log(`[CANCEL_SUBSCRIPTION] ✅ stripeSubscriptionId resolvido automaticamente: ${stripeSubscriptionIdResolved}`);
+
+              // Persistir o vínculo para próximos cancelamentos (Admin SDK bypass rules)
+              await adminDb.collection("subscriptions").doc(subscriptionId).set(
+                {
+                  stripeCustomerId: customerId,
+                  stripeSubscriptionId: stripeSubscriptionIdResolved,
+                },
+                { merge: true }
+              );
+            } else {
+              console.warn(`[CANCEL_SUBSCRIPTION] Não encontrei assinatura ativa para o customer ${customerId}`);
+            }
+          } else {
+            console.warn(`[CANCEL_SUBSCRIPTION] Nenhum customer encontrado no Stripe para email: ${email}`);
+          }
+        } else {
+          console.warn(`[CANCEL_SUBSCRIPTION] Email do usuário não encontrado em users/${companyId}; não foi possível resolver stripeSubscriptionId automaticamente.`);
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn(`[CANCEL_SUBSCRIPTION] Falha ao tentar resolver stripeSubscriptionId automaticamente: ${msg}`);
+      }
+    }
+
     let stripeSubscription: Stripe.Subscription | null;
 
     // Preferir stripeSubscriptionId do Firestore (mais confiável, evita paginação e ambiguidade)
-    if (stripeSubscriptionIdFromFirestore) {
-      console.log(`[CANCEL_SUBSCRIPTION] Tentando buscar assinatura no Stripe usando stripeSubscriptionId: ${stripeSubscriptionIdFromFirestore}`);
+    if (stripeSubscriptionIdResolved) {
+      console.log(`[CANCEL_SUBSCRIPTION] Tentando buscar assinatura no Stripe usando stripeSubscriptionId: ${stripeSubscriptionIdResolved}`);
       try {
-        const sub = await stripe.subscriptions.retrieve(stripeSubscriptionIdFromFirestore);
+        const sub = await stripe.subscriptions.retrieve(stripeSubscriptionIdResolved);
         console.log(`[CANCEL_SUBSCRIPTION] Assinatura encontrada no Stripe via stripeSubscriptionId:`, {
           id: sub.id,
           status: sub.status,
           cancel_at_period_end: sub.cancel_at_period_end,
         });
         if (sub.status === "canceled") {
-          console.warn(`[CANCEL_SUBSCRIPTION] Assinatura já está cancelada no Stripe: ${stripeSubscriptionIdFromFirestore}`);
+          console.warn(`[CANCEL_SUBSCRIPTION] Assinatura já está cancelada no Stripe: ${stripeSubscriptionIdResolved}`);
           return NextResponse.json(
             { message: "Assinatura já está cancelada no Stripe." },
             { status: 400 }
@@ -146,7 +197,7 @@ export async function POST(
         stripeSubscription = sub;
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : String(e);
-        console.warn(`[CANCEL_SUBSCRIPTION] stripeSubscriptionId do Firestore inválido (${stripeSubscriptionIdFromFirestore}), buscando por companyId:`, errorMsg);
+        console.warn(`[CANCEL_SUBSCRIPTION] stripeSubscriptionId inválido (${stripeSubscriptionIdResolved}), buscando por companyId:`, errorMsg);
         stripeSubscription = await findStripeSubscriptionByCompanyId(stripe, companyId);
       }
     } else {
