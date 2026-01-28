@@ -401,6 +401,35 @@ export async function updateSubscriptionStatus(
   });
 }
 
+/**
+ * Garante que a assinatura tenha os IDs do Stripe salvos.
+ *
+ * IMPORTANTE:
+ * - Usa Admin SDK quando disponível (backend/webhooks) para bypass das rules.
+ * - Faz merge (não sobrescreve outros campos).
+ */
+export async function updateSubscriptionStripeIds(input: {
+  subscriptionId: string;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+}) {
+  const updateData: Record<string, unknown> = {};
+  if (input.stripeCustomerId) updateData.stripeCustomerId = input.stripeCustomerId;
+  if (input.stripeSubscriptionId) updateData.stripeSubscriptionId = input.stripeSubscriptionId;
+
+  if (Object.keys(updateData).length === 0) return;
+
+  if (adminDb) {
+    await adminDb.collection("subscriptions").doc(input.subscriptionId).set(updateData, { merge: true });
+    console.log(`[updateSubscriptionStripeIds] IDs do Stripe salvos via Admin SDK: ${input.subscriptionId}`);
+    return;
+  }
+
+  // Fallback Client SDK (dev/local)
+  await setDoc(doc(getSubscriptionsCollection(), input.subscriptionId), updateData, { merge: true });
+  console.log(`[updateSubscriptionStripeIds] IDs do Stripe salvos via Client SDK: ${input.subscriptionId}`);
+}
+
 export interface RecordPaymentInput {
   subscriptionId: string;
   invoiceId: string;
