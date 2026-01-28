@@ -616,16 +616,22 @@ export async function switchSubscriptionPlan(input: SwitchSubscriptionPlanInput)
 }
 
 export async function listPaymentsBySubscription(subscriptionId: string) {
-  // Consulta básica sem "orderBy" extra para evitar necessidade de índice composto.
-  const paymentsQuery = query(
-    getPaymentsCollection(),
-    where("subscriptionId", "==", subscriptionId)
-  );
+  // Em rotas de API / webhooks (produção), usar Admin SDK para não depender de rules.
+  if (adminDb) {
+    const snapshot = await adminDb
+      .collection("payments")
+      .where("subscriptionId", "==", subscriptionId)
+      .get();
 
+    const items = snapshot.docs.map((docSnap) => docSnap.data() as Payment);
+    return items.sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis());
+  }
+
+  // Fallback Client SDK (dev/local)
+  // Consulta básica sem "orderBy" extra para evitar necessidade de índice composto.
+  const paymentsQuery = query(getPaymentsCollection(), where("subscriptionId", "==", subscriptionId));
   const snapshot = await getDocs(paymentsQuery);
   const items = snapshot.docs.map((docSnap) => docSnap.data() as Payment);
-
-  // Ordena em memória por data de vencimento, mais recente primeiro.
   return items.sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis());
 }
 
