@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/app/services/stripeService";
+import { adminDb } from "@/lib/firebase-admin";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -63,18 +64,47 @@ export async function POST(
   try {
     // 1. Buscar assinatura no Firestore
     console.log(`[CANCEL_SUBSCRIPTION] Buscando assinatura no Firestore: ${subscriptionId}`);
-    const subscriptionRef = doc(db, "subscriptions", subscriptionId);
-    const subscriptionSnap = await getDoc(subscriptionRef);
 
-    if (!subscriptionSnap.exists()) {
-      console.error(`[CANCEL_SUBSCRIPTION] Assinatura não encontrada no Firestore: ${subscriptionId}`);
-      return NextResponse.json(
-        { message: "Assinatura não encontrada." },
-        { status: 404 }
-      );
+    // IMPORTANTE: em produção, use Admin SDK para evitar "Missing or insufficient permissions"
+    let subscription: any | null = null;
+
+    if (adminDb) {
+      console.log(`[CANCEL_SUBSCRIPTION] Usando Admin SDK para ler assinatura`);
+      const adminSnap = await adminDb.collection("subscriptions").doc(subscriptionId).get();
+
+      if (!adminSnap.exists) {
+        console.error(`[CANCEL_SUBSCRIPTION] Assinatura não encontrada no Firestore (Admin SDK): ${subscriptionId}`);
+        return NextResponse.json(
+          { message: "Assinatura não encontrada." },
+          { status: 404 }
+        );
+      }
+
+      subscription = adminSnap.data() ?? null;
+    } else {
+      // Fallback (útil em dev/local). Em produção pode falhar por regras.
+      console.warn(`[CANCEL_SUBSCRIPTION] Admin SDK não disponível; usando Client SDK (pode falhar por permissões).`);
+      const subscriptionRef = doc(db, "subscriptions", subscriptionId);
+      const subscriptionSnap = await getDoc(subscriptionRef);
+
+      if (!subscriptionSnap.exists()) {
+        console.error(`[CANCEL_SUBSCRIPTION] Assinatura não encontrada no Firestore (Client SDK): ${subscriptionId}`);
+        return NextResponse.json(
+          { message: "Assinatura não encontrada." },
+          { status: 404 }
+        );
+      }
+
+      subscription = subscriptionSnap.data() ?? null;
     }
 
-    const subscription = subscriptionSnap.data();
+    if (!subscription) {
+      console.error(`[CANCEL_SUBSCRIPTION] Dados da assinatura vazios: ${subscriptionId}`);
+      return NextResponse.json(
+        { message: "Assinatura inválida." },
+        { status: 400 }
+      );
+    }
     const companyId = subscription?.companyId;
     const stripeSubscriptionIdFromFirestore = subscription?.stripeSubscriptionId as string | undefined;
 
