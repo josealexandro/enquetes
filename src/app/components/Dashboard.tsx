@@ -61,6 +61,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
   const [companyPublicPageUrl, setCompanyPublicPageUrl] = useState(""); // Estado para armazenar o URL da página pública da empresa
   const [subscription, setSubscription] = useState<any>(null); // Estado para armazenar dados da assinatura
   const [isCancelling, setIsCancelling] = useState(false); // Estado para controlar o loading do cancelamento
+  const [showCancelSubscriptionModal, setShowCancelSubscriptionModal] = useState(false); // Modal de confirmação de cancelamento
   // Novos estados para as informações do rodapé
   const [editedAboutUs, setEditedAboutUs] = useState(user.aboutUs || "");
   const [editedContactEmail, setEditedContactEmail] = useState(user.contactEmail || "");
@@ -795,7 +796,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     }
   };
 
-  // DOCUMENTAÇÃO: Função para cancelar assinatura
+  // DOCUMENTAÇÃO: Função para cancelar assinatura (chamada após confirmação no modal)
   // Cancela a assinatura no Stripe, que atualiza o Firestore via webhook
   const handleCancelSubscription = async () => {
     if (!subscription?.id) {
@@ -805,14 +806,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       return;
     }
 
-    // Confirmar cancelamento
-    const confirmed = window.confirm(
-      "Tem certeza que deseja cancelar sua assinatura?\n\n" +
-      "Sua assinatura será cancelada ao final do período atual e você continuará tendo acesso até lá."
-    );
-
-    if (!confirmed) return;
-
+    setShowCancelSubscriptionModal(false);
     setIsCancelling(true);
     setFeedbackMessage(null);
 
@@ -855,6 +849,49 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
 
   return (
     <div className="dashboard-container">
+      {/* Modal de confirmação de cancelamento de assinatura */}
+      {showCancelSubscriptionModal && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowCancelSubscriptionModal(false)}
+          aria-modal="true"
+          role="dialog"
+        >
+          <div
+            className="bg-gray-800 border border-gray-600 rounded-xl shadow-xl max-w-md w-full p-6 sm:p-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-white">Cancelar assinatura?</h3>
+            </div>
+            <p className="text-gray-300 text-sm sm:text-base leading-relaxed mb-6">
+              Sua assinatura será cancelada ao final do período atual. Você continuará tendo acesso a todos os recursos até lá.
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCancelSubscriptionModal(false)}
+                className="px-4 py-2.5 rounded-lg font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 transition-colors"
+              >
+                Não, manter assinatura
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelSubscription}
+                className="px-4 py-2.5 rounded-lg font-medium text-white bg-red-600 hover:bg-red-500 transition-colors"
+              >
+                Sim, cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Título principal - Responsivo para mobile/tablet/desktop */}
       {/* DOCUMENTAÇÃO: Título menor no mobile (text-2xl), intermediário no tablet (text-2xl), maior no desktop (text-3xl) */}
       <h2 className="text-2xl md:text-2xl lg:text-3xl font-bold mb-4 md:mb-5 lg:mb-6">
@@ -888,7 +925,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
           {/* DOCUMENTAÇÃO: Botão de cancelar assinatura - só aparece se houver assinatura ativa */}
           {subscription && subscription.status === "ACTIVE" && !subscription.cancelAtPeriodEnd && (
             <button
-              onClick={handleCancelSubscription}
+              onClick={() => setShowCancelSubscriptionModal(true)}
               disabled={isCancelling}
               className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 md:py-2.5 lg:py-2.5 px-3 md:px-4 rounded-lg transition duration-300 text-xs md:text-sm lg:text-base w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
             >
