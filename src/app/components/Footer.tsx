@@ -81,7 +81,7 @@ export default function Footer() {
       </div>
 
       <div className="border-t border-zinc-700 mt-8 pt-6 text-center text-zinc-500 text-sm">
-        © {new Date().getFullYear()} Poll App. Todos os direitos reservados. Desenvolvido por Alexandro Fernandes.
+        © {new Date().getFullYear()} Engaja. Todos os direitos reservados. Desenvolvido por Alexandro Fernandes.
       </div>
     </footer>
   );

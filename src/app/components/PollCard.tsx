@@ -529,7 +529,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
         }         ${
           (poll.isCommercial && companyThemeColor && !poll.rank)
             ? getContrastTextColor(companyThemeColor) // Use a função para cor do tema para o título
-            : (isExpanded ? "text-white" : textColorClass)
+            : (isExpanded ? "text-white" : (textColorClass || "text-white"))
         }`}
         title={poll.title}
       > {/* Aplicar textColorClass */}

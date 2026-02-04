@@ -41,7 +41,7 @@ const permanentMarker = Permanent_Marker({
 });
 
 export const metadata: Metadata = {
-  title: "Poll App - Crie e Compartilhe Enquetes",
+  title: "Engaja - Crie e Compartilhe Enquetes",
   description: "Crie enquetes personalizadas e compartilhe com seus amigos.",
 };
 

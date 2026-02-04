@@ -29,6 +29,17 @@ interface DashboardProps {
   user: Exclude<CustomUser, null>; // Usar o tipo CustomUser e garantir que não é nulo
 }
 
+/** URLs que não são imagens (ex.: link WhatsApp) não podem ser usadas no next/image */
+function isInvalidImageUrl(url: string | undefined): boolean {
+  if (!url || typeof url !== "string") return true;
+  try {
+    const host = new URL(url).hostname;
+    return host === "wa.me" || host === "api.whatsapp.com";
+  } catch {
+    return true;
+  }
+}
+
 const Dashboard = ({ polls, user }: DashboardProps) => {
   const { isMasterUser, firebaseAuthUser, refreshUserData } = useAuth(); // Obter isMasterUser, firebaseAuthUser e refreshUserData do contexto
   const [activePollsCount, setActivePollsCount] = useState(0);
@@ -1058,13 +1069,19 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                 return (
                   <div key={story.id} className="bg-gray-700 p-4 rounded-lg">
                     <div className="relative w-full aspect-[9/16] max-h-64 mb-3 rounded-lg overflow-hidden">
-                      <Image
-                        src={story.imageUrl}
-                        alt={story.text || "Story"}
-                        fill
-                        className="object-cover"
-                        unoptimized={story.imageUrl?.includes('firebasestorage') || story.imageUrl?.includes('googleapis')}
-                      />
+                      {isInvalidImageUrl(story.imageUrl) ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gray-600 text-gray-400 text-sm text-center p-2">
+                          Imagem inválida ou link (ex.: WhatsApp)
+                        </div>
+                      ) : (
+                        <Image
+                          src={story.imageUrl!}
+                          alt={story.text || "Story"}
+                          fill
+                          className="object-cover"
+                          unoptimized={story.imageUrl?.includes('firebasestorage') || story.imageUrl?.includes('googleapis')}
+                        />
+                      )}
                     </div>
                     {story.text && (
                       <p className="text-gray-300 text-sm mb-2 line-clamp-2">{story.text}</p>

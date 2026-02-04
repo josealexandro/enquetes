@@ -127,7 +127,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
     <header className="w-full bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white py-1 px-6 fixed top-0 z-50 shadow-md transition-colors duration-300">
       <nav className="max-w-7xl mx-auto flex justify-between items-center">
         <Link href="/" className="hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300">
-            <Image src="/logoHome.png" alt="Logo do Aplicativo de Enquetes" width={120} height={40} objectFit="contain" className="dark:brightness-0 dark:invert" />
+            <Image src="/logoHomeNova.png" alt="Engaja" width={120} height={40} objectFit="contain" />
         </Link>
 
         {/* Mobile menu button */}
