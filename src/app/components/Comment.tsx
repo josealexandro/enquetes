@@ -29,7 +29,7 @@ const formatTimeAgo = (timestamp: number) => {
 
 interface CommentProps {
   comment: Comment;
-  onAddReply: (parentId: string, text: string) => Promise<void>;
+  onAddReply: (parentId: string, text: string) => Promise<void | { ok: boolean; message?: string }>;
   onDeleteComment: (commentId: string) => void;
   replies?: Comment[];
   totalRepliesCount?: number;
