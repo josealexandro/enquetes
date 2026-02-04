@@ -1,56 +1,69 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { contemPalavrao } from "@/utils/profanityFilter";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFaceFrown } from "@fortawesome/free-regular-svg-icons";
 
 interface CommentFormProps {
   pollId: string;
-  parentId?: string; // Optional: for replies
-  onAddComment: (text: string, parentId?: string) => Promise<void>; // Agora aceita Promise<void>
-  initialText?: string; // New: for pre-filling reply text
+  parentId?: string;
+  onAddComment: (text: string, parentId?: string) => Promise<void | { ok: boolean; message?: string }>;
+  initialText?: string;
 }
 
 export default function CommentForm({ parentId, onAddComment, initialText }: CommentFormProps) {
-  // const [author, setAuthor] = useState(""); // Remover estado local do autor
   const [commentText, setCommentText] = useState(initialText || "");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Use useEffect to update commentText if initialText changes (e.g., when replying to different comments)
   useEffect(() => {
     setCommentText(initialText || "");
   }, [initialText]);
 
-  const handleSubmit = async (e: React.FormEvent) => { // Tornar handleSubmit assíncrono
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (commentText.trim() === "") { // Apenas validar o texto do comentário
-      alert("Por favor, digite seu comentário."); // Mensagem atualizada
+    setErrorMessage(null);
+
+    if (commentText.trim() === "") {
+      setErrorMessage("Digite algo antes de enviar.");
       return;
     }
-    await onAddComment(commentText.trim(), parentId); // Agora aguarda a função assíncrona
+    if (contemPalavrao(commentText.trim())) {
+      setErrorMessage("Opa! Esse comentário tem palavras que não permitimos por aqui. Que tal reescrever de um jeito mais legal?");
+      return;
+    }
+
+    const res = await onAddComment(commentText.trim(), parentId);
+    if (res && typeof res === "object" && res.ok === false) {
+      setErrorMessage(res.message || "Algo deu errado. Tente novamente.");
+      return;
+    }
     setCommentText("");
-    // Optionally, clear author if you want users to re-enter for each comment
-    // setAuthor('');
   };
 
   return (
     <form onSubmit={handleSubmit} className="bg-white dark:bg-zinc-800 p-4 rounded-lg shadow-md space-y-4">
-      {/* Remover input do autor */}
-      {/*
-      <input
-        type="text"
-        placeholder="Seu Nome"
-        value={author}
-        onChange={(e) => setAuthor(e.target.value)}
-        className="w-full px-4 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder-zinc-500 dark:placeholder-zinc-400 font-inter"
-        required
-      />
-      */}
       <textarea
         placeholder={parentId ? "Sua Resposta" : "Seu Comentário"}
         value={commentText}
-        onChange={(e) => setCommentText(e.target.value)}
+        onChange={(e) => { setCommentText(e.target.value); setErrorMessage(null); }}
         rows={3}
-        className="w-full px-4 py-2 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder-zinc-500 dark:placeholder-zinc-400 font-inter"
+        className={`w-full px-4 py-2 rounded border font-inter placeholder-zinc-500 dark:placeholder-zinc-400 transition-colors ${
+          errorMessage
+            ? "border-amber-400 dark:border-amber-500 bg-amber-50/50 dark:bg-amber-900/10"
+            : "border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white"
+        }`}
         required
-      ></textarea>
+      />
+      {errorMessage && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 text-amber-800 dark:text-amber-200"
+        >
+          <FontAwesomeIcon icon={faFaceFrown} className="mt-0.5 shrink-0 text-amber-500" />
+          <p className="text-sm font-medium leading-snug">{errorMessage}</p>
+        </div>
+      )}
       <button
         type="submit"
         className="w-full px-4 py-2 rounded bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-poppins font-bold shadow-md hover:scale-105 transition-transform duration-300"

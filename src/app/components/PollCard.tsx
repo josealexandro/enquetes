@@ -9,7 +9,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShareNodes, faHeart, faHeartCrack } from '@fortawesome/free-solid-svg-icons';
 import { motion } from "framer-motion";
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc, arrayUnion, arrayRemove, increment, limit } from "firebase/firestore"; // Importar funções do Firestore e arrayUnion/arrayRemove
+import { collection, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc, arrayUnion, arrayRemove, increment, limit } from "firebase/firestore"; // Importar funções do Firestore e arrayUnion/arrayRemove
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 import { useAuthModal } from "@/app/context/AuthModalContext"; // Importar useAuthModal
 import HeartAnimation from "@/components/HeartAnimation"; // Importar o componente de animação
@@ -327,47 +327,33 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
       ? user.commercialName
       : (user.displayName || user.email || "Usuário Logado");
 
-    const baseComment = {
-      pollId: poll.id,
-      author: authorName, // Usar o nome determinado acima
-      authorId: user.uid,
-      authorEmail: user.email,
-      text,
-      timestamp: Date.now(),
-      likes: 0, // Inicializa contador de curtidas
-      likedBy: [], // Inicializa array de usuários que curtiram
-    };
-
-    const newComment = parentId
-      ? { ...baseComment, parentId }
-      : baseComment;
-
     try {
-      const commentsCollectionRef = collection(db, "polls", poll.id, "comments");
-      await addDoc(commentsCollectionRef, newComment);
+      const res = await fetch(`/api/polls/${poll.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: text.trim(),
+          parentId: parentId ?? undefined,
+          author: authorName,
+          authorId: user.uid,
+          authorEmail: user.email ?? undefined,
+        }),
+      });
 
-      // Incrementar commentCount no documento da enquete principal
-      const pollRef = doc(db, "polls", poll.id);
-      try {
-        await updateDoc(pollRef, { commentCount: increment(1) });
-      } catch (countError: any) {
-        // Se falhar ao atualizar commentCount mas o comentário foi criado, não mostrar erro
-        // O onSnapshot vai atualizar o estado automaticamente
-        if (countError?.code !== 'permission-denied') {
-          console.error("Erro ao atualizar commentCount:", countError);
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const msg = data.message || "Algo deu errado. Tente novamente.";
+        if (res.status === 400) {
+          return { ok: false, message: msg };
         }
-      }
-      // onSnapshot já vai atualizar o estado de comments, não precisamos fazer setComments aqui
-    } catch (error: any) {
-      console.error("Erro ao adicionar comentário:", error);
-      
-      // Se o erro for de permissão, não mostrar erro ao usuário
-      // O comentário pode ter sido criado mesmo com o erro
-      if (error?.code === 'permission-denied') {
+        alert(msg);
         return;
       }
-      
-      alert("Erro ao adicionar comentário. Tente novamente.");
+      // Sucesso: onSnapshot já vai atualizar a lista de comentários
+    } catch (error: any) {
+      console.error("Erro ao adicionar comentário:", error);
+      return { ok: false, message: "Erro ao adicionar comentário. Tente novamente." };
     }
   };
 
