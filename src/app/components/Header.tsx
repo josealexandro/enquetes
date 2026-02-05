@@ -27,6 +27,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
   // ============================================
   const [darkMode, setDarkMode] = useState(false); // Estado do dark mode - inicializa como false (light mode)
   const [mounted, setMounted] = useState(false); // Controla quando o componente foi montado no cliente (evita hidratação)
+  const [isIOS, setIsIOS] = useState(false); // Detecta iPhone/iPad para fundo do logo no modo light
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
   const [isAvatarExpanded, setIsAvatarExpanded] = useState(false); // Estado para controlar expansão do avatar
   const { user, logout /*, loading */ } = useAuth(); // Remover loading, pois não está sendo usado
@@ -63,6 +64,8 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
       }
       
       setMounted(true); // Componente montado no cliente - permite renderização do ícone
+      const ua = navigator.userAgent || navigator.vendor;
+      setIsIOS(/iPhone|iPad|iPod/i.test(ua));
     }
   }, []); // Executar apenas uma vez na montagem
 
@@ -142,7 +145,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
   return (
     <header className="w-full bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white py-1 px-6 pt-[max(0.25rem,env(safe-area-inset-top))] fixed top-0 left-0 right-0 z-50 shadow-md transition-colors duration-300">
       <nav className="max-w-7xl mx-auto flex justify-between items-center">
-        <Link href="/" className="hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300">
+        <Link href="/" className={`inline-flex items-center hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300 ${!darkMode && isIOS ? "bg-zinc-900 px-2 py-1 -mx-2 -my-1 rounded-md" : ""}`}>
             <Image src="/logoHomeNova.png" alt="Engaja" width={120} height={40} objectFit="contain" />
         </Link>
 
