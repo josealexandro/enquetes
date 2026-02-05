@@ -81,9 +81,25 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
       if (darkMode) {
         document.documentElement.classList.add("dark");
         localStorage.setItem("theme", "dark");
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", "#27272a");
+        else {
+          const m = document.createElement("meta");
+          m.name = "theme-color";
+          m.content = "#27272a";
+          document.head.appendChild(m);
+        }
       } else {
         document.documentElement.classList.remove("dark");
         localStorage.setItem("theme", "light");
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", "#ffffff");
+        else {
+          const m = document.createElement("meta");
+          m.name = "theme-color";
+          m.content = "#ffffff";
+          document.head.appendChild(m);
+        }
       }
     }
   }, [darkMode, mounted]); // Reage às mudanças no darkMode (quando mounted === true)
@@ -124,7 +140,7 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
   // }
 
   return (
-    <header className="w-full bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white py-1 px-6 fixed top-0 z-50 shadow-md transition-colors duration-300">
+    <header className="w-full bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white py-1 px-6 pt-[max(0.25rem,env(safe-area-inset-top))] fixed top-0 left-0 right-0 z-50 shadow-md transition-colors duration-300">
       <nav className="max-w-7xl mx-auto flex justify-between items-center">
         <Link href="/" className="hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300">
             <Image src="/logoHomeNova.png" alt="Engaja" width={120} height={40} objectFit="contain" />
