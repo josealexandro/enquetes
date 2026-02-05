@@ -9,6 +9,7 @@ import '@fortawesome/fontawesome-svg-core/styles.css';
 import { config } from '@fortawesome/fontawesome-svg-core';
 config.autoAddCss = false;
 
+import Script from "next/script";
 import ClientProvidersWrapper from "./components/ClientProvidersWrapper"; // Importar o novo ClientProvidersWrapper
 
 const geistSans = Geist({
@@ -46,12 +47,16 @@ export const metadata: Metadata = {
   other: { "theme-color": "#ffffff" },
 };
 
-// Script que roda ANTES do React para evitar flash branco no header no iOS/Safari.
-// O WebKit no iPhone demora mais para hidratar; sem isso, o header aparece branco até o JS rodar.
+// Script que roda no <head> ANTES do React para evitar flash branco no header no iOS/Safari.
+// Usa prefers-color-scheme quando localStorage vazio (primeira visita / WebView do WhatsApp).
 const themeScript = `
   (function() {
     try {
       var theme = localStorage.getItem('theme');
+      if (!theme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        theme = 'dark';
+        localStorage.setItem('theme', 'dark');
+      }
       var el = document.documentElement;
       if (theme === 'dark') {
         el.classList.add('dark');
@@ -78,7 +83,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${poppins.variable} ${geistSans.variable} ${geistMono.variable} ${permanentMarker.variable} antialiased`}> {/* Adicionado permanentMarker.variable */}
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <Script id="theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeScript }} />
         <ClientProvidersWrapper> {/* Usar o novo componente wrapper */}
           {children}
         </ClientProvidersWrapper>
