@@ -1,6 +1,10 @@
 [
     {
-      "origin": ["http://localhost:3000"],
+      "origin": [
+        "http://localhost:3000",
+        "https://engaaja.com.br",
+        "https://www.engaaja.com.br"
+      ],
       "method": ["GET", "PUT", "POST", "DELETE", "HEAD"],
       "maxAgeSeconds": 3600
     }

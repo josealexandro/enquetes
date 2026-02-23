@@ -18,11 +18,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
     if (docSnap.exists()) {
       const poll = docSnap.data();
-      const title = poll.title || "Enquete no Engaja";
+      const title = poll.title || "Enquete no Engaaja";
       const description = `Vote na enquete: ${title}. Crie suas próprias enquetes gratuitamente!`;
       
       return {
-        title: `${title} | Engaja`,
+        title: `${title} | Engaaja`,
         description: description,
         openGraph: {
           title: title,
@@ -42,8 +42,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   return {
-    title: "Enquete | Engaja",
-    description: "Vote nesta enquete do Engaja.",
+    title: "Enquete | Engaaja",
+    description: "Vote nesta enquete do Engaaja.",
   };
 }
 

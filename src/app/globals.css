@@ -44,7 +44,7 @@ html.dark header.fixed {
      - Dark mode: branco/claro (#ffffff / #9ca3af)
      ============================================ */
   
-  /* Título principal - "Bem-vindo ao Engaja!" */
+  /* Título principal - "Bem-vindo ao Engaaja!" */
   .welcome-text {
     color: #000000 !important; /* Preto no light mode */
   }
@@ -61,6 +61,24 @@ html.dark header.fixed {
   html.dark .welcome-subtext {
     color: #9ca3af !important; /* zinc-400 (cinza claro) no dark mode */
   }
+}
+
+/* Logo do header: sem fundo no hover (evita quadrado preto) e blend para esconder preto da imagem */
+.header-logo-link:not(.bg-zinc-900),
+.header-logo-link:not(.bg-zinc-900):hover,
+.header-logo-link:not(.bg-zinc-900):focus,
+.header-logo-link:not(.bg-zinc-900):focus-visible {
+  background-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.header-logo-link span,
+.header-logo-link .header-logo-img,
+.header-logo-link img {
+  background: transparent !important;
+}
+.header-logo-link img {
+  mix-blend-mode: lighten;
 }
 
 :root {

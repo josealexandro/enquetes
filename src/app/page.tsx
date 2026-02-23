@@ -594,7 +594,7 @@ export default function Home() {
           ============================================ */}
       <div className="max-w-3xl w-full text-center mb-6 mt-4"> {/* Ajustado mb-12 para mb-6 e mt-10 para mt-4 */}
         <h1 className="text-5xl md:text-6xl font-extrabold leading-tight animate-fade-in welcome-text">
-          Bem-vindo ao Eng<span className="text-yellow-400">aja!</span>
+          Bem-vindo ao Eng<span className="text-yellow-400">aaja!</span>
         </h1>
 
         {deleteFeedbackMessage && (

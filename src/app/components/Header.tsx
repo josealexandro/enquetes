@@ -145,8 +145,8 @@ export default function Header({ showLoginModal, setShowLoginModal, showSignupMo
   return (
     <header className="w-full bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white py-1 px-6 pt-[max(0.25rem,env(safe-area-inset-top))] fixed top-0 left-0 right-0 z-50 shadow-md transition-colors duration-300">
       <nav className="max-w-7xl mx-auto flex justify-between items-center">
-        <Link href="/" className={`inline-flex items-center hover:drop-shadow-[0_0_8px_rgba(96,165,250,0.7)] transition-colors duration-300 ${!darkMode && isIOS ? "bg-zinc-900 px-2 py-1 -mx-2 -my-1 rounded-md" : ""}`}>
-            <Image src="/logoHomeNova.png" alt="Engaja" width={120} height={40} objectFit="contain" />
+        <Link href="/" className={`header-logo-link inline-flex items-center ${!darkMode && isIOS ? "px-2 py-1 -mx-2 -my-1 rounded-md bg-zinc-900" : ""}`}>
+            <Image src="/logoHomeEngaaja.png" alt="Engaaja" width={120} height={40} objectFit="contain" className="header-logo-img" />
         </Link>
 
         {/* Mobile menu button */}

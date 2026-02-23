@@ -4,6 +4,7 @@ import {
   countPollsCreatedInCurrentPeriod,
   getSubscriptionByCompany,
 } from "@/app/services/subscriptionService";
+import { getIsAdminByCompanyId } from "@/lib/adminAuth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -14,6 +15,8 @@ import { db } from "@/lib/firebase";
  * 1. Se o usuário tem assinatura ativa
  * 2. Se o usuário atingiu o limite de enquetes no período atual
  * 3. Se o usuário tem créditos avulsos disponíveis
+ * 
+ * ADMIN: Contas listadas em ADMIN_EMAILS sempre recebem canCreate: true (para demonstração).
  * 
  * IMPORTANTE: Esta validação deve ser chamada ANTES de criar a enquete no Firestore
  */
@@ -42,6 +45,24 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("[VALIDATE_POLL] Validando criação de enquete para companyId:", companyId);
+
+    // ADMIN: Conta em ADMIN_EMAILS pode criar enquetes sem verificação de limite
+    const isAdmin = await getIsAdminByCompanyId(companyId);
+    if (isAdmin) {
+      return NextResponse.json({
+        canCreate: true,
+        shouldUseCredit: false,
+        message: "Você pode criar a enquete.",
+        data: {
+          pollsLimit: 999,
+          pollsCreated: 0,
+          baseLimit: 999,
+          extraPollsAvailable: 0,
+          hasActiveSubscription: true,
+          subscriptionStatus: "ACTIVE",
+        },
+      });
+    }
 
     // Obter limite de enquetes para o usuário
     const pollsLimit = await getPollsLimitForCompany(companyId);

@@ -4,6 +4,10 @@ import {
   createSubscription,
   getSubscriptionByCompany,
 } from "@/app/services/subscriptionService";
+import { getIsAdminByCompanyId } from "@/lib/adminAuth";
+import { DEFAULT_PLANS } from "@/app/data/planSeeds";
+import type { Subscription } from "@/app/types/subscription";
+import { Timestamp } from "firebase/firestore";
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,6 +33,35 @@ export async function GET(request: NextRequest) {
     }
 
     console.log("[GET_SUBSCRIPTION] Buscando assinatura para companyId:", companyId);
+
+    // ADMIN: Se o usuário está em ADMIN_EMAILS, retorna assinatura virtual (plano topo) para a UI mostrar acesso total
+    const isAdmin = await getIsAdminByCompanyId(companyId);
+    if (isAdmin) {
+      const planPro = DEFAULT_PLANS.find((p) => p.slug === "pro") ?? DEFAULT_PLANS[DEFAULT_PLANS.length - 1];
+      const now = Timestamp.now();
+      const periodEnd = Timestamp.fromMillis(now.toMillis() + 365 * 24 * 60 * 60 * 1000);
+      const virtualSubscription: Subscription = {
+        id: "admin-virtual",
+        companyId,
+        companyName: "Conta demonstração",
+        planId: planPro.id,
+        planSnapshot: {
+          slug: planPro.slug,
+          name: planPro.name,
+          price: planPro.price,
+          currency: planPro.currency,
+          billingPeriod: planPro.billingPeriod,
+          limits: planPro.limits,
+        },
+        status: "ACTIVE",
+        startDate: now,
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: false,
+      };
+      console.log("[GET_SUBSCRIPTION] Retornando assinatura virtual para conta admin.");
+      return NextResponse.json({ subscription: virtualSubscription });
+    }
     
     // CORREÇÃO: getSubscriptionByCompany agora usa Admin SDK quando disponível (webhook/API context)
     // Se Admin SDK não estiver disponível, usa Client SDK (pode dar erro de permissão)

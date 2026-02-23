@@ -40,6 +40,11 @@ PAGARME_ENCRYPTION_KEY=sua_chave_de_criptografia
 # STRIPE_SECRET_KEY=sk_test_...
 # NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 # STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Conta admin/demo (opcional - para demonstrar a aplicação com acesso a todos os planos)
+# Lista de e-mails separados por vírgula. Só esses usuários terão acesso total (sem limite de enquetes).
+# Não use NEXT_PUBLIC_ para não expor a lista no frontend. Configurar apenas na Vercel ou .env.local.
+# ADMIN_EMAILS=seuemail@exemplo.com,demo@engaaja.com.br
 ```
 
 ## Onde encontrar as credenciais

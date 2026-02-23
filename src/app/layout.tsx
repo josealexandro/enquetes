@@ -42,7 +42,7 @@ const permanentMarker = Permanent_Marker({
 });
 
 export const metadata: Metadata = {
-  title: "Engaja - Crie e Compartilhe Enquetes",
+  title: "Engaaja - Crie e Compartilhe Enquetes",
   description: "Crie enquetes personalizadas e compartilhe com seus amigos.",
   other: { "theme-color": "#ffffff" },
 };

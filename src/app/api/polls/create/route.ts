@@ -4,6 +4,7 @@ import {
   countPollsCreatedInCurrentPeriod,
   getSubscriptionByCompany,
 } from "@/app/services/subscriptionService";
+import { getIsAdminByCompanyId } from "@/lib/adminAuth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { adminDb } from "@/lib/firebase-admin";
@@ -112,82 +113,89 @@ export async function POST(request: NextRequest) {
 
     console.log("[CREATE_POLL] Validando criação de enquete para companyId:", companyId);
 
-    // 1. VALIDAR ASSINATURA E LIMITES
-    const pollsLimit = await getPollsLimitForCompany(companyId);
-    const pollsCreated = await countPollsCreatedInCurrentPeriod(companyId);
-
-    // Obter créditos avulsos
-    const userRef = doc(db, "users", companyId);
-    const userSnap = await getDoc(userRef);
-    const extraPollsAvailable = userSnap.exists()
-      ? (userSnap.data()?.extraPollsAvailable ?? 0)
-      : 0;
-
-    // Verificar assinatura
-    const subscription = await getSubscriptionByCompany(companyId);
-    const hasActiveSubscription = subscription?.status === "ACTIVE";
-
-    // Verificar se atingiu o limite base (sem contar créditos avulsos)
-    const baseLimit = hasActiveSubscription
-      ? subscription?.planSnapshot.limits.pollsPerMonth ?? 2
-      : 2;
-
-    const hasReachedBaseLimit = pollsCreated >= baseLimit;
-    const hasExtraCredit = extraPollsAvailable > 0;
-
-    // 2. VERIFICAR SE PODE CRIAR
+    // ADMIN: Conta em ADMIN_EMAILS pode criar enquetes sem verificação de limite (para demonstração)
     let canCreate = false;
     let shouldUseCredit = false;
-
-    if (pollsCreated < baseLimit) {
-      // Ainda não atingiu o limite base (pode criar sem consumir crédito)
+    let extraPollsAvailable = 0; // usado na resposta; quando admin permanece 0
+    const isAdmin = await getIsAdminByCompanyId(companyId);
+    if (isAdmin) {
       canCreate = true;
       shouldUseCredit = false;
-    } else if (hasReachedBaseLimit) {
-      // Atingiu o limite base - precisa de crédito para criar mais
-      if (hasExtraCredit) {
-        // Tem crédito disponível - pode criar, mas DEVE consumir o crédito
-        // Verificar se ainda não atingiu o limite total (base + créditos já consumidos)
-        const remainingCredits = extraPollsAvailable;
-        const effectiveLimit = baseLimit + remainingCredits;
-        
-        if (pollsCreated < effectiveLimit) {
-          canCreate = true;
-          shouldUseCredit = true;
+    } else {
+      // 1. VALIDAR ASSINATURA E LIMITES
+      const pollsLimit = await getPollsLimitForCompany(companyId);
+      const pollsCreated = await countPollsCreatedInCurrentPeriod(companyId);
+
+      // Obter créditos avulsos
+      const userRef = doc(db, "users", companyId);
+      const userSnap = await getDoc(userRef);
+      extraPollsAvailable = userSnap.exists()
+        ? (userSnap.data()?.extraPollsAvailable ?? 0)
+        : 0;
+
+      // Verificar assinatura
+      const subscription = await getSubscriptionByCompany(companyId);
+      const hasActiveSubscription = subscription?.status === "ACTIVE";
+
+      // Verificar se atingiu o limite base (sem contar créditos avulsos)
+      const baseLimit = hasActiveSubscription
+        ? subscription?.planSnapshot.limits.pollsPerMonth ?? 2
+        : 2;
+
+      const hasReachedBaseLimit = pollsCreated >= baseLimit;
+      const hasExtraCredit = extraPollsAvailable > 0;
+
+      // 2. VERIFICAR SE PODE CRIAR
+      if (pollsCreated < baseLimit) {
+        // Ainda não atingiu o limite base (pode criar sem consumir crédito)
+        canCreate = true;
+        shouldUseCredit = false;
+      } else if (hasReachedBaseLimit) {
+        // Atingiu o limite base - precisa de crédito para criar mais
+        if (hasExtraCredit) {
+          // Tem crédito disponível - pode criar, mas DEVE consumir o crédito
+          // Verificar se ainda não atingiu o limite total (base + créditos já consumidos)
+          const remainingCredits = extraPollsAvailable;
+          const effectiveLimit = baseLimit + remainingCredits;
+          
+          if (pollsCreated < effectiveLimit) {
+            canCreate = true;
+            shouldUseCredit = true;
+          } else {
+            // Já usou todos os créditos disponíveis
+            canCreate = false;
+          }
         } else {
-          // Já usou todos os créditos disponíveis
+          // Não tem crédito disponível
           canCreate = false;
         }
       } else {
-        // Não tem crédito disponível
+        // Não deveria chegar aqui, mas por segurança
         canCreate = false;
       }
-    } else {
-      // Não deveria chegar aqui, mas por segurança
-      canCreate = false;
-    }
 
-    if (!canCreate) {
-      // Verificar tipo de conta para mensagem personalizada
-      const accountType = userSnap.exists() ? (userSnap.data()?.accountType ?? 'personal') : 'personal';
-      const message = accountType === 'commercial'
-        ? "Assine um plano e tenha todo o sistema de customer voice a seu favor."
-        : `Você atingiu o limite de ${baseLimit} enquetes para o seu plano neste período. Compre um crédito avulso para postar mais enquetes.`;
+      if (!canCreate) {
+        // Verificar tipo de conta para mensagem personalizada
+        const accountType = userSnap.exists() ? (userSnap.data()?.accountType ?? 'personal') : 'personal';
+        const message = accountType === 'commercial'
+          ? "Assine um plano e tenha todo o sistema de customer voice a seu favor."
+          : `Você atingiu o limite de ${baseLimit} enquetes para o seu plano neste período. Compre um crédito avulso para postar mais enquetes.`;
 
-      return NextResponse.json(
-        {
-          message,
-          error: "LIMIT_REACHED",
-          data: {
-            pollsLimit,
-            pollsCreated,
-            baseLimit,
-            extraPollsAvailable,
-            hasActiveSubscription,
+        return NextResponse.json(
+          {
+            message,
+            error: "LIMIT_REACHED",
+            data: {
+              pollsLimit,
+              pollsCreated,
+              baseLimit,
+              extraPollsAvailable,
+              hasActiveSubscription,
+            },
           },
-        },
-        { status: 403 }
-      );
+          { status: 403 }
+        );
+      }
     }
 
     // 3. VERIFICAR SE ADMIN SDK ESTÁ DISPONÍVEL
