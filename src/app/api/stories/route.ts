@@ -3,7 +3,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, addDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import { getSubscriptionByCompany } from "@/app/services/subscriptionService";
-import { CreateStoryInput, StoryResponse } from "@/app/types/story";
+import { CreateStoryInput, Story, StoryResponse } from "@/app/types/story";
 import { Timestamp as AdminTimestamp } from "firebase-admin/firestore";
 
 /**
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     // Usar Admin SDK se disponível
     let storyId: string;
-    let createdStory: Record<string, unknown>;
+    let createdStory: Story;
     
     if (adminDb) {
       // Admin SDK: usar AdminTimestamp
