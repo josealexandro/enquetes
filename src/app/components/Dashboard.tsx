@@ -865,7 +865,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
               {/* Ajuste para tablets: gap intermediário */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-3.5 lg:gap-4">
                 {polls.map((poll) => (
-                  <div key={poll.id} className="relative">
+                  <div key={poll.id} className="relative min-w-0">
                     <PollCard 
                       poll={poll} 
                       onVote={handleVote} 

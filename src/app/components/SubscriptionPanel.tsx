@@ -553,48 +553,46 @@ const SubscriptionPanel = ({
             return (
               <article
                 key={plan.id}
-                className={`bg-gray-800 border rounded-2xl p-6 flex flex-col gap-4 ${
+                className={`bg-gray-800 border rounded-2xl p-6 flex flex-col gap-4 min-w-0 overflow-hidden ${
                   subscription?.planId === plan.id
                     ? "border-cyan-500 shadow-lg shadow-cyan-500/20"
                     : "border-gray-700"
                 }`}
               >
-                <div>
-                  <h4 className="text-2xl font-semibold text-white">{plan.name}</h4>
-                  <p className="text-gray-400 text-sm mt-1">{plan.description}</p>
+                <div className="min-w-0">
+                  <h4 className="text-2xl font-semibold text-white truncate" title={plan.name}>{plan.name}</h4>
+                  <p className="text-gray-400 text-sm mt-1 line-clamp-2" title={plan.description}>{plan.description}</p>
                 </div>
-                <div>
+                <div className="min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-1">
                   {/* DOCUMENTAÇÃO: Exibe preço atual e preço original riscado (se houver) para efeito de promoção */}
                   {plan.originalPrice && plan.originalPrice > plan.price ? (
-                    <div className="flex items-center gap-2">
-                      {/* Preço original riscado */}
-                      <span className="text-xl text-gray-500 line-through">
+                    <>
+                      <span className="text-xl text-gray-500 line-through shrink-0">
                         {formatBRL(plan.originalPrice)}
                       </span>
-                      {/* Preço atual em destaque */}
-                      <span className="text-3xl font-bold text-white">
+                      <span className="text-2xl md:text-3xl font-bold text-white shrink-0">
                         {formatBRL(plan.price)}
                       </span>
-                      <span className="text-gray-400 text-sm ml-2">
+                      <span className="text-gray-400 text-sm shrink-0">
                         /{plan.billingPeriod === "monthly" ? "mês" : "ano"}
                       </span>
-                    </div>
+                    </>
                   ) : (
-                    <div>
-                      <span className="text-3xl font-bold text-white">
+                    <>
+                      <span className="text-2xl md:text-3xl font-bold text-white shrink-0">
                         {formatBRL(plan.price)}
                       </span>
-                      <span className="text-gray-400 text-sm ml-2">
+                      <span className="text-gray-400 text-sm shrink-0">
                         /{plan.billingPeriod === "monthly" ? "mês" : "ano"}
                       </span>
-                    </div>
+                    </>
                   )}
                 </div>
-                <ul className="text-sm text-gray-300 space-y-2">
+                <ul className="text-sm text-gray-300 space-y-2 min-w-0">
                   {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2">
-                      <span className="text-cyan-400 mt-1">•</span>
-                      <span>{feature}</span>
+                    <li key={feature} className="flex items-start gap-2 min-w-0">
+                      <span className="text-cyan-400 mt-1 shrink-0">•</span>
+                      <span className="min-w-0 break-words">{feature}</span>
                     </li>
                   ))}
                 </ul>

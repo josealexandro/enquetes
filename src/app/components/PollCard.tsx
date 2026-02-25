@@ -34,9 +34,11 @@ interface PollCardProps {
   companySlug?: string; // Novo prop: slug da empresa, opcional
   enableCompanyLink?: boolean; // Novo prop: Habilita o link da empresa
   companyThemeColor?: string; // Novo prop: Cor do tema da empresa
+  /** No pódio (desktop), card usa 90% da coluna e fica centralizado para não colar nas laterais */
+  variant?: "default" | "podium";
 }
 
-function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorClass, borderColor, companySlug, enableCompanyLink, companyThemeColor }: PollCardProps) {
+function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorClass, borderColor, companySlug, enableCompanyLink, companyThemeColor, variant = "default" }: PollCardProps) {
   const [votedOptionId, setVotedOptionId] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [isClient, setIsClient] = useState(false);
@@ -416,7 +418,9 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
 
   return (
     <div
-      className={`rounded-lg transition-all duration-300 p-6 mb-6 transform hover:-translate-y-1 cursor-pointer w-[90%] mx-auto relative ${showShareMenu ? "z-20" : ""}
+      className={`rounded-lg transition-all duration-300 p-4 md:p-6 mb-6 transform hover:-translate-y-1 cursor-pointer w-full max-w-full min-w-0 mx-auto relative overflow-hidden
+        ${variant === "podium" ? "md:w-[90%] md:max-w-[90%]" : ""}
+        ${showShareMenu ? "z-20" : ""}
         ${isExpanded
           ? poll.rank
             ? `bg-zinc-700 dark:bg-zinc-800 border-2 ${borderColor} shadow-md` // Ranked, expanded: dark background with colored border
@@ -520,14 +524,17 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
         {poll.title}
       </h2>
 
-      <div className="flex items-center space-x-2 mb-4" onClick={(e) => e.stopPropagation()}> {/* Impede a propagação do clique e define uma altura fixa */}
-        <div className="relative">
+      <div
+        className={`flex items-center gap-2 mb-4 min-w-0 ${variant === "podium" ? "flex-nowrap" : "flex-wrap"}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="relative shrink-0">
           <button
             onClick={() => setShowShareMenu(!showShareMenu)}
-            className="text-zinc-300 hover:text-indigo-400 p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors duration-200"
+            className={`text-zinc-300 hover:text-indigo-400 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors duration-200 ${variant === "podium" ? "p-1.5 md:p-2" : "p-2"}`}
             aria-label="Opções de Compartilhamento"
           >
-            <FontAwesomeIcon icon={faShareNodes} size="lg" />
+            <FontAwesomeIcon icon={faShareNodes} size={variant === "podium" ? "sm" : "lg"} />
           </button>
           {showShareMenu && (
             <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-zinc-700 rounded-md shadow-lg py-1 z-10 sm:left-0 sm:right-auto">
@@ -561,33 +568,37 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
 
         <button
           onClick={(e) => handleLike(e)}
-          className={`p-2 rounded-full transition-colors duration-200 min-h-[44px] min-w-[44px] flex items-center justify-center ${
+          className={`rounded-full transition-colors duration-200 flex items-center justify-center shrink-0 ${
+            variant === "podium" ? "p-1.5 md:p-2 min-h-[36px] md:min-h-[44px] min-w-[36px] md:min-w-[44px]" : "p-2 min-h-[44px] min-w-[44px]"
+          } ${
             user && likedBy.includes(user.uid)
               ? "text-red-500 hover:text-red-600 bg-red-100 dark:bg-red-900"
               : "text-zinc-300 hover:text-red-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
           }`}
           aria-label="Curtir Enquete"
         >
-          <FontAwesomeIcon icon={faHeart} size="lg" />
-          <span className="ml-1 text-sm">{likes}</span>
+          <FontAwesomeIcon icon={faHeart} size={variant === "podium" ? "sm" : "lg"} />
+          <span className={`ml-1 whitespace-nowrap ${variant === "podium" ? "text-xs md:text-sm" : "text-sm"}`}>{likes}</span>
         </button>
 
         <button
           onClick={handleDislike}
-          className={`p-2 rounded-full transition-colors duration-200 min-h-[44px] min-w-[44px] flex items-center justify-center ${
+          className={`rounded-full transition-colors duration-200 flex items-center justify-center shrink-0 ${
+            variant === "podium" ? "p-1.5 md:p-2 min-h-[36px] md:min-h-[44px] min-w-[36px] md:min-w-[44px]" : "p-2 min-h-[44px] min-w-[44px]"
+          } ${
             user && dislikedBy.includes(user.uid)
               ? "text-indigo-500 hover:text-indigo-600 bg-indigo-100 dark:bg-indigo-900"
               : "text-zinc-300 hover:text-indigo-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
           }`}
           aria-label="Descurtir Enquete"
         >
-          <FontAwesomeIcon icon={faHeartCrack} size="lg" />
-          <span className="ml-1 text-sm">{dislikes}</span>
+          <FontAwesomeIcon icon={faHeartCrack} size={variant === "podium" ? "sm" : "lg"} />
+          <span className={`ml-1 whitespace-nowrap ${variant === "podium" ? "text-xs md:text-sm" : "text-sm"}`}>{dislikes}</span>
         </button>
         {(user?.uid === poll.creator.id || isMasterUser) && (
           <button
             onClick={() => onDelete(poll.id)}
-            className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors duration-200"
+            className={`text-red-500 hover:text-red-700 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors duration-200 shrink-0 whitespace-nowrap ${variant === "podium" ? "p-1.5 md:p-2 text-xs md:text-sm" : "p-2 text-sm"}`}
             aria-label="Excluir Enquete"
           >
             Excluir
