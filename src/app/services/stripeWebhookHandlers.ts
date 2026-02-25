@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { getStripe } from "@/app/services/stripeService";
 // Removendo importação de Timestamp (não utilizada)
 import {
   createSubscription,
@@ -173,6 +174,9 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
     });
   } else {
     console.log(`[handleCheckoutSessionCompleted] Assinatura já existe (ID: ${subscription.id}). Atualizando plano e status.`);
+    const newStripeSubscriptionId = typeof stripeSubscriptionId === "string" ? stripeSubscriptionId : undefined;
+    const oldStripeSubscriptionId = subscription.stripeSubscriptionId;
+
     // Se já existe, atualiza o plano e status (para o caso de troca de plano)
     // Usa Admin SDK automaticamente
     await switchSubscriptionPlan({
@@ -182,7 +186,7 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
       actorName: "Stripe Webhook",
     });
     console.log(`[handleCheckoutSessionCompleted] Plano atualizado para ${planId}`);
-    
+
     await updateSubscriptionStatus(subscription.id, "ACTIVE", {
       actorId: "stripe_webhook",
       actorName: "Stripe Webhook",
@@ -194,8 +198,20 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
     await updateSubscriptionStripeIds({
       subscriptionId: subscription.id,
       stripeCustomerId: typeof customer === "string" ? customer : customer?.id,
-      stripeSubscriptionId: typeof stripeSubscriptionId === "string" ? stripeSubscriptionId : undefined,
+      stripeSubscriptionId: newStripeSubscriptionId,
     });
+
+    // Evitar cobrança duplicada: cancelar a assinatura antiga no Stripe quando o cliente troca de plano via novo checkout
+    if (oldStripeSubscriptionId && newStripeSubscriptionId && oldStripeSubscriptionId !== newStripeSubscriptionId) {
+      try {
+        const stripe = getStripe();
+        await stripe.subscriptions.cancel(oldStripeSubscriptionId);
+        console.log(`[handleCheckoutSessionCompleted] Assinatura antiga no Stripe cancelada: ${oldStripeSubscriptionId}`);
+      } catch (cancelErr) {
+        console.error(`[handleCheckoutSessionCompleted] Erro ao cancelar assinatura antiga no Stripe (${oldStripeSubscriptionId}):`, cancelErr);
+        // Não falha o webhook: Firestore já está correto; o suporte pode cancelar manualmente no Stripe se necessário
+      }
+    }
   }
 
   // Registra o pagamento (se for a primeira fatura, já é paga aqui)
@@ -230,8 +246,8 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
  */
 export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const { customer: stripeCustomerId, total, status, id: invoiceId } = invoice;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const stripeSubscriptionId = (invoice as any).subscription; // Usando 'any' para acessar a propriedade 'subscription'
+  const rawSub = invoice.subscription;
+  const stripeSubscriptionId = typeof rawSub === "string" ? rawSub : (rawSub as { id?: string })?.id;
 
   if (!stripeSubscriptionId || typeof stripeSubscriptionId !== 'string') {
     console.warn("Invoice paid event sem stripeSubscriptionId válido:", invoiceId);
@@ -328,14 +344,14 @@ export async function handleCustomerSubscriptionUpdated(stripeSubscription: Stri
   });
 
   // Conserto definitivo: persistir IDs do Stripe sempre que houver atualização
-  const stripeCustomerId = typeof sub.customer === "string" ? sub.customer : (sub.customer as any)?.id;
+  const stripeCustomerId = typeof sub.customer === "string" ? sub.customer : (sub.customer as { id?: string })?.id;
   await updateSubscriptionStripeIds({
     subscriptionId: subscription.id,
     stripeCustomerId: typeof stripeCustomerId === "string" ? stripeCustomerId : undefined,
     stripeSubscriptionId,
   });
 
-  if (typeof currentPeriodStart === 'undefined' || typeof currentPeriodEnd === 'undefined') {
+  if (typeof currentPeriodStart === "undefined" || typeof currentPeriodEnd === 'undefined') {
     console.warn("Datas de período (start/end) são indefinidas para a assinatura Stripe:", stripeSubscriptionId);
     return;
   }
@@ -381,7 +397,7 @@ export async function handleCustomerSubscriptionDeleted(stripeSubscription: Stri
   });
 
   // Conserto definitivo: persistir IDs do Stripe também no deleted
-  const stripeCustomerId = typeof sub.customer === "string" ? sub.customer : (sub.customer as any)?.id;
+  const stripeCustomerId = typeof sub.customer === "string" ? sub.customer : (sub.customer as { id?: string })?.id;
   await updateSubscriptionStripeIds({
     subscriptionId: subscription.id,
     stripeCustomerId: typeof stripeCustomerId === "string" ? stripeCustomerId : undefined,

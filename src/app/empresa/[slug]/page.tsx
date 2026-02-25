@@ -10,12 +10,10 @@ import PollCard from "@/app/components/PollCard"; // Importar PollCard
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 import { useAuthModal } from "@/app/context/AuthModalContext"; // Importar useAuthModal
 import AuthPromptCard from "@/app/components/Auth/AuthPromptCard"; // Importar AuthPromptCard
-import Image from "next/image"; // Importar Image do next/image
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'; // Re-importar FontAwesomeIcon
 import { faFacebookF, faInstagram, faTwitter } from '@fortawesome/free-brands-svg-icons'; // Re-importar ícones de redes sociais
 // Removido: import { faEnvelope } from '@fortawesome/free-solid-svg-icons'; // Importar ícone de envelope
 import { useCompanyFooter } from "@/app/context/CompanyFooterContext"; // Re-importar useCompanyFooter
-import { motion } from "framer-motion"; // Importar motion para animações
 import CompanyRatingInput from "@/app/components/CompanyRatingInput"; // Importar o novo componente de avaliação
 import Notification from "@/app/components/Notification"; // Importar o novo componente de notificação
 import RatingSuccessAnimation from "@/app/components/RatingSuccessAnimation"; // Importar o novo componente de animação de estrelas

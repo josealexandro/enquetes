@@ -72,7 +72,7 @@ export default function DashboardPage() {
               commentCount: commentCount,
               createdAt: data.createdAt, // Firebase retorna Timestamp, a interface Poll agora aceita isso
             } as Poll;
-          } catch (commentError) {
+          } catch {
             // Se houver erro ao buscar comentários, retornar enquete com commentCount = 0
             return {
               id: docSnap.id,

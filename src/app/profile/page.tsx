@@ -98,10 +98,10 @@ export default function ProfilePage() {
           // Obter URL do arquivo
           avatarUrl = await getDownloadURL(snapshot.ref);
           setUploadingAvatar(false);
-        } catch (uploadError: any) {
+        } catch (uploadError: unknown) {
           setUploadingAvatar(false);
           console.error("Erro ao fazer upload do avatar:", uploadError);
-          setNotificationMessage(`Erro ao fazer upload da imagem: ${uploadError.message}`);
+          setNotificationMessage(`Erro ao fazer upload da imagem: ${uploadError instanceof Error ? uploadError.message : "Erro desconhecido"}`);
           setNotificationType("error");
           setLoading(false);
           return;
@@ -134,9 +134,9 @@ export default function ProfilePage() {
         try {
           const userDocRef = doc(db, "users", user.uid);
           await updateDoc(userDocRef, firestoreUpdateData);
-        } catch (firestoreError: any) {
-          // Se falhar ao atualizar no Firestore mas o Auth foi atualizado, não mostrar erro
-          if (firestoreError?.code !== 'permission-denied') {
+        } catch (firestoreError: unknown) {
+          const code = firestoreError && typeof firestoreError === "object" && "code" in firestoreError ? (firestoreError as { code: string }).code : undefined;
+          if (code !== "permission-denied") {
             console.error("Erro ao atualizar perfil no Firestore:", firestoreError);
           }
         }
@@ -148,15 +148,14 @@ export default function ProfilePage() {
 
       setNotificationMessage("Perfil atualizado com sucesso!");
       setNotificationType("success");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao atualizar perfil:", error);
-      
-      // Se o erro for de permissão, não mostrar erro ao usuário
-      if (error?.code === 'permission-denied') {
+      const code = error && typeof error === "object" && "code" in error ? (error as { code: string }).code : undefined;
+      if (code === "permission-denied") {
         setNotificationMessage("Perfil atualizado com sucesso!");
         setNotificationType("success");
       } else {
-        setNotificationMessage(`Erro ao atualizar perfil: ${error.message}`);
+        setNotificationMessage(`Erro ao atualizar perfil: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
         setNotificationType("error");
       }
     } finally {
@@ -187,7 +186,7 @@ export default function ProfilePage() {
     }
 
     try {
-      const auth = getAuth();
+      getAuth();
       const credential = EmailAuthProvider.credential(firebaseAuthUser.email!, currentPassword);
       await reauthenticateWithCredential(firebaseAuthUser, credential);
       await updatePassword(firebaseAuthUser, newPassword);
@@ -197,15 +196,15 @@ export default function ProfilePage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmNewPassword("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao atualizar senha:", error);
-      // Firebase specific error handling for reauthentication
-      if (error.code === 'auth/wrong-password') {
+      const err = error && typeof error === "object" && "code" in error ? (error as { code: string; message?: string }) : null;
+      if (err?.code === "auth/wrong-password") {
         setNotificationMessage("Senha atual errada.");
-      } else if (error.code === 'auth/requires-recent-login') {
+      } else if (err?.code === "auth/requires-recent-login") {
         setNotificationMessage("Esta ação requer autenticação recente. Por favor, faça logout e login novamente.");
       } else {
-        setNotificationMessage(`Erro ao atualizar senha: ${error.message}`);
+        setNotificationMessage(`Erro ao atualizar senha: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
       }
       setNotificationType("error");
     } finally {

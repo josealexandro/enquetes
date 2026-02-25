@@ -160,7 +160,7 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
         name: (isCommercial && user.commercialName)
           ? user.commercialName
           : (user.displayName || user.email || "Usuário Logado"),
-        avatarUrl: (user as any).avatarUrl || user.photoURL || "https://www.gravatar.com/avatar/?d=mp",
+        avatarUrl: (user as { avatarUrl?: string | null }).avatarUrl || user.photoURL || "https://www.gravatar.com/avatar/?d=mp",
         id: user.uid,
         ...(user.commercialName && { commercialName: user.commercialName }),
         ...(user.themeColor && { themeColor: user.themeColor }),
@@ -217,9 +217,9 @@ export default function PollForm({ onPollCreated, isCommercial = false }: PollFo
         setFeedbackMessage(null);
         onPollCreated?.();
       }, 3000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao criar enquete:", error);
-      setFeedbackMessage(error?.message || "Erro ao criar enquete. Tente novamente.");
+      setFeedbackMessage(error instanceof Error ? error.message : "Erro ao criar enquete. Tente novamente.");
       setFeedbackType("error");
       setTimeout(() => setFeedbackMessage(null), 5000);
     }

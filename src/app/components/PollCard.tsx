@@ -9,7 +9,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShareNodes, faHeart, faHeartCrack } from '@fortawesome/free-solid-svg-icons';
 import { motion } from "framer-motion";
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc, arrayUnion, arrayRemove, increment, limit } from "firebase/firestore"; // Importar funções do Firestore e arrayUnion/arrayRemove
+import { collection, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc, increment, limit } from "firebase/firestore"; // Importar funções do Firestore
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 import { useAuthModal } from "@/app/context/AuthModalContext"; // Importar useAuthModal
 import HeartAnimation from "@/components/HeartAnimation"; // Importar o componente de animação
@@ -211,7 +211,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
         setDislikes(data.data.dislikes || 0);
         setDislikedBy(data.data.dislikedBy || []);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao curtir/descurtir enquete:", error);
       
       // Revert Optimistic Update on error
@@ -279,7 +279,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
         setDislikes(data.data.dislikes || 0);
         setDislikedBy(data.data.dislikedBy || []);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao descurtir enquete:", error);
       
       // Revert Optimistic Update
@@ -351,7 +351,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
         return;
       }
       // Sucesso: onSnapshot já vai atualizar a lista de comentários
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao adicionar comentário:", error);
       return { ok: false, message: "Erro ao adicionar comentário. Tente novamente." };
     }
@@ -371,20 +371,18 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
       const pollRef = doc(db, "polls", poll.id);
       try {
         await updateDoc(pollRef, { commentCount: increment(-1) });
-      } catch (countError: any) {
+      } catch (countError: unknown) {
         // Se falhar ao atualizar commentCount mas o comentário foi excluído, não mostrar erro
-        // O onSnapshot vai atualizar o estado automaticamente
-        if (countError?.code !== 'permission-denied') {
+        const code = countError && typeof countError === "object" && "code" in countError ? (countError as { code: string }).code : undefined;
+        if (code !== "permission-denied") {
           console.error("Erro ao atualizar commentCount:", countError);
         }
       }
       // onSnapshot já vai atualizar o estado de comments, não precisamos fazer setComments aqui
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao excluir comentário:", error);
-      
-      // Se o erro for de permissão, não mostrar erro ao usuário
-      // O comentário pode ter sido excluído mesmo com o erro
-      if (error?.code === 'permission-denied') {
+      const code = error && typeof error === "object" && "code" in error ? (error as { code: string }).code : undefined;
+      if (code === "permission-denied") {
         return;
       }
       

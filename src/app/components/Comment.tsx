@@ -99,11 +99,10 @@ export default function CommentComponent({
           likedBy: arrayUnion(user.uid),
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao curtir comentário:", error);
-      
-      // Se erro de permissão, não mostrar erro (regras do Firestore vão tratar)
-      if (error?.code === 'permission-denied') {
+      const code = error && typeof error === "object" && "code" in error ? (error as { code: string }).code : undefined;
+      if (code === "permission-denied") {
         return;
       }
       

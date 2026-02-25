@@ -6,7 +6,7 @@ import PollCard from "@/app/components/PollCard";
 import { Poll } from "@/app/types/poll";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, deleteDoc } from "firebase/firestore";
 import { useAuth } from "@/app/context/AuthContext";
 import { PollOption } from "@/app/types/poll";
 
@@ -126,9 +126,9 @@ export default function PollDetailClient({ pollId }: PollDetailClientProps) {
           votedBy: data.data.votedBy,
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao votar:", error);
-      alert(error.message || "Erro ao registrar voto. Tente novamente.");
+      alert(error instanceof Error ? error.message : "Erro ao registrar voto. Tente novamente.");
       // Reverter o estado local se o voto falhar
       setPoll(poll);
     }

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, updateDoc, arrayUnion } from "firebase/firestore"; // Adicionado updateDoc e arrayUnion
+import { collection, query, where, getDocs } from "firebase/firestore";
 import slugify from "@/utils/slugify";
 import { useAuth } from "@/app/context/AuthContext"; // Importar useAuth
 import Link from "next/link"; // Adicionado Link
@@ -194,9 +194,9 @@ const PollDetailPage: React.FC<PollDetailPageProps> = ({ params }) => { // Alter
       setFeedbackMessage("Voto registrado com sucesso!");
       setFeedbackType("success");
       setTimeout(() => setFeedbackMessage(null), 3000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao votar:", error);
-      setFeedbackMessage(error.message || "Erro ao registrar voto. Tente novamente.");
+      setFeedbackMessage(error instanceof Error ? error.message : "Erro ao registrar voto. Tente novamente.");
       setFeedbackType("error");
       setTimeout(() => setFeedbackMessage(null), 3000);
       

@@ -134,7 +134,31 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
           Esqueci minha senha
         </button>
       </div>
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {error && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60"
+        >
+          <span className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
+            <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-red-800 dark:text-red-200">{error}</p>
+            <p className="text-sm text-red-600 dark:text-red-400 mt-0.5">
+              Verifique os dados e tente novamente. Use &quot;Esqueci minha senha&quot; se precisar.
+            </p>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="mt-2 text-sm font-medium text-red-600 dark:text-red-400 hover:underline"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
       <button
         type="submit"
         disabled={loading}
@@ -162,13 +186,31 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
               required
             />
             {resetMessage && (
-              <p className={`text-sm text-center ${
-                resetMessage.includes("enviado") 
-                  ? "text-green-600 dark:text-green-400" 
-                  : "text-red-500 dark:text-red-400"
-              }`}>
-                {resetMessage}
-              </p>
+              <div
+                role="alert"
+                className={`flex items-start gap-3 p-3 rounded-xl text-sm ${
+                  resetMessage.includes("enviado")
+                    ? "bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800/60"
+                    : "bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60"
+                }`}
+              >
+                {resetMessage.includes("enviado") ? (
+                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                ) : (
+                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </span>
+                )}
+                <p className={resetMessage.includes("enviado") ? "text-green-800 dark:text-green-200" : "text-red-800 dark:text-red-200"}>
+                  {resetMessage}
+                </p>
+              </div>
             )}
             <div className="flex gap-2">
               <button

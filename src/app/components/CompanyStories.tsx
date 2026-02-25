@@ -180,7 +180,7 @@ const CompanyStories: React.FC<CompanyStoriesProps> = ({ companyId }) => {
               } 
               // Caso 2: Objeto serializado do Firestore (pode ter _seconds ou seconds)
               else if (typeof story.expiresAt === 'object' && story.expiresAt !== null) {
-                const expiresAtObj = story.expiresAt as any;
+                const expiresAtObj = story.expiresAt as { _seconds?: number; seconds?: number; _nanoseconds?: number; nanoseconds?: number; toMillis?: () => number };
                 // Tentar _seconds primeiro (formato Admin SDK serializado)
                 if (expiresAtObj._seconds !== undefined) {
                   expiresAtMillis = expiresAtObj._seconds * 1000 + (expiresAtObj._nanoseconds || 0) / 1000000;
@@ -234,7 +234,7 @@ const CompanyStories: React.FC<CompanyStoriesProps> = ({ companyId }) => {
               if (typeof a.createdAt.toMillis === 'function') {
                 aTime = a.createdAt.toMillis();
               } else if (typeof a.createdAt === 'object' && a.createdAt !== null) {
-                const createdAtObj = a.createdAt as any;
+                const createdAtObj = a.createdAt as { _seconds?: number; seconds?: number; _nanoseconds?: number; nanoseconds?: number };
                 // Tentar _seconds primeiro (formato Admin SDK serializado)
                 if (createdAtObj._seconds !== undefined) {
                   aTime = createdAtObj._seconds * 1000 + (createdAtObj._nanoseconds || 0) / 1000000;
@@ -248,7 +248,7 @@ const CompanyStories: React.FC<CompanyStoriesProps> = ({ companyId }) => {
               if (typeof b.createdAt.toMillis === 'function') {
                 bTime = b.createdAt.toMillis();
               } else if (typeof b.createdAt === 'object' && b.createdAt !== null) {
-                const createdAtObj = b.createdAt as any;
+                const createdAtObj = b.createdAt as { _seconds?: number; seconds?: number; _nanoseconds?: number; nanoseconds?: number };
                 // Tentar _seconds primeiro (formato Admin SDK serializado)
                 if (createdAtObj._seconds !== undefined) {
                   bTime = createdAtObj._seconds * 1000 + (createdAtObj._nanoseconds || 0) / 1000000;

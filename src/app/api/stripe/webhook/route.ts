@@ -70,9 +70,9 @@ export async function POST(req: NextRequest) {
       default:
         console.log(`[WEBHOOK] Evento não tratado: ${event.type} (ID: ${event.id})`);
     }
-  } catch (error: any) {
-    const errorMessage = error?.message || "Erro desconhecido";
-    const errorStack = error?.stack || "Sem stack trace";
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+    const errorStack = error instanceof Error ? error.stack : "Sem stack trace";
     
     console.error(`[WEBHOOK] ERRO ao processar evento ${event.type} (ID: ${event.id}):`, errorMessage);
     console.error(`[WEBHOOK] Stack trace:`, errorStack);

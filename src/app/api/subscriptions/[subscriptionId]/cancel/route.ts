@@ -66,7 +66,7 @@ export async function POST(
     console.log(`[CANCEL_SUBSCRIPTION] Buscando assinatura no Firestore: ${subscriptionId}`);
 
     // IMPORTANTE: em produção, use Admin SDK para evitar "Missing or insufficient permissions"
-    let subscription: any | null = null;
+    let subscription: Record<string, unknown> | null = null;
 
     if (adminDb) {
       console.log(`[CANCEL_SUBSCRIPTION] Usando Admin SDK para ler assinatura`);
@@ -132,7 +132,7 @@ export async function POST(
     if (!stripeSubscriptionIdResolved && adminDb) {
       try {
         const userSnap = await adminDb.collection("users").doc(companyId).get();
-        const email = (userSnap.exists ? (userSnap.data() as any)?.email : undefined) as string | undefined;
+        const email = (userSnap.exists ? (userSnap.data() as Record<string, unknown>)?.email : undefined) as string | undefined;
 
         if (email) {
           console.log(`[CANCEL_SUBSCRIPTION] Tentando resolver stripeSubscriptionId via email do usuário: ${email}`);
@@ -226,7 +226,7 @@ export async function POST(
 
     // Tipagem do Stripe pode retornar Stripe.Response<Stripe.Subscription> (nem sempre expõe campos diretamente no tipo)
     const updatedSub = updatedSubscription as unknown as Stripe.Subscription;
-    const currentPeriodEnd = (updatedSub as any)?.current_period_end as number | undefined;
+    const currentPeriodEnd = (updatedSub as Stripe.Subscription).current_period_end;
 
     console.log(`[CANCEL_SUBSCRIPTION] ✅ Assinatura cancelada com sucesso no Stripe:`, {
       stripeSubscriptionId: updatedSub.id,

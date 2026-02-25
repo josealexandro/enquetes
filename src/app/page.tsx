@@ -10,7 +10,7 @@ import { useAuth } from "./context/AuthContext";
 import { motion } from "framer-motion";
 import { AnimatePresence } from "framer-motion"; // Importar AnimatePresence
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
-import { collection, query, orderBy, updateDoc, deleteDoc, doc, getDoc, Timestamp, limit, startAfter, getDocs, where, QueryDocumentSnapshot, DocumentData, arrayUnion } from "firebase/firestore";
+import { collection, query, orderBy, updateDoc, deleteDoc, doc, getDoc, Timestamp, limit, startAfter, getDocs, where, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import { useRouter } from 'next/navigation';
 import PollPodium from "./components/PollPodium";
 import slugify from "@/utils/slugify";
@@ -84,7 +84,7 @@ export default function Home() {
           creatorCommercialName = userData.commercialName || undefined;
           creatorThemeColor = userData.themeColor || undefined;
         }
-      } catch (error) {
+      } catch {
         // Erro ao buscar dados do criador não deve quebrar o processamento da enquete
         // Os dados já existentes na enquete serão usados como fallback
       }
@@ -108,13 +108,11 @@ export default function Home() {
     
     // Remover campos que vamos sobrescrever do spread para evitar conflitos
     // Usar variáveis descartáveis para evitar conflitos de nome
-    const { 
-      isCommercial: _isCommercialFromData, 
-      options: _optionsFromData, 
-      creator: _creatorFromData, 
-      createdAt: _createdAtFromData, 
-      ...restData 
-    } = data;
+    const restData = { ...data };
+    delete (restData as Record<string, unknown>).isCommercial;
+    delete (restData as Record<string, unknown>).options;
+    delete (restData as Record<string, unknown>).creator;
+    delete (restData as Record<string, unknown>).createdAt;
     
     return {
       id: docSnap.id,
@@ -508,15 +506,12 @@ export default function Home() {
         });
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao votar:", error);
-      
-      // Se o erro for de permissão, não mostrar erro ao usuário
-      // O onSnapshot vai atualizar se funcionou
-      if (error?.code === 'permission-denied') {
+      const code = error && typeof error === "object" && "code" in error ? (error as { code: string }).code : undefined;
+      if (code === "permission-denied") {
         return;
       }
-      
       alert("Erro ao registrar voto. Tente novamente.");
       // Reverter a UI se o voto falhar
       const updateState = (prevPolls: Poll[]) =>
@@ -734,7 +729,7 @@ export default function Home() {
                 {showCitySuggestions && citySearchQuery.trim() && citySuggestions.length === 0 && (
                   <div className="absolute top-full left-0 mt-2 bg-white dark:bg-zinc-800 rounded-lg shadow-lg z-50 border border-zinc-300 dark:border-zinc-700 min-w-[250px] p-4">
                     <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                      Nenhuma cidade encontrada com "{citySearchQuery}"
+                      Nenhuma cidade encontrada com &quot;{citySearchQuery}&quot;
                     </p>
                   </div>
                 )}

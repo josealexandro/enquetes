@@ -12,7 +12,7 @@ export default function DashboardPaymentHandler({ onPaymentSuccess }: DashboardP
   const searchParams = useSearchParams();
   const router = useRouter();
   const { refreshUserData, user } = useAuth();
-  const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
+  const [, setIsCheckingSubscription] = useState(false);
   const [subscriptionConfirmed, setSubscriptionConfirmed] = useState(false);
 
   useEffect(() => {

@@ -4,7 +4,7 @@ import PollCard from "../components/PollCard";
 import { Poll, PollOption } from "../types/poll";
 import { useState, useEffect, useCallback } from "react"; // Importar useCallback
 import { db } from "@/lib/firebase";
-import { collection, query, orderBy, updateDoc, deleteDoc, doc, where, arrayUnion, getDoc, getDocs, limit, startAfter, QueryDocumentSnapshot, DocumentData, Timestamp } from "firebase/firestore";
+import { collection, query, orderBy, deleteDoc, doc, where, getDoc, getDocs, limit, startAfter, QueryDocumentSnapshot, DocumentData, Timestamp } from "firebase/firestore";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
 import PollPodium from "../components/PollPodium";
@@ -256,9 +256,9 @@ export default function EnquetesPage() {
         if (polls.some(p => p.id === pollId)) setPolls(prev => updateListWithServerData(prev));
         if (podiumPolls.some(p => p.id === pollId)) setPodiumPolls(prev => updateListWithServerData(prev));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao votar:", error);
-      alert(error.message || "Erro ao registrar voto. Tente novamente.");
+      alert(error instanceof Error ? error.message : "Erro ao registrar voto. Tente novamente.");
       // Reverter atualização otimista
       const revertList = (list: Poll[]) => list.map(p => 
         p.id === pollId ? pollToUpdate : p

@@ -17,7 +17,7 @@ import QRCode from "react-qr-code"; // Importar QRCode
 import PollResults from "./PollResults"; // Importar componente de resultados de enquete
 import { Story } from "../types/story"; // Importar tipo Story
 import { CreateStoryInput } from "../types/story"; // Importar tipo CreateStoryInput
-import { BRAZIL_STATES, BRAZIL_REGIONS, getStatesByRegion } from "@/app/data/brazilLocations"; // Importar dados de localização
+import { BRAZIL_REGIONS, getStatesByRegion } from "@/app/data/brazilLocations"; // Importar dados de localização
 // Removido: import { UserInfo, User } from "firebase/auth"; // Removido: UserInfo e User não são necessários aqui
 // Removido: import { AuthContextType } from "../context/AuthContext"; // Removido: AuthContextType não é necessário ser importado diretamente para o tipo CustomUser
 
@@ -28,6 +28,9 @@ interface DashboardProps {
   polls: Poll[];
   user: Exclude<CustomUser, null>; // Usar o tipo CustomUser e garantir que não é nulo
 }
+
+/** Planos que têm acesso à análise de resultados (gráficos, relatório) no dashboard */
+const PLANS_WITH_ANALYSIS = ["medium", "pro"];
 
 /** URLs que não são imagens (ex.: link WhatsApp) não podem ser usadas no next/image */
 function isInvalidImageUrl(url: string | undefined): boolean {
@@ -70,9 +73,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
   const [bannerPreviewUrl, setBannerPreviewUrl] = useState<string | null>(null); // Novo estado para a URL de pré-visualização do banner
   const [showQrCodeModal, setShowQrCodeModal] = useState(false); // Estado para controlar a visibilidade do modal QR Code
   const [companyPublicPageUrl, setCompanyPublicPageUrl] = useState(""); // Estado para armazenar o URL da página pública da empresa
-  const [subscription, setSubscription] = useState<any>(null); // Estado para armazenar dados da assinatura
-  const [isCancelling, setIsCancelling] = useState(false); // Estado para controlar o loading do cancelamento
-  const [showCancelSubscriptionModal, setShowCancelSubscriptionModal] = useState(false); // Modal de confirmação de cancelamento
+  const [subscription, setSubscription] = useState<Record<string, unknown> | null>(null); // Estado para armazenar dados da assinatura
   // Novos estados para as informações do rodapé
   const [editedAboutUs, setEditedAboutUs] = useState(user.aboutUs || "");
   const [editedContactEmail, setEditedContactEmail] = useState(user.contactEmail || "");
@@ -101,6 +102,14 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
 
   // Gerar o slug da empresa aqui para passar para o PollCard
   const companySlug = user?.commercialName ? slugify(user.commercialName) : undefined;
+
+  // Análise (gráficos e relatório) só para planos Medium e Pro com assinatura ativa
+  const canShowAnalysis = Boolean(
+    subscription &&
+    (subscription.status === "ACTIVE" || subscription.status === "TRIALING") &&
+    subscription.planSnapshot?.slug &&
+    PLANS_WITH_ANALYSIS.includes(subscription.planSnapshot.slug)
+  );
 
   // Inicializa editedCompanyName com o displayName do usuário quando o componente é montado ou o usuário muda
   useEffect(() => {
@@ -439,7 +448,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       const userDocRef = doc(db, "users", user.uid);
       
       // Garantir que apenas campos permitidos sejam enviados
-      const firestoreUpdateData: Record<string, any> = {};
+      const firestoreUpdateData: Record<string, unknown> = {};
       
       // DOCUMENTAÇÃO: Atualiza displayName e commercialName juntos para contas comerciais
       // Isso garante que Header e outros componentes usem o nome correto
@@ -544,8 +553,8 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
         }
       } else {
         // Verificar se é um erro do Firestore
-        const firestoreError = error as any;
-        if (firestoreError?.code === 'permission-denied') {
+        const firestoreError = error && typeof error === "object" && "code" in error ? (error as { code: string }) : null;
+        if (firestoreError?.code === "permission-denied") {
           setFeedbackMessage("Erro de permissão: Verifique se você está logado e tem permissão para atualizar seu perfil.");
         } else {
           console.error("Erro desconhecido ao atualizar perfil:", error);
@@ -672,9 +681,9 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
           setStories(storiesData.stories);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao criar story:", error);
-      setStoryFeedback({ message: error.message || "Erro ao criar story. Tente novamente.", type: "error" });
+      setStoryFeedback({ message: error instanceof Error ? error.message : "Erro ao criar story. Tente novamente.", type: "error" });
     } finally {
       setCreatingStory(false);
       setTimeout(() => setStoryFeedback(null), 5000);
@@ -728,14 +737,12 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       // Atualizar lista local
       setStories(stories.filter(s => s.id !== storyId));
       setStoryFeedback({ message: "Story excluído com sucesso.", type: "success" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[handleDeleteStory] Erro ao excluir story:", error);
-      
-      // Tratamento específico para erros
       let errorMessage = "Erro ao excluir story. Tente novamente.";
-      if (error?.message) {
+      if (error instanceof Error) {
         errorMessage = error.message;
-      } else if (error?.code === "not-found") {
+      } else if (error && typeof error === "object" && "code" in error && (error as { code: string }).code === "not-found") {
         errorMessage = "Story não encontrado. Pode já ter sido excluído.";
       }
       
@@ -775,9 +782,9 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       setFeedbackMessage("Voto registrado com sucesso!");
       setFeedbackType("success");
       setTimeout(() => setFeedbackMessage(null), 3000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao votar:", error);
-      setFeedbackMessage(error.message || "Erro ao registrar voto. Tente novamente.");
+      setFeedbackMessage(error instanceof Error ? error.message : "Erro ao registrar voto. Tente novamente.");
       setFeedbackType("error");
       setTimeout(() => setFeedbackMessage(null), 3000);
     }
@@ -807,102 +814,8 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     }
   };
 
-  // DOCUMENTAÇÃO: Função para cancelar assinatura (chamada após confirmação no modal)
-  // Cancela a assinatura no Stripe, que atualiza o Firestore via webhook
-  const handleCancelSubscription = async () => {
-    if (!subscription?.id) {
-      setFeedbackMessage("Assinatura não encontrada.");
-      setFeedbackType("error");
-      setTimeout(() => setFeedbackMessage(null), 3000);
-      return;
-    }
-
-    setShowCancelSubscriptionModal(false);
-    setIsCancelling(true);
-    setFeedbackMessage(null);
-
-    try {
-      const response = await fetch(`/api/subscriptions/${subscription.id}/cancel`, {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || "Erro ao cancelar assinatura.");
-      }
-
-      setFeedbackMessage("Assinatura cancelada com sucesso! Ela será encerrada ao final do período atual.");
-      setFeedbackType("success");
-      
-      // Atualizar dados da assinatura após alguns segundos
-      setTimeout(async () => {
-        try {
-          const subResponse = await fetch(`/api/subscriptions?companyId=${user.uid}`);
-          if (subResponse.ok) {
-            const subData = await subResponse.json();
-            setSubscription(subData.subscription);
-          }
-        } catch (error) {
-          console.error("Erro ao atualizar dados da assinatura:", error);
-        }
-      }, 2000);
-    } catch (error) {
-      console.error("Erro ao cancelar assinatura:", error);
-      setFeedbackMessage(
-        error instanceof Error ? error.message : "Erro ao cancelar assinatura. Tente novamente."
-      );
-      setFeedbackType("error");
-    } finally {
-      setIsCancelling(false);
-      setTimeout(() => setFeedbackMessage(null), 5000);
-    }
-  };
-
   return (
     <div className="dashboard-container">
-      {/* Modal de confirmação de cancelamento de assinatura */}
-      {showCancelSubscriptionModal && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          onClick={() => setShowCancelSubscriptionModal(false)}
-          aria-modal="true"
-          role="dialog"
-        >
-          <div
-            className="bg-gray-800 border border-gray-600 rounded-xl shadow-xl max-w-md w-full p-6 sm:p-8"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-white">Cancelar assinatura?</h3>
-            </div>
-            <p className="text-gray-300 text-sm sm:text-base leading-relaxed mb-6">
-              Sua assinatura será cancelada ao final do período atual. Você continuará tendo acesso a todos os recursos até lá.
-            </p>
-            <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setShowCancelSubscriptionModal(false)}
-                className="px-4 py-2.5 rounded-lg font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 transition-colors"
-              >
-                Não, manter assinatura
-              </button>
-              <button
-                type="button"
-                onClick={handleCancelSubscription}
-                className="px-4 py-2.5 rounded-lg font-medium text-white bg-red-600 hover:bg-red-500 transition-colors"
-              >
-                Sim, cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Título principal - Responsivo para mobile/tablet/desktop */}
       {/* DOCUMENTAÇÃO: Título menor no mobile (text-2xl), intermediário no tablet (text-2xl), maior no desktop (text-3xl) */}
       <h2 className="text-2xl md:text-2xl lg:text-3xl font-bold mb-4 md:mb-5 lg:mb-6">
@@ -933,16 +846,6 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
           >
             Criar Enquete
           </button>
-          {/* DOCUMENTAÇÃO: Botão de cancelar assinatura - só aparece se houver assinatura ativa */}
-          {subscription && subscription.status === "ACTIVE" && !subscription.cancelAtPeriodEnd && (
-            <button
-              onClick={() => setShowCancelSubscriptionModal(true)}
-              disabled={isCancelling}
-              className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 md:py-2.5 lg:py-2.5 px-3 md:px-4 rounded-lg transition duration-300 text-xs md:text-sm lg:text-base w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isCancelling ? "Cancelando..." : "Cancelar Assinatura"}
-            </button>
-          )}
         </div>
       </div>
 
@@ -980,11 +883,17 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                   </div>
                 ))}
               </div>
-              {/* Exibir resultados da enquete selecionada */}
-              {/* DOCUMENTAÇÃO: Margem responsiva */}
+              {/* Exibir resultados da enquete selecionada (análise só para planos Medium e Pro) */}
               {selectedPollForResults && (
                 <div className="mt-4 md:mt-5 lg:mt-6">
-                  <PollResults poll={selectedPollForResults} />
+                  {canShowAnalysis ? (
+                    <PollResults poll={selectedPollForResults} />
+                  ) : (
+                    <div className="bg-gray-700/50 border border-gray-600 rounded-xl p-6 text-center">
+                      <p className="text-gray-300 mb-2">Análise de resultados disponível nos planos Medium e Pro.</p>
+                      <p className="text-sm text-gray-400">Acesse a aba Assinatura para fazer upgrade.</p>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -1051,7 +960,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                     expiresAtMillis = story.expiresAt.toMillis();
                   } else if (typeof story.expiresAt === 'object' && story.expiresAt !== null) {
                     // Formato do Admin SDK ou objeto serializado
-                    const expiresAtObj = story.expiresAt as any;
+                    const expiresAtObj = story.expiresAt as { _seconds?: number; seconds?: number; _nanoseconds?: number; nanoseconds?: number };
                     if (expiresAtObj._seconds !== undefined || expiresAtObj.seconds !== undefined) {
                       const seconds = expiresAtObj._seconds || expiresAtObj.seconds || 0;
                       const nanoseconds = expiresAtObj._nanoseconds || expiresAtObj.nanoseconds || 0;

@@ -54,8 +54,53 @@ export function calculatePollStatistics(options: PollOption[]): PollStatistics {
 }
 
 /**
+ * Gera recomendações acionáveis com base nas estatísticas da enquete.
+ * DOCUMENTAÇÃO: Retorna array de ações práticas; usa percentageDifference e totalVotes já calculados.
+ */
+function getRecommendations(stats: PollStatistics): string[] {
+  const { totalVotes, mostVoted, leastVoted, percentageDifference, optionsWithStats } = stats;
+  const recommendations: string[] = [];
+
+  if (totalVotes === 0) return recommendations;
+
+  const leastVotedPercentage = optionsWithStats.find((opt) => opt.option.id === leastVoted.id)?.percentage ?? 0;
+
+  // Poucos votos: recomendar divulgar antes de decidir
+  if (totalVotes < 5) {
+    recommendations.push("Divulgar a enquete para mais pessoas antes de tomar decisões, para ter uma amostra mais representativa.");
+    return recommendations;
+  }
+
+  // Disputa muito equilibrada (diferença ≤ 10%)
+  if (stats.optionsWithStats.length >= 2 && percentageDifference <= 10) {
+    recommendations.push("Segmentar a comunicação: destacar pontos fortes diferentes por canal ou público, em vez de uma mensagem única.");
+    recommendations.push("Aprofundar com nova enquete ou entrevistas qualitativas para entender qual fator pesa mais na decisão.");
+    recommendations.push("Aproveitar o equilíbrio na mensagem: reforçar que a oferta atende a múltiplas necessidades (ex.: bom custo-benefício e recursos).");
+    return recommendations;
+  }
+
+  // Vantagem moderada (entre 10% e 30%)
+  if (stats.optionsWithStats.length >= 2 && percentageDifference > 10 && percentageDifference <= 30) {
+    recommendations.push(`Reforçar a opção "${mostVoted.text}" nas campanhas, mantendo a segunda opção como alternativa destacada.`);
+    recommendations.push("Acompanhar se a preferência se mantém ao longo do tempo com novas medições.");
+    return recommendations;
+  }
+
+  // Preferência clara (diferença > 30%)
+  if (stats.optionsWithStats.length >= 2 && percentageDifference > 30) {
+    recommendations.push(`Alinhar estratégia e comunicação à opção mais votada ("${mostVoted.text}"), pois há preferência clara do público.`);
+    if (leastVotedPercentage < 10) {
+      recommendations.push(`Investigar por que "${leastVoted.text}" teve pouca adesão: se é falta de divulgação ou se o público realmente prioriza outros fatores.`);
+    }
+    return recommendations;
+  }
+
+  return recommendations;
+}
+
+/**
  * Gera relatório textual automático baseado nas estatísticas
- * DOCUMENTAÇÃO: Função pura que gera texto interpretativo sem usar IA
+ * DOCUMENTAÇÃO: Função pura que gera texto interpretativo sem usar IA; inclui recomendações acionáveis ao final.
  */
 export function generatePollReport(
   pollTitle: string,
@@ -101,7 +146,16 @@ export function generatePollReport(
 
   // Análise da opção menos votada
   if (leastVotedPercentage < 5 && totalVotes > 20) {
-    report += `**Observação:** A opção "${leastVoted.text}" teve baixa relevância (${leastVotedPercentage.toFixed(1)}%), indicando pouca preferência dos participantes.`;
+    report += `**Observação:** A opção "${leastVoted.text}" teve baixa relevância (${leastVotedPercentage.toFixed(1)}%), indicando pouca preferência dos participantes.\n\n`;
+  }
+
+  // Recomendações acionáveis (lista numerada)
+  const recommendations = getRecommendations(stats);
+  if (recommendations.length > 0) {
+    report += `### Recomendações\n\n`;
+    recommendations.forEach((text, index) => {
+      report += `${index + 1}. ${text}\n`;
+    });
   }
 
   return report;

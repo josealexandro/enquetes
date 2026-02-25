@@ -72,6 +72,29 @@ export interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Converte erros do Firebase Auth em mensagens amigáveis (não expõe "auth/invalid-credential" etc.) */
+function getFriendlyAuthErrorMessage(error: unknown, defaultMessage: string): string {
+  if (error && typeof error === "object" && "code" in error) {
+    const code = (error as { code: string }).code;
+    const map: Record<string, string> = {
+      "auth/invalid-credential": "Email ou senha incorretos.",
+      "auth/invalid-email": "Formato de e-mail inválido.",
+      "auth/user-disabled": "Esta conta foi desabilitada.",
+      "auth/user-not-found": "Email ou senha incorretos.",
+      "auth/wrong-password": "Email ou senha incorretos.",
+      "auth/too-many-requests": "Muitas tentativas. Tente novamente mais tarde.",
+      "auth/popup-closed-by-user": "Login cancelado.",
+      "auth/popup-blocked": "Popup bloqueado. Permita popups para este site.",
+    };
+    return map[code] ?? defaultMessage;
+  }
+  const msg = error instanceof Error ? error.message : "";
+  if (msg.includes("auth/invalid-credential") || msg.includes("Firebase: Error (auth/")) {
+    return defaultMessage;
+  }
+  return defaultMessage;
+}
+
 interface AuthProviderProps {
   children: ReactNode;
 }
@@ -216,9 +239,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       setFirebaseAuthUser(userCredential.user); // Armazenar o objeto User original após login
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
-      console.error("Erro ao fazer login:", errorMessage);
-      throw new Error(errorMessage || "Email ou senha incorretos."); // Mensagem amigável ao usuário
+      const friendlyMessage = getFriendlyAuthErrorMessage(error, "Email ou senha incorretos.");
+      if (process.env.NODE_ENV === "development") {
+        console.warn("Login falhou:", friendlyMessage);
+      }
+      throw new Error(friendlyMessage);
     } finally {
       setLoading(false);
     }
@@ -251,9 +276,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         await setDoc(userDocRef, userDataToSave);
       }
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
-      console.error("Erro ao fazer login com Google:", errorMessage);
-      throw new Error(errorMessage || "Erro ao fazer login com Google. Tente novamente.");
+      const friendlyMessage = getFriendlyAuthErrorMessage(error, "Erro ao fazer login com Google. Tente novamente.");
+      if (process.env.NODE_ENV === "development") {
+        console.warn("Login com Google falhou:", friendlyMessage);
+      }
+      throw new Error(friendlyMessage);
     } finally {
       setLoading(false);
     }
@@ -267,18 +294,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // O Firebase envia automaticamente um email com link para redefinir a senha
       await sendPasswordResetEmail(auth, email);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
-      console.error("Erro ao enviar email de recuperação:", errorMessage);
-      // Tratar erros específicos do Firebase
-      if (error instanceof Error && 'code' in error) {
-        const firebaseError = error as { code: string; message: string };
-        if (firebaseError.code === 'auth/user-not-found') {
+      const defaultMsg = "Erro ao enviar email de recuperação. Tente novamente.";
+      if (error && typeof error === "object" && "code" in error) {
+        const code = (error as { code: string }).code;
+        if (code === "auth/user-not-found") {
           throw new Error("Email não encontrado. Verifique se o email está correto.");
-        } else if (firebaseError.code === 'auth/invalid-email') {
+        }
+        if (code === "auth/invalid-email") {
           throw new Error("Formato de email inválido.");
         }
       }
-      throw new Error(errorMessage || "Erro ao enviar email de recuperação. Tente novamente.");
+      const friendlyMessage = getFriendlyAuthErrorMessage(error, defaultMsg);
+      if (process.env.NODE_ENV === "development") {
+        console.warn("Recuperação de senha falhou:", friendlyMessage);
+      }
+      throw new Error(friendlyMessage);
     } finally {
       setLoading(false);
     }

@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     const hasDisliked = currentDislikedBy.includes(userId);
 
     // Preparar atualizações
-    const updates: any = {};
+    const updates: Record<string, unknown> = {};
 
     if (action === "like") {
       if (hasLiked) {
@@ -142,12 +142,12 @@ export async function POST(request: NextRequest) {
         dislikedBy: updatedData?.dislikedBy || [],
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[LIKE_POLL] Erro ao curtir/descurtir enquete:", error);
     return NextResponse.json(
       {
         message: "Erro ao curtir/descurtir enquete.",
-        error: error?.message || "UNKNOWN_ERROR",
+        error: error instanceof Error ? error.message : "UNKNOWN_ERROR",
       },
       { status: 500 }
     );

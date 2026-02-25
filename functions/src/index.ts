@@ -26,14 +26,14 @@ export const voteOnPoll = functions.https.onCall(async (data, context) => {
       if (!snap.exists) {
         throw new functions.https.HttpsError('not-found', 'Poll not found');
       }
-      const poll = snap.data() as any;
+      const poll = snap.data() as { votedBy?: string[]; options?: { id?: string; votes?: number }[] };
       const votedBy: string[] = poll.votedBy || [];
       if (votedBy.includes(uid)) {
         throw new functions.https.HttpsError('failed-precondition', 'User has already voted');
       }
 
       const options = poll.options || [];
-      const idx = options.findIndex((o: any) => o.id === optionId);
+      const idx = options.findIndex((o: { id?: string }) => o.id === optionId);
       if (idx === -1) {
         throw new functions.https.HttpsError('invalid-argument', 'Option not found');
       }
@@ -49,7 +49,7 @@ export const voteOnPoll = functions.https.onCall(async (data, context) => {
     });
 
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof functions.https.HttpsError) throw err;
     console.error('voteOnPoll error', err);
     throw new functions.https.HttpsError('internal', 'Erro ao processar voto');

@@ -1,0 +1,7 @@
+# Regras do projeto Engaaja
+
+## Regra principal
+- **Nunca quebrar o sistema.** Qualquer alteração deve preservar o que já funciona. Em dúvida, priorizar o comportamento atual.
+
+## Complexidade e lógica
+- **Não criar nada complexo fora da lógica de funcionamento do sistema.** Evoluir dentro do padrão e do fluxo que o projeto já usa, sem introduzir arquiteturas ou regras novas que destoem do resto.

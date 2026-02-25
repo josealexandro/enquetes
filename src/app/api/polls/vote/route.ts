@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar se a opção existe
     const options = pollData.options || [];
-    const optionIndex = options.findIndex((opt: any) => opt.id === optionId);
+    const optionIndex = options.findIndex((opt: { id?: string }) => opt.id === optionId);
     
     if (optionIndex === -1) {
       return NextResponse.json(
@@ -117,12 +117,12 @@ export async function POST(request: NextRequest) {
         votedBy: updatedData?.votedBy || [],
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[VOTE_POLL] Erro ao votar:", error);
     return NextResponse.json(
       {
         message: "Erro ao registrar voto.",
-        error: error?.message || "UNKNOWN_ERROR",
+        error: error instanceof Error ? error.message : "UNKNOWN_ERROR",
       },
       { status: 500 }
     );

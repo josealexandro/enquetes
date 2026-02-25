@@ -30,7 +30,6 @@ import {
   SubscriptionStatus,
   Payment,
   PaymentStatus,
-  SubscriptionAudit,
 } from "@/app/types/subscription";
 
 // Helper functions para criar referências de coleção apenas quando necessário
@@ -193,10 +192,10 @@ export async function getSubscriptionByCompany(companyId: string) {
     }
 
     return subscriptionData as Subscription;
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Se for erro de permissão, retornar null em vez de lançar erro
     // Isso permite que a aplicação continue funcionando mesmo sem assinatura
-    if (error?.code === 'permission-denied') {
+    if (error && typeof error === "object" && "code" in error && (error as { code: string }).code === "permission-denied") {
       console.error("[getSubscriptionByCompany] Erro de permissão ao buscar assinatura:", error);
       console.error("[getSubscriptionByCompany] Dica: Verifique se Admin SDK está configurado corretamente para webhooks");
       return null;
@@ -359,9 +358,6 @@ export async function updateSubscriptionStatus(
   status: SubscriptionStatus,
   options?: { notes?: string; actorId?: string; actorName?: string; invoiceId?: string }
 ) {
-  let currentStatus: SubscriptionStatus;
-  let subscriptionData: Subscription | null = null;
-
   // Buscar assinatura atual (sempre usa Client SDK para leitura, pois é seguro)
   const subscriptionRef = doc(getSubscriptionsCollection(), subscriptionId);
   const subscriptionSnap = await getDoc(subscriptionRef);
@@ -370,8 +366,8 @@ export async function updateSubscriptionStatus(
     throw new Error("Assinatura não encontrada.");
   }
 
-  subscriptionData = subscriptionSnap.data() as Subscription;
-  currentStatus = subscriptionData.status;
+  const subscriptionData = subscriptionSnap.data() as Subscription;
+  const currentStatus = subscriptionData.status;
 
   // Usar Admin SDK se disponível (contexto de backend/webhook)
   if (adminDb) {
@@ -455,7 +451,7 @@ export interface RecordPaymentInput {
  * @returns ID do pagamento registrado
  */
 export async function recordPayment(input: RecordPaymentInput) {
-  const paymentData: any = {
+  const paymentData: Record<string, unknown> = {
     id: "", // Será definido abaixo
     subscriptionId: input.subscriptionId,
     invoiceId: input.invoiceId,
@@ -523,7 +519,7 @@ export async function logSubscriptionChange(input: LogSubscriptionChangeInput) {
   // Criar createdAt com o tipo apropriado dependendo do contexto
   const createdAt = adminDb ? admin.firestore.Timestamp.now() : Timestamp.now();
   
-  const auditData: any = {
+  const auditData: Record<string, unknown> = {
     id: "", // Será definido abaixo
     subscriptionId: input.subscriptionId,
     actorId: input.actorId,
@@ -533,7 +529,7 @@ export async function logSubscriptionChange(input: LogSubscriptionChangeInput) {
     fromStatus: input.fromStatus,
     toStatus: input.toStatus,
     notes: input.notes,
-    createdAt: createdAt as any, // Usar 'as any' para evitar conflito de tipos entre Admin SDK e Client SDK
+    createdAt,
   };
 
   // Usar Admin SDK se disponível (contexto de backend/webhook)
@@ -771,7 +767,7 @@ export async function countPollsCreatedInCurrentPeriod(companyId: string): Promi
 
     const snapshot = await getDocs(logsQuery);
     return snapshot.size;
-  } catch (error: any) {
+  } catch (error: unknown) {
     // REMOVIDO: Fallback perigoso que contava enquetes existentes
     // Isso permitia bypass ao deletar enquetes
     // 
@@ -826,7 +822,7 @@ export async function recordPollCreation(userId: string, pollId: string) {
       pollId: pollId,
       createdAt: serverTimestamp(),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Se falhar ao criar o log, não deve quebrar a criação da enquete
     // O log é importante para o limite, mas não é crítico para a funcionalidade básica
     console.error("Erro ao registrar log de criação de enquete (não crítico):", error);

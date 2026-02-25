@@ -29,6 +29,18 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'engaaja.com.br',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.engaaja.com.br',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   /* config options here */

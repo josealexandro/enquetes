@@ -95,7 +95,7 @@ export default function PollResults({ poll }: PollResultsProps) {
     return (
       <div className="flex flex-col items-center">
         <svg width={size} height={size} className="mb-4">
-          {arcs.map((arc, index) => (
+          {arcs.map((arc) => (
             <path
               key={arc.option.id}
               d={arc.path}
@@ -108,7 +108,7 @@ export default function PollResults({ poll }: PollResultsProps) {
         </svg>
         {/* Legenda do gráfico */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-md">
-          {arcs.map((arc, index) => (
+          {arcs.map((arc) => (
             <div key={arc.option.id} className="flex items-center gap-2 text-sm">
               <div
                 className="w-4 h-4 rounded"
@@ -247,7 +247,6 @@ export default function PollResults({ poll }: PollResultsProps) {
                 <svg width="200" height="200" style="margin-bottom: 16px;">
                   ${(() => {
                     if (stats.totalVotes === 0) return '';
-                    const size = 200;
                     const radius = 90;
                     const center = 100;
                     let currentAngle = -90;
@@ -268,7 +267,7 @@ export default function PollResults({ poll }: PollResultsProps) {
                       currentAngle = endAngle;
                       return { path: pathData, color: colors[index % colors.length], percentage, option: item.option };
                     });
-                    return arcs.map((arc, idx) => 
+                    return arcs.map((arc) => 
                       '<path d="' + arc.path + '" fill="' + arc.color + '" stroke="#ffffff" stroke-width="2" />'
                     ).join('');
                   })()}

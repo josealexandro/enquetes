@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     // Usar Admin SDK se disponível
     let storyId: string;
-    let createdStory: any;
+    let createdStory: Record<string, unknown>;
     
     if (adminDb) {
       // Admin SDK: usar AdminTimestamp
@@ -220,7 +220,7 @@ export async function GET(request: NextRequest) {
 
     // DOCUMENTAÇÃO: Buscar stories ativos
     // Filtrar apenas stories onde expiresAt > now
-    const stories: any[] = [];
+    const stories: Record<string, unknown>[] = [];
 
     if (adminDb) {
       // Usar Admin SDK se disponível

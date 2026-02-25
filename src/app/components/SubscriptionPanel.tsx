@@ -234,11 +234,13 @@ const SubscriptionPanel = ({
   companyId,
   companyName,
 }: SubscriptionPanelProps) => {
-  const { plans, subscription, payments, loading, error } =
+  const { plans, subscription, payments, loading, error, refetch } =
     useSubscriptionData(companyId, { enabled: !!companyId });
 
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   
   // Estado para contador de enquetes
   const [pollsCount, setPollsCount] = useState<{
@@ -305,51 +307,25 @@ const SubscriptionPanel = ({
     }
   };
 
-  const createOrSwitchSubscription = async (plan: Plan) => {
-    const isSwitching = Boolean(subscription);
-    if (isSwitching && !subscription?.id) {
-      throw new Error("Não foi possível identificar a assinatura atual para alteração.");
-    }
-    const subscriptionId = subscription?.id;
-    if (isSwitching && !subscriptionId) {
-      throw new Error("Não foi possível identificar a assinatura atual para alteração.");
-    }
-    const endpoint = isSwitching && subscriptionId
-      ? `/api/subscriptions/${subscriptionId}/plan`
-      : "/api/subscriptions";
-    const method = isSwitching ? "PATCH" : "POST";
-    const payload = isSwitching
-      ? {
-          planId: plan.id,
-          actorId: companyId,
-          actorName: companyName,
-        }
-      : {
-          planId: plan.id,
-          companyId,
-          companyName,
-        };
-
-    const response = await fetch(endpoint, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      let backendMessage = "";
-      try {
-        const data = await response.json();
-        backendMessage =
-          typeof data?.message === "string" ? ` Detalhe: ${data.message}` : "";
-      } catch {
-        // ignore parse errors
-      }
-      throw new Error(
-        `Falha ao registrar solicitação (código ${response.status}). Tente novamente.${backendMessage}`
-      );
+  const handleCancelSubscription = async () => {
+    if (!subscription?.id) return;
+    setShowCancelModal(false);
+    setIsCancelling(true);
+    setAlert(null);
+    try {
+      const response = await fetch(`/api/subscriptions/${subscription.id}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Erro ao cancelar.");
+      setAlert({ type: "success", message: "Assinatura será cancelada ao final do período atual. Você continua com acesso até lá." });
+      await refetch();
+    } catch (err) {
+      setAlert({ type: "error", message: err instanceof Error ? err.message : "Erro ao cancelar. Tente novamente." });
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -474,7 +450,7 @@ const SubscriptionPanel = ({
                     </button>
                   </div>
                   <p className="text-xs text-gray-500 mb-2">
-                    Clique em "Atualizar" para ver o contador mais recente
+                    Clique em &quot;Atualizar&quot; para ver o contador mais recente
                   </p>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -517,6 +493,42 @@ const SubscriptionPanel = ({
           )}
         </div>
       </section>
+
+      {/* Modal de confirmação de cancelamento */}
+      {showCancelModal && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowCancelModal(false)}
+          aria-modal="true"
+          role="dialog"
+        >
+          <div
+            className="bg-gray-800 border border-gray-600 rounded-xl shadow-xl max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-white mb-2">Cancelar assinatura?</h3>
+            <p className="text-gray-300 text-sm mb-6">
+              Sua assinatura será cancelada ao final do período atual. Você continuará com acesso até lá.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600"
+              >
+                Manter assinatura
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelSubscription}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-500"
+              >
+                Sim, cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {alert && (
         <div className={`border rounded-xl px-4 py-3 ${alertStyles[alert.type]}`}>
@@ -602,6 +614,19 @@ const SubscriptionPanel = ({
             );
           })}
         </div>
+        {/* Link discreto para cancelar assinatura: ao final da seção Planos disponíveis */}
+        {subscription?.status === "ACTIVE" && !subscription.cancelAtPeriodEnd && (
+          <div className="mt-6 pt-4 border-t border-gray-700 text-center">
+            <button
+              type="button"
+              onClick={() => setShowCancelModal(true)}
+              disabled={isCancelling}
+              className="text-xs text-gray-500 hover:text-gray-400 transition-colors disabled:opacity-50"
+            >
+              {isCancelling ? "Cancelando..." : "Cancelar assinatura no final do período"}
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="bg-gray-800 rounded-xl p-6 border border-gray-700">
