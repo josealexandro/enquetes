@@ -115,7 +115,7 @@ export async function POST(
       status: subscription?.status,
     });
 
-    if (!companyId) {
+    if (!companyId || typeof companyId !== "string") {
       console.error(`[CANCEL_SUBSCRIPTION] Assinatura sem companyId: ${subscriptionId}`);
       return NextResponse.json(
         { message: "Assinatura sem companyId associado." },
