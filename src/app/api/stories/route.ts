@@ -298,9 +298,10 @@ export async function GET(request: NextRequest) {
       });
 
       // Ordenar por createdAt (mais recente primeiro) e limitar a 2
+      type WithCreatedAt = { createdAt?: { toMillis?: () => number } };
       stories.sort((a, b) => {
-        const aTime = a.createdAt?.toMillis?.() || 0;
-        const bTime = b.createdAt?.toMillis?.() || 0;
+        const aTime = (a as WithCreatedAt).createdAt?.toMillis?.() ?? 0;
+        const bTime = (b as WithCreatedAt).createdAt?.toMillis?.() ?? 0;
         return bTime - aTime;
       });
       stories.splice(2); // Limitar a 2 stories
