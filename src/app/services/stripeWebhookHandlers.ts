@@ -246,8 +246,8 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
  */
 export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const { customer: stripeCustomerId, total, status, id: invoiceId } = invoice;
-  const rawSub = invoice.subscription;
-  const stripeSubscriptionId = typeof rawSub === "string" ? rawSub : (rawSub as { id?: string })?.id;
+  const rawSub = (invoice as unknown as { subscription?: string | { id?: string } }).subscription;
+  const stripeSubscriptionId = typeof rawSub === "string" ? rawSub : rawSub?.id;
 
   if (!stripeSubscriptionId || typeof stripeSubscriptionId !== 'string') {
     console.warn("Invoice paid event sem stripeSubscriptionId válido:", invoiceId);

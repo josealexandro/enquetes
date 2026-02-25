@@ -104,11 +104,12 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
   const companySlug = user?.commercialName ? slugify(user.commercialName) : undefined;
 
   // Análise (gráficos e relatório) só para planos Medium e Pro com assinatura ativa
+  const sub = subscription as { status?: string; planSnapshot?: { slug?: string } } | null;
   const canShowAnalysis = Boolean(
-    subscription &&
-    (subscription.status === "ACTIVE" || subscription.status === "TRIALING") &&
-    subscription.planSnapshot?.slug &&
-    PLANS_WITH_ANALYSIS.includes(subscription.planSnapshot.slug)
+    sub &&
+    (sub.status === "ACTIVE" || sub.status === "TRIALING") &&
+    sub.planSnapshot?.slug &&
+    PLANS_WITH_ANALYSIS.includes(sub.planSnapshot.slug)
   );
 
   // Inicializa editedCompanyName com o displayName do usuário quando o componente é montado ou o usuário muda

@@ -224,9 +224,9 @@ export async function POST(
       cancel_at_period_end: true,
     });
 
-    // Tipagem do Stripe pode retornar Stripe.Response<Stripe.Subscription> (nem sempre expõe campos diretamente no tipo)
+    // Tipagem do Stripe pode não expor current_period_end no tipo; em runtime o objeto tem a propriedade
     const updatedSub = updatedSubscription as unknown as Stripe.Subscription;
-    const currentPeriodEnd = (updatedSub as Stripe.Subscription).current_period_end;
+    const currentPeriodEnd = (updatedSub as { current_period_end?: number }).current_period_end;
 
     console.log(`[CANCEL_SUBSCRIPTION] ✅ Assinatura cancelada com sucesso no Stripe:`, {
       stripeSubscriptionId: updatedSub.id,
