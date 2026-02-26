@@ -96,6 +96,13 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
   const [creatingStory, setCreatingStory] = useState(false); // Estado de loading ao criar story
   const [uploadingStoryImage, setUploadingStoryImage] = useState(false); // Estado de upload da imagem
   const [storyFeedback, setStoryFeedback] = useState<{ message: string; type: "success" | "error" } | null>(null); // Feedback de criação
+  const [generatingAiPoll, setGeneratingAiPoll] = useState(false);
+  const [aiPollFeedback, setAiPollFeedback] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [showAiPollModal, setShowAiPollModal] = useState(false);
+  const [aiPollTopic, setAiPollTopic] = useState("");
+  const [aiPollDraft, setAiPollDraft] = useState<{ question: string; options: string[] } | null>(null);
+  const [aiUsageRemaining, setAiUsageRemaining] = useState<number | null>(null);
+  const [publishingAiPoll, setPublishingAiPoll] = useState(false);
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
   const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -110,6 +117,12 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     (sub.status === "ACTIVE" || sub.status === "TRIALING") &&
     sub.planSnapshot?.slug &&
     PLANS_WITH_ANALYSIS.includes(sub.planSnapshot.slug)
+  );
+  // Enquete com IA apenas para plano Pro com assinatura ativa
+  const isPro = Boolean(
+    sub &&
+    (sub.status === "ACTIVE" || sub.status === "TRIALING") &&
+    sub.planSnapshot?.slug === "pro"
   );
 
   // Inicializa editedCompanyName com o displayName do usuário quando o componente é montado ou o usuário muda
@@ -791,6 +804,130 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     }
   };
 
+  const handleOpenAiPollModal = () => {
+    setAiPollTopic("");
+    setAiPollFeedback(null);
+    setAiPollDraft(null);
+    setAiUsageRemaining(null);
+    setShowAiPollModal(true);
+  };
+
+  const handleGenerateAiPoll = async () => {
+    if (!user?.uid || !firebaseAuthUser) {
+      setAiPollFeedback({ message: "Faça login para usar esta função.", type: "error" });
+      setTimeout(() => setAiPollFeedback(null), 4000);
+      return;
+    }
+    const topic = aiPollTopic.trim();
+    if (!topic) {
+      setAiPollFeedback({ message: "Digite o tema da enquete.", type: "error" });
+      setTimeout(() => setAiPollFeedback(null), 4000);
+      return;
+    }
+    setGeneratingAiPoll(true);
+    setAiPollFeedback(null);
+    try {
+      const token = await firebaseAuthUser.getIdToken();
+      const response = await fetch("/api/polls/generate-ai", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ companyId: user.uid, topic }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setAiPollFeedback({
+          message: data.message || "Não foi possível gerar a enquete. Tente novamente.",
+          type: "error",
+        });
+        setTimeout(() => setAiPollFeedback(null), 5000);
+        return;
+      }
+      setAiPollDraft({ question: data.question, options: data.options });
+      setAiUsageRemaining(typeof data.usageRemaining === "number" ? data.usageRemaining : null);
+      setAiPollFeedback(null);
+    } catch (error) {
+      console.error("Erro ao gerar enquete com IA:", error);
+      setAiPollFeedback({
+        message: "Erro ao conectar com o servidor. Tente novamente.",
+        type: "error",
+      });
+      setTimeout(() => setAiPollFeedback(null), 5000);
+    } finally {
+      setGeneratingAiPoll(false);
+    }
+  };
+
+  const handleBackToAiTopic = () => {
+    setAiPollDraft(null);
+    setAiUsageRemaining(null);
+    setAiPollFeedback(null);
+  };
+
+  const handlePublishAiPoll = async () => {
+    if (!aiPollDraft || !user?.uid) return;
+    setPublishingAiPoll(true);
+    setAiPollFeedback(null);
+    try {
+      const creatorData = {
+        name: (user.accountType === "commercial" && user.commercialName)
+          ? user.commercialName
+          : (user.displayName || user.email || "Usuário"),
+        avatarUrl: (user as { avatarUrl?: string | null }).avatarUrl || user.photoURL || "https://www.gravatar.com/avatar/?d=mp",
+        id: user.uid,
+        ...(user.commercialName && { commercialName: user.commercialName }),
+        ...(user.themeColor && { themeColor: user.themeColor }),
+      };
+      const pollLocation = {
+        ...(user.region && { region: user.region }),
+        ...(user.city && { city: user.city }),
+        ...(user.state && { state: user.state }),
+      };
+      const response = await fetch("/api/polls/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: user.uid,
+          title: aiPollDraft.question,
+          options: aiPollDraft.options,
+          category: "Geral",
+          isCommercial: true,
+          creatorData,
+          ...pollLocation,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setAiPollFeedback({
+          message: data.message || "Erro ao publicar enquete.",
+          type: "error",
+        });
+        setTimeout(() => setAiPollFeedback(null), 5000);
+        return;
+      }
+      if (data.creditsRemaining !== undefined) {
+        await refreshUserData();
+      }
+      setAiPollFeedback({ message: "Enquete publicada com sucesso!", type: "success" });
+      setTimeout(() => setAiPollFeedback(null), 3000);
+      setShowAiPollModal(false);
+      setAiPollDraft(null);
+      setAiUsageRemaining(null);
+      setAiPollTopic("");
+    } catch (error) {
+      console.error("Erro ao publicar enquete com IA:", error);
+      setAiPollFeedback({
+        message: "Erro ao conectar com o servidor. Tente novamente.",
+        type: "error",
+      });
+      setTimeout(() => setAiPollFeedback(null), 5000);
+    } finally {
+      setPublishingAiPoll(false);
+    }
+  };
+
   const handleDeletePoll = async (pollId: string) => {
     // user é garantido como não nulo aqui
     const pollToDelete = polls.find(p => p.id === pollId);
@@ -847,7 +984,24 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
           >
             Criar Enquete
           </button>
+          {isPro && (
+            <button
+              type="button"
+              onClick={handleOpenAiPollModal}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 md:py-2.5 lg:py-2.5 px-3 md:px-4 rounded-lg transition duration-300 text-xs md:text-sm lg:text-base w-full sm:w-auto"
+            >
+              Criar enquete com IA
+            </button>
+          )}
         </div>
+        {aiPollFeedback && (
+          <div
+            className={`mt-2 text-sm ${aiPollFeedback.type === "success" ? "text-green-400" : "text-red-400"}`}
+            role="alert"
+          >
+            {aiPollFeedback.message}
+          </div>
+        )}
       </div>
 
       {/* Minhas Enquetes */}
@@ -1406,6 +1560,98 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
           </div>
         </div>
       </div>
+
+      {/* Modal: tema da enquete com IA → prévia → publicar */}
+      {showAiPollModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+          <div className="bg-gray-900 p-4 sm:p-6 rounded-lg shadow-xl w-full max-w-md relative">
+            <button
+              type="button"
+              onClick={() => !generatingAiPoll && !publishingAiPoll && (setAiPollDraft(null), setAiUsageRemaining(null), setShowAiPollModal(false))}
+              className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl z-10 disabled:opacity-50"
+              aria-label="Fechar"
+              disabled={generatingAiPoll || publishingAiPoll}
+            >
+              &times;
+            </button>
+            <h4 className="text-lg font-semibold text-white mb-2">Criar enquete com IA</h4>
+
+            {!aiPollDraft ? (
+              <>
+                <p className="text-gray-400 text-sm mb-4">Qual o tema da enquete?</p>
+                <input
+                  type="text"
+                  value={aiPollTopic}
+                  onChange={(e) => setAiPollTopic(e.target.value)}
+                  placeholder="Ex.: atendimento da clínica"
+                  className="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-600 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-4"
+                  disabled={generatingAiPoll}
+                  onKeyDown={(e) => e.key === "Enter" && handleGenerateAiPoll()}
+                />
+                {aiPollFeedback && (
+                  <p className={`text-sm mb-3 ${aiPollFeedback.type === "error" ? "text-red-400" : "text-green-400"}`}>
+                    {aiPollFeedback.message}
+                  </p>
+                )}
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => !generatingAiPoll && (setAiPollDraft(null), setAiUsageRemaining(null), setShowAiPollModal(false))}
+                    className="px-4 py-2 rounded-lg bg-gray-700 text-white hover:bg-gray-600 disabled:opacity-50"
+                    disabled={generatingAiPoll}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGenerateAiPoll}
+                    disabled={generatingAiPoll}
+                    className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {generatingAiPoll ? "Gerando..." : "Gerar"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-400 text-sm mb-2">Prévia da enquete</p>
+                <p className="text-white font-medium mb-2">{aiPollDraft.question}</p>
+                <ul className="list-disc list-inside text-gray-300 text-sm mb-4 space-y-1">
+                  {aiPollDraft.options.map((opt, i) => (
+                    <li key={i}>{opt}</li>
+                  ))}
+                </ul>
+                {aiUsageRemaining !== null && (
+                  <p className="text-gray-400 text-sm mb-4">Você ainda tem {aiUsageRemaining} geração(ões) este mês.</p>
+                )}
+                {aiPollFeedback && (
+                  <p className={`text-sm mb-3 ${aiPollFeedback.type === "error" ? "text-red-400" : "text-green-400"}`}>
+                    {aiPollFeedback.message}
+                  </p>
+                )}
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={handleBackToAiTopic}
+                    disabled={generatingAiPoll}
+                    className="px-4 py-2 rounded-lg bg-gray-700 text-white hover:bg-gray-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    Gerar outra
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePublishAiPoll}
+                    disabled={publishingAiPoll}
+                    className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {publishingAiPoll ? "Publicando..." : "Publicar"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Modal de Criação de Enquete */}
       {/* DOCUMENTAÇÃO: Modal responsivo com padding ajustado para mobile */}

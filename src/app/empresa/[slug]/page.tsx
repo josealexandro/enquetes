@@ -332,9 +332,8 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
           )}
           {!isProfileImageExpanded && (
             <div className="flex flex-col ml-4 flex-grow">
-              <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight drop-shadow-md">{company.commercialName || company.displayName}</h1>
               {company.description && (
-                 <p className="text-base text-purple-100 font-semibold italic mt-1 font-permanent-marker drop-shadow-md">{company.description}</p>
+                 <p className="text-base text-purple-100 font-semibold italic font-permanent-marker drop-shadow-md">{company.description}</p>
               )}
             </div>
           )}
