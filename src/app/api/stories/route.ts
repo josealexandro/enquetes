@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, addDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import { getSubscriptionByCompany } from "@/app/services/subscriptionService";
+import { getIsAdminByCompanyId } from "@/lib/adminAuth";
 import { CreateStoryInput, Story, StoryResponse } from "@/app/types/story";
 import { Timestamp as AdminTimestamp } from "firebase-admin/firestore";
 
@@ -62,24 +63,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // DOCUMENTAÇÃO: Validação de assinatura
-    // Verificar se a empresa tem assinatura ativa (qualquer plano)
-    const subscription = await getSubscriptionByCompany(body.companyId);
+    // DOCUMENTAÇÃO: Admin pode criar stories sem assinatura (demonstração)
+    const isAdmin = await getIsAdminByCompanyId(body.companyId);
+    if (!isAdmin) {
+      // Validação de assinatura: empresa precisa ter assinatura ativa (qualquer plano)
+      const subscription = await getSubscriptionByCompany(body.companyId);
 
-    if (!subscription) {
-      return NextResponse.json<StoryResponse>(
-        { success: false, error: "Empresa não possui assinatura ativa" },
-        { status: 403 }
-      );
-    }
+      if (!subscription) {
+        return NextResponse.json<StoryResponse>(
+          { success: false, error: "Empresa não possui assinatura ativa" },
+          { status: 403 }
+        );
+      }
 
-    // Verificar se a assinatura está ativa (ACTIVE ou TRIALING)
-    const isActive = subscription.status === "ACTIVE" || subscription.status === "TRIALING";
-    if (!isActive) {
-      return NextResponse.json<StoryResponse>(
-        { success: false, error: "Assinatura não está ativa. Status: " + subscription.status },
-        { status: 403 }
-      );
+      const isActive = subscription.status === "ACTIVE" || subscription.status === "TRIALING";
+      if (!isActive) {
+        return NextResponse.json<StoryResponse>(
+          { success: false, error: "Assinatura não está ativa. Status: " + subscription.status },
+          { status: 403 }
+        );
+      }
     }
 
     // DOCUMENTAÇÃO: Validação de plano removida - todas as contas comerciais (Basic, Medium, Pro) podem criar stories
