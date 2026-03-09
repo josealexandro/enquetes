@@ -11,6 +11,7 @@ pmp-debug/
 # Misc
 .DS_Store
 *.pem
+ghp_*
 
 # Local env files (sensitive - contains API keys and secrets)
 .env

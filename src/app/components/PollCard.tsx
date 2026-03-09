@@ -6,7 +6,7 @@ import Image from "next/image";
 import CommentComponent from "./Comment";
 import CommentForm from "./CommentForm";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faShareNodes, faHeart, faHeartCrack } from '@fortawesome/free-solid-svg-icons';
+import { faShareNodes, faHeart, faHeartCrack, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
 import { motion } from "framer-motion";
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc, increment, limit } from "firebase/firestore"; // Importar funções do Firestore
@@ -479,6 +479,18 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
           </span>
           )}
         </div>
+        {!poll.rank && (
+          <div
+            className={`ml-auto flex-shrink-0 opacity-70 ${
+              poll.isCommercial && companyThemeColor
+                ? getContrastTextColor(companyThemeColor)
+                : "text-white"
+            }`}
+            aria-hidden
+          >
+            <FontAwesomeIcon icon={isExpanded ? faChevronUp : faChevronDown} className="text-sm" />
+          </div>
+        )}
         {poll.rank && (
           <motion.div
             className="ml-auto w-8 h-8 flex items-center justify-center"
