@@ -57,9 +57,9 @@ export default function Footer() {
         <div className="col-span-1">
           <h4 className="text-lg font-semibold mb-4">Contato</h4>
           <p className="text-zinc-400 text-sm flex items-center mb-2">
-            <FontAwesomeIcon icon={faEnvelope} className="mr-2" /> {dataToUse?.contactEmail || "contato@pollapp.com"}
+            <FontAwesomeIcon icon={faEnvelope} className="mr-2" /> {dataToUse?.contactEmail || "pollappvoice@gmail.com"}
           </p>
-          <p className="text-zinc-400 text-sm">{dataToUse?.address || "123 Rua Principal, Cidade, Estado"}</p>
+          <p className="text-zinc-400 text-sm">{dataToUse?.address || "Av monsenhor Ângelo sampaio, numero 570"}</p>
         </div>
 
         {/* Seção 4: Redes Sociais */}
@@ -70,10 +70,8 @@ export default function Footer() {
             {dataToUse?.instagramUrl && <a href={dataToUse.instagramUrl} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition-colors duration-200"><FontAwesomeIcon icon={faInstagram} size="lg" /></a>}
             {dataToUse?.twitterUrl && <a href={dataToUse.twitterUrl} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition-colors duration-200"><FontAwesomeIcon icon={faTwitter} size="lg" /></a>}
             {(!dataToUse?.facebookUrl && !dataToUse?.instagramUrl && !dataToUse?.twitterUrl) && (
-              <> {/* Default social media icons if no custom URLs are provided */}
-                <a href="#" className="text-zinc-400 hover:text-white transition-colors duration-200"><FontAwesomeIcon icon={faFacebookF} size="lg" /></a>
-                <a href="#" className="text-zinc-400 hover:text-white transition-colors duration-200"><FontAwesomeIcon icon={faInstagram} size="lg" /></a>
-                <a href="#" className="text-zinc-400 hover:text-white transition-colors duration-200"><FontAwesomeIcon icon={faTwitter} size="lg" /></a>
+              <> {/* Default social media icons - página principal do sistema */}
+                <a href="https://www.instagram.com/engaaja_aqui?igsh=MW9hOWlxNTN5czN5bw==" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition-colors duration-200"><FontAwesomeIcon icon={faInstagram} size="lg" /></a>
               </>
             )}
           </div>

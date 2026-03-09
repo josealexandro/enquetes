@@ -12,7 +12,7 @@ import { useAuthModal } from "@/app/context/AuthModalContext"; // Importar useAu
 import AuthPromptCard from "@/app/components/Auth/AuthPromptCard"; // Importar AuthPromptCard
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'; // Re-importar FontAwesomeIcon
 import { faFacebookF, faInstagram, faTwitter } from '@fortawesome/free-brands-svg-icons'; // Re-importar ícones de redes sociais
-// Removido: import { faEnvelope } from '@fortawesome/free-solid-svg-icons'; // Importar ícone de envelope
+import { faStar, faStarHalfStroke, faThumbsUp, faXmark } from '@fortawesome/free-solid-svg-icons'; // Ícones para avaliação
 import { useCompanyFooter } from "@/app/context/CompanyFooterContext"; // Re-importar useCompanyFooter
 import CompanyRatingInput from "@/app/components/CompanyRatingInput"; // Importar o novo componente de avaliação
 import Notification from "@/app/components/Notification"; // Importar o novo componente de notificação
@@ -99,6 +99,8 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
   const [notificationType, setNotificationType] = useState<'success' | 'error' | 'info'>('info'); // Estado para o tipo da notificação
   const [showRatingAnimation, setShowRatingAnimation] = useState(false); // Novo estado para controlar a animação das estrelas
   const [isProfileImageExpanded, setIsProfileImageExpanded] = useState(false); // Estado para controlar a expansão da imagem de perfil
+  const [recommendationPercentage, setRecommendationPercentage] = useState<number | null>(null); // Percentual de clientes que recomendam
+  const [showRatingModal, setShowRatingModal] = useState(false); // Modal de avaliação com estrelas
 
   // Removido useEffect que logava company, será logado dentro do useEffect principal
   // useEffect(() => { ... }, [company]);
@@ -153,14 +155,20 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
         // - Importante mostrar novas avaliações em tempo real
         const companyRatingsRef = collection(db, `users/${fetchedCompany.id}/ratings`);
         const unsubscribeRatings = onSnapshot(companyRatingsRef, (snapshot) => {
-          const ratings = snapshot.docs.map(doc => doc.data().rating);
+          const ratings = snapshot.docs.map(doc => doc.data().rating as number | undefined).filter((r): r is number => typeof r === "number");
           if (ratings.length > 0) {
             const sum = ratings.reduce((acc, curr) => acc + curr, 0);
             setAverageRating(sum / ratings.length);
             setTotalRatings(ratings.length);
+
+            // Regra simples: notas >= 4 contam como "recomendam esta empresa"
+            const recommendCount = ratings.filter(r => r >= 4).length;
+            const percentage = Math.round((recommendCount / ratings.length) * 100);
+            setRecommendationPercentage(percentage);
           } else {
             setAverageRating(0);
             setTotalRatings(0);
+            setRecommendationPercentage(null);
           }
         }, (error) => {
           console.error("Erro ao carregar avaliações da empresa:", error);
@@ -245,6 +253,7 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
     setNotificationType(type);
     if (type === 'success' && message === "Sua avaliação foi registrada com sucesso!") {
       setShowRatingAnimation(true);
+      setShowRatingModal(false); // Fechar modal após avaliar com sucesso
     }
   };
 
@@ -364,13 +373,7 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
       */}
       <div className="w-full max-w-screen-xl mx-auto px-4 mb-6">
         <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
-          {/* DOCUMENTAÇÃO: Stories da empresa - lado esquerdo
-              - Exibe stories ativos (não expirados) em formato de bolhas circulares
-              - Layout horizontal com scroll lateral no mobile
-              - Componente isolado, não acoplado com outras funcionalidades
-              - IMPORTANTE: company.id deve ser o ID do documento em users/{id}
-              - Stories são armazenados em users/{companyId}/stories/{storyId}
-          */}
+          {/* Stories da empresa */}
           <div className="flex-1 w-full md:w-auto">
             {company?.id && <CompanyStories companyId={company.id} />}
           </div>
@@ -384,40 +387,106 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
           <div className="w-full md:w-auto md:min-w-[300px]">
             {user?.uid !== company?.id && (
               <div className="w-full">
-                <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-4 text-center">Avalie esta empresa</h3>
-                
-                {/* DOCUMENTAÇÃO: Exibir avaliação média acima do formulário de avaliação */}
-                {totalRatings > 0 && (
-                  <div className="text-center mb-4">
-                    <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">
-                      {averageRating.toFixed(1)}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      avaliação média ({totalRatings} {totalRatings === 1 ? 'voto' : 'votos'})
-                    </p>
+                {/* Cabeçalho: título + estrelas + nota na mesma linha (quando há avaliações) */}
+                {totalRatings > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2 mb-4">
+                    <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Satisfação dos clientes</h3>
+                    <div className="flex items-center gap-1.5 text-amber-400">
+                      {[1, 2, 3, 4, 5].map((i) => {
+                        const full = Math.floor(averageRating);
+                        const remainder = averageRating - full;
+                        const hasHalf = remainder >= 0.25 && remainder < 0.75;
+                        if (i <= full) return <FontAwesomeIcon key={i} icon={faStar} className="text-lg" />;
+                        if (i === full + 1 && hasHalf) return <FontAwesomeIcon key={i} icon={faStarHalfStroke} className="text-lg" />;
+                        return <FontAwesomeIcon key={i} icon={faStar} className="text-lg text-gray-300 dark:text-gray-600" />;
+                      })}
+                    </div>
+                    <span className="text-lg font-bold text-zinc-900 dark:text-white">{averageRating.toFixed(1)}</span>
+                  </div>
+                ) : (
+                  <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-4 text-center">Satisfação dos clientes</h3>
+                )}
+
+                {/* Botão de recomendação + Botão Avalie esta empresa lado a lado */}
+                <div className="flex flex-wrap items-center gap-4 mb-4">
+                  {totalRatings > 0 && recommendationPercentage !== null && (
+                    <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-md hover:bg-blue-700 transition-colors">
+                      <FontAwesomeIcon icon={faThumbsUp} className="text-white" />
+                      <span>{recommendationPercentage}% recomendam esta empresa</span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!user) {
+                        setShowAuthPrompt(true);
+                        return;
+                      }
+                      setShowRatingModal(true);
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold shadow-md hover:bg-indigo-700 transition-colors"
+                  >
+                    <FontAwesomeIcon icon={faStar} className="text-amber-400" />
+                    <span>Avalie esta empresa</span>
+                  </button>
+                </div>
+
+                {/* Modal de avaliação com estrelas */}
+                {showRatingModal && company?.id && (
+                  <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                    onClick={() => setShowRatingModal(false)}
+                  >
+                    <div
+                      className="bg-white dark:bg-zinc-800 rounded-xl shadow-xl p-6 max-w-sm w-full"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="text-lg font-bold text-zinc-900 dark:text-white">Avalie esta empresa</h4>
+                        <button
+                          type="button"
+                          onClick={() => setShowRatingModal(false)}
+                          className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 p-1"
+                        >
+                          <FontAwesomeIcon icon={faXmark} className="text-xl" />
+                        </button>
+                      </div>
+                      <CompanyRatingInput companyId={company.id} onRatingSubmitted={handleShowNotification} />
+                    </div>
                   </div>
                 )}
-                
-                {company.id && <CompanyRatingInput companyId={company.id} onRatingSubmitted={handleShowNotification} />}
               </div>
             )}
             
             {/* DOCUMENTAÇÃO: Exibir apenas avaliação média para o dono da empresa (sem formulário) */}
             {user?.uid === company?.id && totalRatings > 0 && (
-              <div className="text-center">
-                <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-4">Avaliação da Empresa</h3>
-                <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">
-                  {averageRating.toFixed(1)}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  avaliação média ({totalRatings} {totalRatings === 1 ? 'voto' : 'votos'})
-                </p>
+              <div className="w-full">
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Satisfação dos clientes</h3>
+                  <div className="flex items-center gap-1.5 text-amber-400">
+                    {[1, 2, 3, 4, 5].map((i) => {
+                      const full = Math.floor(averageRating);
+                      const remainder = averageRating - full;
+                      const hasHalf = remainder >= 0.25 && remainder < 0.75;
+                      if (i <= full) return <FontAwesomeIcon key={i} icon={faStar} className="text-lg" />;
+                      if (i === full + 1 && hasHalf) return <FontAwesomeIcon key={i} icon={faStarHalfStroke} className="text-lg" />;
+                      return <FontAwesomeIcon key={i} icon={faStar} className="text-lg text-gray-300 dark:text-gray-600" />;
+                    })}
+                  </div>
+                  <span className="text-lg font-bold text-zinc-900 dark:text-white">{averageRating.toFixed(1)}</span>
+                </div>
+
+                {recommendationPercentage !== null && (
+                  <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-md">
+                    <FontAwesomeIcon icon={faThumbsUp} className="text-white" />
+                    <span>{recommendationPercentage}% recomendam esta empresa</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
-
 
       {companyPolls.length === 0 ? (
         <p className="text-center text-gray-600 text-lg">Nenhuma enquete encontrada para esta empresa.</p>
@@ -461,3 +530,4 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
     </div>
   );
 }
+
