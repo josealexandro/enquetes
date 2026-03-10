@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth, AuthContextType } from "../context/AuthContext";
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore (ainda necessária para update/delete)
-import { doc, updateDoc, deleteDoc } from "firebase/firestore"; // Importar doc, updateDoc e deleteDoc (deleteDoc usado apenas para enquetes, stories usa API route)
+import { doc, updateDoc, deleteDoc, collection, getDocs } from "firebase/firestore"; // Importar funções do Firestore (deleteDoc usado apenas para enquetes, stories usa API route)
 import { updateProfile } from "firebase/auth"; // Importar updateProfile do Firebase Auth
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"; // Importar Firebase Storage
 import PollForm from "./PollForm"; // Importar o PollForm
@@ -103,6 +103,24 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
   const [aiPollDraft, setAiPollDraft] = useState<{ question: string; options: string[] } | null>(null);
   const [aiUsageRemaining, setAiUsageRemaining] = useState<number | null>(null);
   const [publishingAiPoll, setPublishingAiPoll] = useState(false);
+
+  // NPS (Net Promoter Score) - resultados agregados, carregados sob demanda
+  const [showNpsModal, setShowNpsModal] = useState(false);
+  const [npsLoading, setNpsLoading] = useState(false);
+  const [npsError, setNpsError] = useState<string | null>(null);
+  const [npsSummary, setNpsSummary] = useState<{
+    totalResponses: number;
+    promoters: number;
+    passives: number;
+    detractors: number;
+    npsScore: number; // NPS em -100..100
+    averageScore: number; // média 0..10
+  } | null>(null);
+  const [npsDistribution, setNpsDistribution] = useState<number[]>([]); // contagem por nota 0-10
+  const [npsHistory, setNpsHistory] = useState<{ monthLabel: string; npsScore: number }[]>([]);
+  const [npsComments, setNpsComments] = useState<
+    { score: number; comment: string; createdAt: Date }[]
+  >([]);
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
   const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -928,6 +946,170 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     }
   };
 
+  // Carregar resultados de NPS sob demanda (quando o comerciante clicar no botão)
+  const handleOpenNpsModal = async () => {
+    // Apenas planos Medium/Pro com assinatura ativa podem ver resultados de NPS
+    if (!canShowAnalysis) {
+      return;
+    }
+    setShowNpsModal(true);
+    setNpsLoading(true);
+    setNpsError(null);
+    setNpsSummary(null);
+
+    try {
+      const ratingsRef = collection(db, `users/${user.uid}/ratings`);
+      const snapshot = await getDocs(ratingsRef);
+
+      if (snapshot.empty) {
+        setNpsSummary(null);
+        setNpsDistribution([]);
+        setNpsHistory([]);
+        setNpsComments([]);
+        setNpsError("Ainda não há respostas de NPS para sua empresa.");
+        return;
+      }
+
+      const scores: { score: number; createdAt?: Date; comment?: string | null }[] = [];
+
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as {
+          npsScore?: number;
+          rating?: number;
+          score?: number;
+          createdAt?: { toDate?: () => Date } | Date;
+          comment?: string | null;
+        };
+        let scoreValue: number | null = null;
+
+        if (typeof data.npsScore === "number") {
+          scoreValue = data.npsScore;
+        } else if (typeof data.score === "number") {
+          scoreValue = data.score;
+        } else if (typeof data.rating === "number") {
+          // Compatibilidade com avaliações antigas: converter estrelas (1-5) em NPS aproximado (0-10)
+          scoreValue = Math.max(0, Math.min(10, Math.round((data.rating as number) * 2)));
+        }
+
+        if (scoreValue !== null && !Number.isNaN(scoreValue)) {
+          let createdAtDate: Date | undefined;
+          if (data.createdAt instanceof Date) {
+            createdAtDate = data.createdAt;
+          } else if (data.createdAt && typeof data.createdAt.toDate === "function") {
+            createdAtDate = data.createdAt.toDate();
+          }
+
+          scores.push({
+            score: scoreValue,
+            createdAt: createdAtDate,
+            comment: data.comment ?? null,
+          });
+        }
+      });
+
+      if (scores.length === 0) {
+        setNpsSummary(null);
+        setNpsDistribution([]);
+        setNpsHistory([]);
+        setNpsComments([]);
+        setNpsError("Ainda não há respostas de NPS válidas para sua empresa.");
+        return;
+      }
+
+      const totalResponses = scores.length;
+      const onlyScores = scores.map((s) => s.score);
+
+      const promoters = onlyScores.filter((s) => s >= 9).length;
+      const detractors = onlyScores.filter((s) => s <= 6).length;
+      const passives = totalResponses - promoters - detractors;
+
+      const promotersPct = (promoters / totalResponses) * 100;
+      const detractorsPct = (detractors / totalResponses) * 100;
+      const npsScore = Math.round(promotersPct - detractorsPct);
+
+      const averageScore =
+        onlyScores.reduce((acc, curr) => acc + curr, 0) / totalResponses;
+
+      setNpsSummary({
+        totalResponses,
+        promoters,
+        passives,
+        detractors,
+        npsScore,
+        averageScore,
+      });
+
+      // Distribuição por nota (0-10)
+      const distribution = Array.from({ length: 11 }, () => 0);
+      onlyScores.forEach((s) => {
+        const idx = Math.max(0, Math.min(10, Math.round(s)));
+        distribution[idx] += 1;
+      });
+      setNpsDistribution(distribution);
+
+      // Histórico mensal de NPS
+      const monthlyMap = new Map<
+        string,
+        { scores: number[]; promoters: number; detractors: number }
+      >();
+
+      scores.forEach(({ score, createdAt }) => {
+        const d = createdAt ?? new Date();
+        const year = d.getFullYear();
+        const month = d.getMonth(); // 0-11
+        const key = `${year}-${month}`;
+        const entry =
+          monthlyMap.get(key) ?? { scores: [], promoters: 0, detractors: 0 };
+        entry.scores.push(score);
+        if (score >= 9) entry.promoters += 1;
+        else if (score <= 6) entry.detractors += 1;
+        monthlyMap.set(key, entry);
+      });
+
+      const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+      const history = Array.from(monthlyMap.entries())
+        .sort(([a], [b]) => (a < b ? -1 : 1))
+        .map(([key, value]) => {
+          const [yearStr, monthStr] = key.split("-");
+          const year = Number(yearStr);
+          const month = Number(monthStr);
+          const total = value.scores.length;
+          const promotersPctMonth = total > 0 ? (value.promoters / total) * 100 : 0;
+          const detractorsPctMonth = total > 0 ? (value.detractors / total) * 100 : 0;
+          const monthNps = Math.round(promotersPctMonth - detractorsPctMonth);
+          const label = `${monthNames[month]}/${String(year).slice(-2)}`;
+          return { monthLabel: label, npsScore: monthNps };
+        });
+
+      setNpsHistory(history);
+
+      // Comentários recentes (somente os que têm texto)
+      const comments = scores
+        .filter((s) => s.comment && s.comment.trim().length > 0)
+        .sort((a, b) => {
+          const da = a.createdAt?.getTime() ?? 0;
+          const db = b.createdAt?.getTime() ?? 0;
+          return db - da;
+        })
+        .slice(0, 20)
+        .map((s) => ({
+          score: s.score,
+          comment: s.comment!.trim(),
+          createdAt: s.createdAt ?? new Date(),
+        }));
+
+      setNpsComments(comments);
+    } catch (error) {
+      console.error("Erro ao carregar resultados de NPS:", error);
+      setNpsError(
+        "Não foi possível carregar os resultados de NPS. Tente novamente mais tarde."
+      );
+    } finally {
+      setNpsLoading(false);
+    }
+  };
+
   const handleDeletePoll = async (pollId: string) => {
     // user é garantido como não nulo aqui
     const pollToDelete = polls.find(p => p.id === pollId);
@@ -976,6 +1158,15 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 md:py-2.5 lg:py-2.5 px-3 md:px-4 rounded-lg transition duration-300 text-xs md:text-sm lg:text-base w-full sm:w-auto"
             >
               Gerar QR Code
+            </button>
+          )}
+          {user?.accountType === "commercial" && canShowAnalysis && (
+            <button
+              type="button"
+              onClick={handleOpenNpsModal}
+              className="bg-zinc-700 hover:bg-zinc-600 text-white font-bold py-2 md:py-2.5 lg:py-2.5 px-3 md:px-4 rounded-lg transition duration-300 text-xs md:text-sm lg:text-base w-full sm:w-auto"
+            >
+              Ver resultados NPS
             </button>
           )}
           <button
@@ -1055,6 +1246,203 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
           )}
         </div>
       </div>
+
+      {/* Modal de resultados NPS - carregado sob demanda, apenas para planos com análise */}
+      {showNpsModal && canShowAnalysis && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+          onClick={() => setShowNpsModal(false)}
+        >
+          <div
+            className="bg-zinc-900 text-white rounded-xl shadow-2xl max-w-md w-full p-6 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">Resultados de NPS</h3>
+              <button
+                type="button"
+                onClick={() => setShowNpsModal(false)}
+                className="text-zinc-400 hover:text-zinc-200 text-xl leading-none"
+                aria-label="Fechar"
+              >
+                ×
+              </button>
+            </div>
+
+            {npsLoading && (
+              <p className="text-sm text-zinc-300">Carregando resultados...</p>
+            )}
+
+            {!npsLoading && npsError && (
+              <p className="text-sm text-red-400">{npsError}</p>
+            )}
+
+            {!npsLoading && npsSummary && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-zinc-300">
+                    <span className="font-semibold">Média de nota (0 a 10): </span>
+                    {npsSummary.averageScore.toFixed(1)}
+                  </p>
+                  <p className="text-sm text-zinc-300">
+                    <span className="font-semibold">NPS (‑100 a 100): </span>
+                    {npsSummary.npsScore}
+                  </p>
+                  <p className="text-sm mt-1">
+                    <span className="font-semibold">Classificação: </span>
+                    <span
+                      className={
+                        npsSummary.npsScore < 0
+                          ? "text-red-400"
+                          : npsSummary.npsScore < 30
+                          ? "text-yellow-400"
+                          : npsSummary.npsScore < 70
+                          ? "text-emerald-300"
+                          : "text-emerald-400"
+                      }
+                    >
+                      {npsSummary.npsScore < 0
+                        ? "Ruim"
+                        : npsSummary.npsScore < 30
+                        ? "Regular"
+                        : npsSummary.npsScore < 70
+                        ? "Bom"
+                        : "Excelente"}
+                    </span>
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    NPS = % Promotores (9–10) − % Detratores (0–6)
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div className="bg-emerald-950/60 border border-emerald-700 rounded-lg p-3 text-center">
+                    <p className="text-xs text-emerald-300">Promotores</p>
+                    <p className="text-lg font-bold text-emerald-400">
+                      {npsSummary.promoters}
+                    </p>
+                  </div>
+                  <div className="bg-amber-950/60 border border-amber-600 rounded-lg p-3 text-center">
+                    <p className="text-xs text-amber-300">Neutros</p>
+                    <p className="text-lg font-bold text-amber-300">
+                      {npsSummary.passives}
+                    </p>
+                  </div>
+                  <div className="bg-red-950/60 border border-red-700 rounded-lg p-3 text-center">
+                    <p className="text-xs text-red-300">Detratores</p>
+                    <p className="text-lg font-bold text-red-400">
+                      {npsSummary.detractors}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-zinc-500">
+                  <span className="font-semibold">Total de respostas:</span>{" "}
+                  {npsSummary.totalResponses}
+                </p>
+
+                {/* Distribuição por nota (0-10) */}
+                {npsDistribution.length === 11 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-zinc-200">
+                      Distribuição das notas (0 a 10)
+                    </p>
+                    <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                      {npsDistribution.map((count, score) => {
+                        const maxCount = Math.max(...npsDistribution, 1);
+                        const widthPct = (count / maxCount) * 100;
+                        return (
+                          <div
+                            key={score}
+                            className="flex items-center gap-2 text-xs text-zinc-300"
+                          >
+                            <span className="w-4 text-right">{score}</span>
+                            <div className="flex-1 h-3 bg-zinc-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-indigo-500 rounded-full"
+                                style={{ width: `${widthPct}%` }}
+                              />
+                            </div>
+                            <span className="w-6 text-right">{count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Evolução mensal do NPS */}
+                {npsHistory.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-zinc-200">
+                      Evolução do NPS por mês
+                    </p>
+                    <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                      {npsHistory.map((entry) => {
+                        const normalized = (entry.npsScore + 100) / 2; // -100..100 -> 0..100
+                        return (
+                          <div
+                            key={entry.monthLabel}
+                            className="flex items-center gap-2 text-xs text-zinc-300"
+                          >
+                            <span className="w-12">{entry.monthLabel}</span>
+                            <div className="flex-1 h-3 bg-zinc-800 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${
+                                  entry.npsScore < 0
+                                    ? "bg-red-500"
+                                    : entry.npsScore < 30
+                                    ? "bg-amber-400"
+                                    : entry.npsScore < 70
+                                    ? "bg-emerald-400"
+                                    : "bg-emerald-500"
+                                }`}
+                                style={{ width: `${normalized}%` }}
+                              />
+                            </div>
+                            <span className="w-10 text-right">
+                              {entry.npsScore}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Comentários recentes */}
+                {npsComments.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-zinc-200">
+                      Comentários recentes
+                    </p>
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {npsComments.map((item, idx) => (
+                        <div
+                          key={`${item.createdAt.getTime()}-${idx}`}
+                          className="bg-zinc-800 rounded-lg p-3 text-xs"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-semibold text-zinc-100">
+                              Nota: {item.score}
+                            </span>
+                            <span className="text-[10px] text-zinc-500">
+                              {item.createdAt.toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-zinc-300 whitespace-pre-wrap">
+                            {item.comment}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* DOCUMENTAÇÃO: Seção de Stories
           - Visível para todas as contas comerciais
