@@ -6,6 +6,14 @@
 /* CSS crítico para header escuro no iOS - fallback quando Tailwind dark: demora */
 html.dark header.fixed {
   background-color: #27272a !important;
+  color: #ffffff !important;
+}
+
+/* Garantir que textos do cabeçalho fiquem brancos no dark mode,
+   independentemente de variações de breakpoint/navegador (ex.: tablets) */
+html.dark header.fixed a,
+html.dark header.fixed span {
+  color: #ffffff !important;
 }
 
 @layer base {
