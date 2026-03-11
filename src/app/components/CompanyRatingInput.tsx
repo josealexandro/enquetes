@@ -4,65 +4,61 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faStar as solidStar } from '@fortawesome/free-solid-svg-icons';
-import { db } from '@/lib/firebase';
-import { doc, collection, query, where, getDocs, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/app/context/AuthContext';
 import { motion } from 'framer-motion';
 
+const NPS_CLIENT_ID_KEY = "nps_client_id";
+
+function getOrCreateClientId(): string {
+  if (typeof window === "undefined") return "";
+  let id = localStorage.getItem(NPS_CLIENT_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID?.() ?? `nps-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(NPS_CLIENT_ID_KEY, id);
+  }
+  return id;
+}
+
 interface CompanyRatingInputProps {
   companyId: string;
-  onRatingSubmitted: (message: string, type: 'success' | 'error' | 'info') => void; // Callback para quando a avaliação for enviada
+  onRatingSubmitted: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
 const CompanyRatingInput: React.FC<CompanyRatingInputProps> = ({ companyId, onRatingSubmitted }) => {
-  const [selectedScore, setSelectedScore] = useState<number | null>(null); // Nota NPS escolhida (0-10)
-  const [userScore, setUserScore] = useState<number | null>(null); // Nota NPS já salva para o usuário
-  const [comment, setComment] = useState(""); // Comentário opcional
-  const [hasRated, setHasRated] = useState(false); // Se o usuário já avaliou
+  const [selectedScore, setSelectedScore] = useState<number | null>(null);
+  const [userScore, setUserScore] = useState<number | null>(null);
+  const [comment, setComment] = useState("");
+  const [hasRated, setHasRated] = useState(false);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
   useEffect(() => {
-    const fetchUserRating = async () => {
-      if (!user || !companyId) return;
+    if (!companyId) return;
 
-      setLoading(true);
-      try {
-        const ratingsRef = collection(db, `users/${companyId}/ratings`);
-        const q = query(ratingsRef, where('userId', '==', user.uid));
-        const querySnapshot = await getDocs(q);
+    const clientId = getOrCreateClientId();
+    if (!clientId) {
+      setLoading(false);
+      return;
+    }
 
-        if (!querySnapshot.empty) {
-          const ratingDoc = querySnapshot.docs[0];
-          const data = ratingDoc.data();
-          // Se já existir npsScore, usa; senão, deriva de rating antigo (1-5) multiplicando por 2
-          const existingScore: number | null =
-            typeof data.npsScore === "number"
-              ? data.npsScore
-              : typeof data.rating === "number"
-                ? Math.max(0, Math.min(10, Math.round((data.rating as number) * 2)))
-                : null;
-
-          if (existingScore !== null) {
-            setUserScore(existingScore);
-            setSelectedScore(existingScore);
-          }
-
-          if (typeof data.comment === "string") {
-            setComment(data.comment);
-          }
-
+    setLoading(true);
+    fetch(`/api/nps?companyId=${encodeURIComponent(companyId)}&clientId=${encodeURIComponent(clientId)}`)
+      .then((res) => {
+        if (res.status === 404) return null;
+        if (!res.ok) throw new Error("Erro ao buscar avaliação");
+        return res.json();
+      })
+      .then((data) => {
+        if (data?.exists && typeof data.score === "number") {
+          setUserScore(data.score);
+          setSelectedScore(data.score);
+          if (typeof data.comment === "string") setComment(data.comment);
           setHasRated(true);
         }
-      } catch (error) {
-        console.error("Erro ao buscar avaliação do usuário:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserRating();
-  }, [user, companyId]);
+      })
+      .catch((err) => console.error("Erro ao buscar avaliação:", err))
+      .finally(() => setLoading(false));
+  }, [companyId]);
 
   const handleSubmit = async () => {
     if (selectedScore === null) {
@@ -70,42 +66,42 @@ const CompanyRatingInput: React.FC<CompanyRatingInputProps> = ({ companyId, onRa
       return;
     }
 
-    if (!user) {
-      alert("Você precisa estar logado para avaliar.");
-      return;
-    }
-
-    if (user.uid === companyId) {
+    if (user?.uid === companyId) {
       onRatingSubmitted("Ação não permitida: Você não pode avaliar sua própria empresa.", "error");
       return;
     }
 
-    // Mapear NPS (0-10) para rating em estrelas (1-5) para compatibilidade com a lógica existente
-    const mappedStarRating = Math.max(1, Math.min(5, Math.round(selectedScore / 2)));
+    const clientId = getOrCreateClientId();
+    if (!clientId) {
+      onRatingSubmitted("Não foi possível identificar seu dispositivo. Tente novamente.", "error");
+      return;
+    }
 
     setLoading(true);
     try {
-      const ratingDocRef = doc(db, `users/${companyId}/ratings`, user.uid); // Usar UID do usuário como ID do documento
-      await setDoc(
-        ratingDocRef,
-        {
-          userId: user.uid,
-          empresaId: companyId,
-          rating: mappedStarRating,
-          npsScore: selectedScore,
+      const res = await fetch("/api/nps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId,
+          clientId,
           score: selectedScore,
-          comment: comment.trim() || null,
-          createdAt: serverTimestamp(),
-        },
-        { merge: true }
-      ); // Usar merge para atualizar se já existir
+          comment: comment.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        onRatingSubmitted(data.message ?? "Erro ao registrar sua avaliação. Tente novamente.", "error");
+        return;
+      }
 
       setUserScore(selectedScore);
       setHasRated(true);
-      onRatingSubmitted("Sua avaliação foi registrada com sucesso!", "success"); // Usar a prop para notificação
+      onRatingSubmitted("Sua avaliação foi registrada com sucesso!", "success");
     } catch (error) {
       console.error("Erro ao enviar avaliação:", error);
-      onRatingSubmitted("Erro ao registrar sua avaliação. Tente novamente.", "error"); // Usar a prop para notificação
+      onRatingSubmitted("Erro ao registrar sua avaliação. Tente novamente.", "error");
     } finally {
       setLoading(false);
     }

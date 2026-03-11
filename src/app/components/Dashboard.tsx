@@ -15,6 +15,7 @@ import slugify from "@/utils/slugify"; // Importar a função slugify
 import ExpandableImage from "./ExpandableImage"; // Importar componente de imagem expansível
 import QRCode from "react-qr-code"; // Importar QRCode
 import PollResults from "./PollResults"; // Importar componente de resultados de enquete
+import jsPDF from "jspdf";
 import { Story } from "../types/story"; // Importar tipo Story
 import { CreateStoryInput } from "../types/story"; // Importar tipo CreateStoryInput
 import { BRAZIL_REGIONS, getStatesByRegion } from "@/app/data/brazilLocations"; // Importar dados de localização
@@ -121,6 +122,8 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
   const [npsComments, setNpsComments] = useState<
     { score: number; comment: string; createdAt: Date }[]
   >([]);
+  const [npsPeriodLabel, setNpsPeriodLabel] = useState<string | null>(null);
+  const [npsPdfGenerating, setNpsPdfGenerating] = useState(false);
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
   const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -956,6 +959,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     setNpsLoading(true);
     setNpsError(null);
     setNpsSummary(null);
+    setNpsPeriodLabel(null);
 
     try {
       const ratingsRef = collection(db, `users/${user.uid}/ratings`);
@@ -1013,6 +1017,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
         setNpsHistory([]);
         setNpsComments([]);
         setNpsError("Ainda não há respostas de NPS válidas para sua empresa.");
+        setNpsPeriodLabel(null);
         return;
       }
 
@@ -1084,6 +1089,27 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
 
       setNpsHistory(history);
 
+      // Período do relatório: menor e maior data de resposta
+      const dates = scores
+        .map((s) => s.createdAt)
+        .filter((d): d is Date => d instanceof Date && !Number.isNaN(d.getTime()));
+      if (dates.length > 0) {
+        const minDate = new Date(Math.min(...dates.map((d) => d.getTime())));
+        const maxDate = new Date(Math.max(...dates.map((d) => d.getTime())));
+        const buildLabel = (d: Date) => {
+          const year = d.getFullYear();
+          const month = d.getMonth(); // 0-11
+          return `${monthNames[month]} ${year}`;
+        };
+        const startLabel = buildLabel(minDate);
+        const endLabel = buildLabel(maxDate);
+        setNpsPeriodLabel(
+          startLabel === endLabel ? startLabel : `${startLabel} – ${endLabel}`
+        );
+      } else {
+        setNpsPeriodLabel(null);
+      }
+
       // Comentários recentes (somente os que têm texto)
       const comments = scores
         .filter((s) => s.comment && s.comment.trim().length > 0)
@@ -1107,6 +1133,179 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       );
     } finally {
       setNpsLoading(false);
+    }
+  };
+
+  const addNpsPdfFooter = (pdf: jsPDF) => {
+    const totalPages = pdf.getNumberOfPages();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const margin = 18;
+    const footerY = pageHeight - 14;
+    for (let p = 1; p <= totalPages; p++) {
+      pdf.setPage(p);
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, footerY - 6, pageWidth - margin, footerY - 6);
+      pdf.setFontSize(8);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text("Relatório gerado por Engaaja", pageWidth / 2, footerY, { align: "center" });
+      pdf.text("Plataforma de inteligência de clientes", pageWidth / 2, footerY + 4, { align: "center" });
+    }
+    pdf.setTextColor(0, 0, 0);
+  };
+
+  const handleNpsExportPdf = () => {
+    if (!npsSummary) return;
+    setNpsPdfGenerating(true);
+    try {
+      const pdf = new jsPDF("p", "mm", "a4");
+      const margin = 18;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const maxWidth = pageWidth - margin * 2;
+      let y = margin;
+
+      const pushY = (dy: number) => {
+        y += dy;
+        if (y > pdf.internal.pageSize.getHeight() - 30) {
+          pdf.addPage();
+          y = margin;
+        }
+      };
+
+      const total = Math.max(npsSummary.totalResponses, 1);
+      const promotersPct = Math.round((npsSummary.promoters / total) * 100);
+      const passivesPct = Math.round((npsSummary.passives / total) * 100);
+      const detractorsPct = Math.round((npsSummary.detractors / total) * 100);
+      const classification =
+        npsSummary.npsScore < 0
+          ? "Ruim"
+          : npsSummary.npsScore < 30
+            ? "Regular"
+            : npsSummary.npsScore < 70
+              ? "Bom"
+              : "Excelente";
+      const summarySentence =
+        npsSummary.npsScore >= 70
+          ? "Seus clientes estão extremamente satisfeitos."
+          : npsSummary.npsScore >= 40
+          ? "Seus clientes estão muito satisfeitos."
+          : npsSummary.npsScore >= 10
+          ? "Seus clientes estão moderadamente satisfeitos."
+          : npsSummary.npsScore >= 0
+          ? "Seus clientes estão ligeiramente satisfeitos."
+          : "Seus clientes estão insatisfeitos e há espaço claro para melhoria.";
+
+      pdf.setFontSize(16);
+      pdf.text("Relatório de Experiência do Cliente", margin, y);
+      pushY(8);
+
+      pdf.setFontSize(11);
+      pdf.text(`Empresa: ${user.commercialName || user.displayName || "Sua empresa"}`, margin, y);
+      pushY(6);
+
+      if (npsPeriodLabel) {
+        pdf.setFontSize(11);
+        pdf.text(`Período: ${npsPeriodLabel}`, margin, y);
+        pushY(8);
+      } else {
+        pushY(4);
+      }
+
+      pdf.setFontSize(13);
+      pdf.text("Resultados de NPS", margin, y);
+      pushY(8);
+
+      pdf.setFontSize(11);
+      pdf.text(`NPS: ${npsSummary.npsScore} / 100 (${classification})`, margin, y);
+      pushY(6);
+
+      pdf.setFontSize(10);
+      const summaryLines = pdf.splitTextToSize(
+        `${summarySentence} ${promotersPct}% dos respondentes são promotores e recomendariam sua empresa.`,
+        maxWidth
+      );
+      summaryLines.forEach((line: string) => {
+        pdf.text(line, margin, y);
+        pushY(5);
+      });
+      pushY(3);
+
+      pdf.setFontSize(10);
+      pdf.text(
+        `0–6 (Detratores): ${npsSummary.detractors} (${detractorsPct}%)`,
+        margin,
+        y
+      );
+      pushY(6);
+      pdf.text(
+        `7–8 (Neutros): ${npsSummary.passives} (${passivesPct}%)`,
+        margin,
+        y
+      );
+      pushY(6);
+      pdf.text(
+        `9–10 (Promotores): ${npsSummary.promoters} (${promotersPct}%)`,
+        margin,
+        y
+      );
+      pushY(6);
+      pdf.text(`Total de respostas: ${npsSummary.totalResponses}`, margin, y);
+      pushY(12);
+
+      if (npsDistribution.length === 11) {
+        const detratores = npsDistribution.slice(0, 7).reduce((acc, v) => acc + v, 0);
+        const neutros = npsDistribution.slice(7, 9).reduce((acc, v) => acc + v, 0);
+        const promotores = npsDistribution.slice(9, 11).reduce((acc, v) => acc + v, 0);
+        pdf.setFontSize(11);
+        pdf.text("Distribuição das notas", margin, y);
+        pushY(7);
+        pdf.setFontSize(9);
+        pdf.text(`0–6 (Detratores): ${detratores}`, margin, y);
+        pushY(5);
+        pdf.text(`7–8 (Neutros): ${neutros}`, margin, y);
+        pushY(5);
+        pdf.text(`9–10 (Promotores): ${promotores}`, margin, y);
+        pushY(6);
+      }
+
+      if (npsHistory.length > 0) {
+        pdf.setFontSize(11);
+        pdf.text("Evolução do NPS por mês", margin, y);
+        pushY(7);
+        pdf.setFontSize(9);
+        npsHistory.forEach((entry) => {
+          pdf.text(`${entry.monthLabel}: ${entry.npsScore}`, margin, y);
+          pushY(5);
+        });
+        pushY(6);
+      }
+
+      if (npsComments.length > 0) {
+        pdf.setFontSize(11);
+        pdf.text("Comentários recentes", margin, y);
+        pushY(7);
+        pdf.setFontSize(9);
+        npsComments.forEach((item) => {
+          const line1 = `Nota: ${item.score}  —  ${item.createdAt.toLocaleDateString("pt-BR")}`;
+          pdf.text(line1, margin, y);
+          pushY(5);
+          const lines = pdf.splitTextToSize(item.comment, maxWidth);
+          lines.forEach((line: string) => {
+            pdf.text(line, margin, y);
+            pushY(5);
+          });
+          pushY(4);
+        });
+      }
+
+      addNpsPdfFooter(pdf);
+
+      const date = new Date().toLocaleDateString("pt-BR").replace(/\//g, "-");
+      pdf.save(`Resultados_NPS_${date}.pdf`);
+    } catch (error) {
+      console.error("Erro ao gerar PDF NPS:", error);
+    } finally {
+      setNpsPdfGenerating(false);
     }
   };
 
@@ -1250,124 +1449,176 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       {/* Modal de resultados NPS - carregado sob demanda, apenas para planos com análise */}
       {showNpsModal && canShowAnalysis && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-3 sm:p-4"
           onClick={() => setShowNpsModal(false)}
         >
           <div
-            className="bg-zinc-900 text-white rounded-xl shadow-2xl max-w-md w-full p-6 relative"
+            className="bg-zinc-900 text-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col p-4 sm:p-6 relative"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold">Resultados de NPS</h3>
-              <button
-                type="button"
-                onClick={() => setShowNpsModal(false)}
-                className="text-zinc-400 hover:text-zinc-200 text-xl leading-none"
-                aria-label="Fechar"
-              >
-                ×
-              </button>
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="text-base sm:text-lg font-bold">Resultados de NPS</h3>
+              <div className="flex items-center gap-2">
+                {npsSummary && (
+                  <button
+                    type="button"
+                    onClick={handleNpsExportPdf}
+                    disabled={npsPdfGenerating}
+                    className="text-xs sm:text-sm font-medium py-1.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {npsPdfGenerating ? "Gerando…" : "Gerar PDF"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowNpsModal(false)}
+                  className="text-zinc-400 hover:text-zinc-200 text-xl leading-none"
+                  aria-label="Fechar"
+                >
+                  ×
+                </button>
+              </div>
             </div>
 
-            {npsLoading && (
-              <p className="text-sm text-zinc-300">Carregando resultados...</p>
-            )}
+            <div className="flex-1 space-y-3 sm:space-y-4 overflow-y-auto pr-1 -mr-1">
+              {npsLoading && (
+                <p className="text-sm text-zinc-300">Carregando resultados...</p>
+              )}
 
-            {!npsLoading && npsError && (
-              <p className="text-sm text-red-400">{npsError}</p>
-            )}
+              {!npsLoading && npsError && (
+                <p className="text-sm text-red-400">{npsError}</p>
+              )}
 
-            {!npsLoading && npsSummary && (
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-zinc-300">
-                    <span className="font-semibold">Média de nota (0 a 10): </span>
-                    {npsSummary.averageScore.toFixed(1)}
-                  </p>
-                  <p className="text-sm text-zinc-300">
-                    <span className="font-semibold">NPS (‑100 a 100): </span>
-                    {npsSummary.npsScore}
-                  </p>
-                  <p className="text-sm mt-1">
-                    <span className="font-semibold">Classificação: </span>
-                    <span
-                      className={
-                        npsSummary.npsScore < 0
-                          ? "text-red-400"
-                          : npsSummary.npsScore < 30
-                          ? "text-yellow-400"
-                          : npsSummary.npsScore < 70
-                          ? "text-emerald-300"
-                          : "text-emerald-400"
-                      }
-                    >
-                      {npsSummary.npsScore < 0
-                        ? "Ruim"
-                        : npsSummary.npsScore < 30
-                        ? "Regular"
-                        : npsSummary.npsScore < 70
-                        ? "Bom"
-                        : "Excelente"}
-                    </span>
-                  </p>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    NPS = % Promotores (9–10) − % Detratores (0–6)
-                  </p>
-                </div>
+              {!npsLoading && npsSummary && (
+                <div className="space-y-4">
+                {(() => {
+                  const total = Math.max(npsSummary.totalResponses, 1);
+                  const promotersPct = Math.round((npsSummary.promoters / total) * 100);
+                  const passivesPct = Math.round((npsSummary.passives / total) * 100);
+                  const detractorsPct = Math.round((npsSummary.detractors / total) * 100);
+                  const classification =
+                    npsSummary.npsScore < 0
+                      ? "Ruim"
+                      : npsSummary.npsScore < 30
+                      ? "Regular"
+                      : npsSummary.npsScore < 70
+                      ? "Bom"
+                      : "Excelente";
+                  const summarySentence =
+                    npsSummary.npsScore >= 70
+                      ? "Seus clientes estão extremamente satisfeitos."
+                      : npsSummary.npsScore >= 40
+                      ? "Seus clientes estão muito satisfeitos."
+                      : npsSummary.npsScore >= 10
+                      ? "Seus clientes estão moderadamente satisfeitos."
+                      : npsSummary.npsScore >= 0
+                      ? "Seus clientes estão ligeiramente satisfeitos."
+                      : "Seus clientes estão insatisfeitos e há espaço claro para melhoria.";
+                  return (
+                    <>
+                      <div className="space-y-2">
+                        {npsPeriodLabel && (
+                          <p className="text-xs text-zinc-400">
+                            <span className="font-semibold">Período do relatório: </span>
+                            {npsPeriodLabel}
+                          </p>
+                        )}
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800 border border-zinc-700 text-xs sm:text-sm">
+                          <span className="text-yellow-300">⭐</span>
+                          <span className="font-semibold">
+                            NPS: {npsSummary.npsScore} / 100
+                          </span>
+                          <span
+                            className={
+                              npsSummary.npsScore < 0
+                                ? "text-red-400"
+                                : npsSummary.npsScore < 30
+                                ? "text-yellow-400"
+                                : npsSummary.npsScore < 70
+                                ? "text-emerald-300"
+                                : "text-emerald-400"
+                            }
+                          >
+                            ({classification})
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-400">
+                          <span className="font-semibold">Resumo: </span>
+                          {summarySentence} {promotersPct}% dos respondentes são
+                          {" "}
+                          promotores e recomendariam sua empresa.
+                        </p>
+                        <p className="text-xs text-zinc-500">
+                          NPS = % Promotores (9–10) − % Detratores (0–6)
+                        </p>
+                      </div>
 
-                <div className="grid grid-cols-3 gap-3 text-sm">
-                  <div className="bg-emerald-950/60 border border-emerald-700 rounded-lg p-3 text-center">
-                    <p className="text-xs text-emerald-300">Promotores</p>
-                    <p className="text-lg font-bold text-emerald-400">
-                      {npsSummary.promoters}
-                    </p>
-                  </div>
-                  <div className="bg-amber-950/60 border border-amber-600 rounded-lg p-3 text-center">
-                    <p className="text-xs text-amber-300">Neutros</p>
-                    <p className="text-lg font-bold text-amber-300">
-                      {npsSummary.passives}
-                    </p>
-                  </div>
-                  <div className="bg-red-950/60 border border-red-700 rounded-lg p-3 text-center">
-                    <p className="text-xs text-red-300">Detratores</p>
-                    <p className="text-lg font-bold text-red-400">
-                      {npsSummary.detractors}
-                    </p>
-                  </div>
-                </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                        <div className="bg-emerald-950/60 border border-emerald-700 rounded-lg p-3 text-center">
+                          <p className="text-xs text-emerald-300">Promotores</p>
+                          <p className="text-lg font-bold text-emerald-400">
+                            {npsSummary.promoters} ({promotersPct}%)
+                          </p>
+                        </div>
+                        <div className="bg-amber-950/60 border border-amber-600 rounded-lg p-3 text-center">
+                          <p className="text-xs text-amber-300">Neutros</p>
+                          <p className="text-lg font-bold text-amber-300">
+                            {npsSummary.passives} ({passivesPct}%)
+                          </p>
+                        </div>
+                        <div className="bg-red-950/60 border border-red-700 rounded-lg p-3 text-center">
+                          <p className="text-xs text-red-300">Detratores</p>
+                          <p className="text-lg font-bold text-red-400">
+                            {npsSummary.detractors} ({detractorsPct}%)
+                          </p>
+                        </div>
+                      </div>
 
-                <p className="text-xs text-zinc-500">
-                  <span className="font-semibold">Total de respostas:</span>{" "}
-                  {npsSummary.totalResponses}
-                </p>
+                      <p className="text-xs text-zinc-500">
+                        <span className="font-semibold">Total de respostas:</span>{" "}
+                        {npsSummary.totalResponses}
+                      </p>
+                    </>
+                  );
+                })()}
 
-                {/* Distribuição por nota (0-10) */}
+                {/* Distribuição por grupos de nota */}
                 {npsDistribution.length === 11 && (
                   <div className="space-y-2">
                     <p className="text-sm font-semibold text-zinc-200">
-                      Distribuição das notas (0 a 10)
+                      Distribuição das notas
                     </p>
-                    <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-                      {npsDistribution.map((count, score) => {
-                        const maxCount = Math.max(...npsDistribution, 1);
+                    {(() => {
+                      const detratores = npsDistribution.slice(0, 7).reduce((acc, v) => acc + v, 0);
+                      const neutros = npsDistribution.slice(7, 9).reduce((acc, v) => acc + v, 0);
+                      const promotores = npsDistribution.slice(9, 11).reduce((acc, v) => acc + v, 0);
+                      const maxCount = Math.max(detratores, neutros, promotores, 1);
+                      const makeBar = (label: string, count: number, color: string) => {
                         const widthPct = (count / maxCount) * 100;
                         return (
                           <div
-                            key={score}
+                            key={label}
                             className="flex items-center gap-2 text-xs text-zinc-300"
                           >
-                            <span className="w-4 text-right">{score}</span>
+                            <span className="w-28 sm:w-32">{label}</span>
                             <div className="flex-1 h-3 bg-zinc-800 rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-indigo-500 rounded-full"
+                                className={`h-full rounded-full ${color}`}
                                 style={{ width: `${widthPct}%` }}
                               />
                             </div>
                             <span className="w-6 text-right">{count}</span>
                           </div>
                         );
-                      })}
-                    </div>
+                      };
+                      return (
+                        <div className="space-y-1">
+                          {makeBar("0–6 (Detratores)", detratores, "bg-red-500")}
+                          {makeBar("7–8 (Neutros)", neutros, "bg-amber-400")}
+                          {makeBar("9–10 (Promotores)", promotores, "bg-emerald-400")}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -1440,6 +1691,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                 )}
               </div>
             )}
+            </div>
           </div>
         </div>
       )}

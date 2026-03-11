@@ -155,16 +155,21 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
         // - Importante mostrar novas avaliações em tempo real
         const companyRatingsRef = collection(db, `users/${fetchedCompany.id}/ratings`);
         const unsubscribeRatings = onSnapshot(companyRatingsRef, (snapshot) => {
-          const ratings = snapshot.docs.map(doc => doc.data().rating as number | undefined).filter((r): r is number => typeof r === "number");
-          if (ratings.length > 0) {
-            const sum = ratings.reduce((acc, curr) => acc + curr, 0);
-            setAverageRating(sum / ratings.length);
-            setTotalRatings(ratings.length);
-
-            // Regra simples: notas >= 4 contam como "recomendam esta empresa"
-            const recommendCount = ratings.filter(r => r >= 4).length;
-            const percentage = Math.round((recommendCount / ratings.length) * 100);
-            setRecommendationPercentage(percentage);
+          // Normalizar: cada doc pode ter score (0-10), npsScore ou rating (1-5) — converter tudo para 0-10
+          const scores010 = snapshot.docs
+            .map((d) => {
+              const data = d.data();
+              const s = typeof data.score === "number" ? data.score : typeof data.npsScore === "number" ? data.npsScore : typeof data.rating === "number" ? Math.round(Number(data.rating) * 2) : null;
+              return s;
+            })
+            .filter((s): s is number => typeof s === "number" && !Number.isNaN(s));
+          if (scores010.length > 0) {
+            const sum = scores010.reduce((acc, curr) => acc + curr, 0);
+            const avg010 = sum / scores010.length;
+            setAverageRating(avg010 / 2);
+            setTotalRatings(scores010.length);
+            const recommendCount = scores010.filter((r) => r >= 9).length;
+            setRecommendationPercentage(Math.round((recommendCount / scores010.length) * 100));
           } else {
             setAverageRating(0);
             setTotalRatings(0);
@@ -417,13 +422,7 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
                   )}
                   <button
                     type="button"
-                    onClick={() => {
-                      if (!user) {
-                        setShowAuthPrompt(true);
-                        return;
-                      }
-                      setShowRatingModal(true);
-                    }}
+                    onClick={() => setShowRatingModal(true)}
                     className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold shadow-md hover:bg-indigo-700 transition-colors"
                   >
                     <FontAwesomeIcon icon={faStar} className="text-amber-400" />
