@@ -260,6 +260,10 @@ export default function CompanyProfilePage({ params }: CompanyProfilePageProps) 
       setShowRatingAnimation(true);
       setShowRatingModal(false); // Fechar modal após avaliar com sucesso
     }
+    // Fechar modal também quando o usuário envia o contato (nota baixa) com sucesso
+    if (type === 'success' && message === "Contato enviado. A empresa poderá entrar em contato para melhorar sua experiência.") {
+      setShowRatingModal(false);
+    }
   };
 
   const handleCloseNotification = () => {

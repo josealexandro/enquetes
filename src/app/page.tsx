@@ -12,6 +12,9 @@ import { AnimatePresence } from "framer-motion"; // Importar AnimatePresence
 import { db } from "@/lib/firebase"; // Importar a instância do Firestore
 import { collection, query, orderBy, updateDoc, deleteDoc, doc, getDoc, Timestamp, limit, startAfter, getDocs, where, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import { useRouter } from 'next/navigation';
+import Link from "next/link";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTrophy, faStar, faStarHalfStroke } from "@fortawesome/free-solid-svg-icons";
 import PollPodium from "./components/PollPodium";
 import slugify from "@/utils/slugify";
 import { BRAZIL_STATES } from "@/app/data/brazilLocations"; // Importar estados do Brasil para exibir nome completo
@@ -44,6 +47,18 @@ export default function Home() {
   const [showPollForm, setShowPollForm] = useState(false);
   const pollFormRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  type RankedCompany = {
+    id: string;
+    commercialName: string;
+    displayName: string;
+    avatarUrl: string | null;
+    slug: string;
+    averageScore: number;
+    totalRatings: number;
+  };
+  const [topCompanies, setTopCompanies] = useState<RankedCompany[]>([]);
+  const [loadingTopCompanies, setLoadingTopCompanies] = useState(true);
 
   // Função auxiliar para processar os dados da enquete
   const processPollData = async (docSnap: QueryDocumentSnapshot<DocumentData>) => {
@@ -275,6 +290,16 @@ export default function Home() {
     setIsClient(true);
     fetchInitialPolls();
   }, [fetchInitialPolls]);
+
+  useEffect(() => {
+    if (!isClient) return;
+    setLoadingTopCompanies(true);
+    fetch("/api/ranking/companies?limit=6")
+      .then((res) => (res.ok ? res.json() : { companies: [] }))
+      .then((data: { companies?: RankedCompany[] }) => setTopCompanies(data.companies ?? []))
+      .catch(() => setTopCompanies([]))
+      .finally(() => setLoadingTopCompanies(false));
+  }, [isClient]);
 
   // DOCUMENTAÇÃO: Extrair cidades únicas das enquetes para sugestões
   const availableCities = useMemo(() => {
@@ -620,6 +645,92 @@ export default function Home() {
           />
         </div>
       )}
+
+      {/* Empresas mais bem avaliadas */}
+      <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-4xl px-4 mt-10 mb-6">
+        {loadingTopCompanies ? (
+          <p className="text-zinc-500 dark:text-zinc-400 text-center py-8">Carregando...</p>
+        ) : topCompanies.length > 0 ? (
+          <div className="bg-zinc-800 dark:bg-zinc-800 rounded-xl shadow-lg border border-zinc-700 overflow-hidden">
+            {/* Cabeçalho: troféu + título à esquerda, botão à direita */}
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3 border-b border-zinc-700">
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faTrophy} className="text-amber-400 text-lg" />
+                <h2 className="text-lg sm:text-xl font-bold text-white">Empresas mais bem avaliadas</h2>
+              </div>
+              <Link
+                href="/ranking"
+                className="px-3 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-zinc-900 text-xs sm:text-sm font-semibold transition-colors inline-flex items-center gap-1"
+              >
+                Ver ranking completo
+                <span aria-hidden>→</span>
+              </Link>
+            </div>
+            {/* Duas colunas */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-zinc-700">
+              {[0, 1].map((colIndex) => {
+                const half = Math.ceil(topCompanies.length / 2);
+                const start = colIndex * half;
+                const colCompanies = topCompanies.slice(start, start + half);
+                return (
+                  <div key={colIndex} className="flex flex-col">
+                    {colCompanies.map((company, idx) => {
+                      const position = start + idx + 1;
+                      const starValue = company.averageScore / 2;
+                      const fullStars = Math.floor(starValue);
+                      const hasHalf = starValue - fullStars >= 0.25 && starValue - fullStars < 0.75;
+                      const ratingFormatted = (company.averageScore / 2).toFixed(1).replace(".", ",");
+                      return (
+                        <Link
+                          key={company.id}
+                          href={`/empresa/${company.slug}`}
+                          className="flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2 hover:bg-zinc-700/50 transition-colors"
+                        >
+                          <span className="flex-shrink-0 w-5 text-zinc-400 text-xs font-semibold">
+                            {position}
+                          </span>
+                          <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {company.avatarUrl ? (
+                              <img
+                                src={company.avatarUrl}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-xs font-bold text-zinc-400">
+                                {(company.commercialName || company.displayName || "E").charAt(0)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-white truncate text-xs sm:text-sm">
+                              {company.commercialName || company.displayName}
+                            </p>
+                            <div className="flex items-center gap-1 mt-0">
+                              {[1, 2, 3, 4, 5].map((i) => {
+                                if (i <= fullStars) {
+                                  return <FontAwesomeIcon key={i} icon={faStar} className="text-xs text-amber-400" />;
+                                }
+                                if (i === fullStars + 1 && hasHalf) {
+                                  return <FontAwesomeIcon key={i} icon={faStarHalfStroke} className="text-xs text-amber-400" />;
+                                }
+                                return <FontAwesomeIcon key={i} icon={faStar} className="text-xs text-zinc-600" />;
+                              })}
+                              <span className="text-zinc-300 text-xs font-medium ml-1">{ratingFormatted}</span>
+                            </div>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <p className="text-zinc-500 dark:text-zinc-400 text-center py-8">Nenhuma empresa com avaliações no momento.</p>
+        )}
+      </div>
 
       <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-7xl px-4 mt-4"> {/* Restaurado lg:max-w-7xl para desapertar os cards */}
         {!isClient ? (
