@@ -30,6 +30,11 @@ const CompanyRatingInput: React.FC<CompanyRatingInputProps> = ({ companyId, onRa
   const [comment, setComment] = useState("");
   const [hasRated, setHasRated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showLowScoreModal, setShowLowScoreModal] = useState(false);
+  const [contactName, setContactName] = useState("");
+  const [contactInfo, setContactInfo] = useState("");
+  const [contactMessage, setContactMessage] = useState("");
+  const [submittingContact, setSubmittingContact] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -98,7 +103,16 @@ const CompanyRatingInput: React.FC<CompanyRatingInputProps> = ({ companyId, onRa
 
       setUserScore(selectedScore);
       setHasRated(true);
-      onRatingSubmitted("Sua avaliação foi registrada com sucesso!", "success");
+
+      if (selectedScore <= 5) {
+        onRatingSubmitted(
+          "Sua avaliação foi registrada. Queremos melhorar sua experiência.",
+          "success"
+        );
+        setShowLowScoreModal(true);
+      } else {
+        onRatingSubmitted("Sua avaliação foi registrada com sucesso!", "success");
+      }
     } catch (error) {
       console.error("Erro ao enviar avaliação:", error);
       onRatingSubmitted("Erro ao registrar sua avaliação. Tente novamente.", "error");
@@ -107,11 +121,62 @@ const CompanyRatingInput: React.FC<CompanyRatingInputProps> = ({ companyId, onRa
     }
   };
 
+  const handleSubmitLowScoreContact = async () => {
+    if (selectedScore === null || selectedScore > 5) {
+      setShowLowScoreModal(false);
+      return;
+    }
+
+    const hasAnyField =
+      contactName.trim().length > 0 ||
+      contactInfo.trim().length > 0 ||
+      contactMessage.trim().length > 0;
+
+    if (!hasAnyField) {
+      onRatingSubmitted("Preencha pelo menos um campo de contato ou feche a janela.", "info");
+      return;
+    }
+
+    const clientId = getOrCreateClientId();
+    if (!clientId) {
+      setShowLowScoreModal(false);
+      return;
+    }
+
+    setSubmittingContact(true);
+    try {
+      const res = await fetch("/api/nps/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId,
+          clientId,
+          score: selectedScore,
+          contactName: contactName.trim() || undefined,
+          contactInfo: contactInfo.trim() || undefined,
+          message: contactMessage.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error("Erro ao salvar contato NPS:", data);
+      } else {
+        onRatingSubmitted("Contato enviado. A empresa poderá entrar em contato para melhorar sua experiência.", "success");
+        setShowLowScoreModal(false);
+      }
+    } catch (error) {
+      console.error("Erro ao enviar contato NPS:", error);
+    } finally {
+      setSubmittingContact(false);
+    }
+  };
+
   if (loading) {
     return <div className="text-gray-500 dark:text-gray-400 text-center">Carregando avaliação...</div>;
   }
 
   return (
+    <>
     <div className="space-y-4">
       <p className="text-sm text-zinc-700 dark:text-zinc-300 text-center font-medium">
         De 0 a 10, quanto você recomendaria esta empresa para um amigo?
@@ -202,6 +267,87 @@ const CompanyRatingInput: React.FC<CompanyRatingInputProps> = ({ companyId, onRa
         </p>
       )}
     </div>
+
+    {showLowScoreModal && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+        <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl max-w-sm w-full p-5 space-y-4">
+          <div className="flex justify-between items-start gap-2">
+            <div>
+              <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                😔 Queremos melhorar sua experiência.
+              </p>
+              <p className="text-sm text-zinc-600 dark:text-zinc-300 mt-1">
+                Se quiser, deixe um contato para que possamos entender melhor o que aconteceu. Apenas o dono desta empresa verá essas informações.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowLowScoreModal(false)}
+              className="text-zinc-400 hover:text-zinc-200 text-xl leading-none"
+              aria-label="Fechar"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                Nome (opcional)
+              </label>
+              <input
+                type="text"
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-800 dark:text-zinc-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                E-mail ou WhatsApp (opcional)
+              </label>
+              <input
+                type="text"
+                value={contactInfo}
+                onChange={(e) => setContactInfo(e.target.value)}
+                className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-800 dark:text-zinc-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="ex: seuemail@exemplo.com ou (11) 99999-9999"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                (Opcional) Conte como podemos melhorar
+              </label>
+              <textarea
+                rows={3}
+                value={contactMessage}
+                onChange={(e) => setContactMessage(e.target.value)}
+                className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-800 dark:text-zinc-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2 pt-2">
+            <button
+              type="button"
+              onClick={handleSubmitLowScoreContact}
+              disabled={submittingContact}
+              className="flex-1 inline-flex items-center justify-center rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2.5 transition-colors"
+            >
+              {submittingContact ? "Enviando..." : "Enviar contato"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowLowScoreModal(false)}
+              className="flex-1 inline-flex items-center justify-center rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 text-sm font-semibold px-4 py-2.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              Agora não
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

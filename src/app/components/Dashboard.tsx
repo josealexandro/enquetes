@@ -109,6 +109,15 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
   const [showNpsModal, setShowNpsModal] = useState(false);
   const [npsLoading, setNpsLoading] = useState(false);
   const [npsError, setNpsError] = useState<string | null>(null);
+  type NpsContact = {
+    id: string;
+    score: number;
+    contactName?: string | null;
+    contactInfo?: string | null;
+    message?: string | null;
+    createdAt?: Date;
+  };
+
   const [npsSummary, setNpsSummary] = useState<{
     totalResponses: number;
     promoters: number;
@@ -123,6 +132,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
     { score: number; comment: string; createdAt: Date }[]
   >([]);
   const [npsPeriodLabel, setNpsPeriodLabel] = useState<string | null>(null);
+  const [npsContacts, setNpsContacts] = useState<NpsContact[]>([]);
   const [npsPdfGenerating, setNpsPdfGenerating] = useState(false);
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -966,10 +976,11 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       const snapshot = await getDocs(ratingsRef);
 
       if (snapshot.empty) {
-        setNpsSummary(null);
-        setNpsDistribution([]);
-        setNpsHistory([]);
-        setNpsComments([]);
+    setNpsSummary(null);
+    setNpsDistribution([]);
+    setNpsHistory([]);
+    setNpsComments([]);
+    setNpsContacts([]);
         setNpsError("Ainda não há respostas de NPS para sua empresa.");
         return;
       }
@@ -1016,6 +1027,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
         setNpsDistribution([]);
         setNpsHistory([]);
         setNpsComments([]);
+        setNpsContacts([]);
         setNpsError("Ainda não há respostas de NPS válidas para sua empresa.");
         setNpsPeriodLabel(null);
         return;
@@ -1126,6 +1138,36 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
         }));
 
       setNpsComments(comments);
+
+      // Carregar contatos de clientes insatisfeitos (npsContacts) via API backend (Admin SDK)
+      try {
+        const res = await fetch(`/api/nps/contact?companyId=${encodeURIComponent(user.uid)}`);
+        if (!res.ok) {
+          throw new Error(`Erro HTTP ${res.status}`);
+        }
+        const data = (await res.json()) as {
+          contacts?: {
+            id: string;
+            score: number | null;
+            contactName?: string | null;
+            contactInfo?: string | null;
+            message?: string | null;
+            createdAt?: string | null;
+          }[];
+        };
+        const contactsFromApi: NpsContact[] =
+          data.contacts?.map((c) => ({
+            id: c.id,
+            score: typeof c.score === "number" ? c.score : NaN,
+            contactName: c.contactName ?? null,
+            contactInfo: c.contactInfo ?? null,
+            message: c.message ?? null,
+            createdAt: c.createdAt ? new Date(c.createdAt) : undefined,
+          })) ?? [];
+        setNpsContacts(contactsFromApi);
+      } catch (contactsError) {
+        console.error("Erro ao carregar contatos de NPS:", contactsError);
+      }
     } catch (error) {
       console.error("Erro ao carregar resultados de NPS:", error);
       setNpsError(
@@ -1298,6 +1340,51 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
         });
       }
 
+      if (npsContacts.length > 0) {
+        pushY(6);
+        pdf.setFontSize(11);
+        pdf.text("Contatos de clientes para recuperação", margin, y);
+        pushY(7);
+        pdf.setFontSize(9);
+        npsContacts.forEach((item) => {
+          const hasInfo =
+            (item.contactName && item.contactName.trim().length > 0) ||
+            (item.contactInfo && item.contactInfo.trim().length > 0) ||
+            (item.message && item.message.trim().length > 0);
+          if (!hasInfo) {
+            return;
+          }
+          const headerLine = `Nota: ${
+            Number.isFinite(item.score) ? item.score : "-"
+          }  —  ${
+            item.createdAt
+              ? item.createdAt.toLocaleDateString("pt-BR")
+              : ""
+          }`;
+          pdf.text(headerLine, margin, y);
+          pushY(5);
+          if (item.contactName && item.contactName.trim().length > 0) {
+            pdf.text(`Nome: ${item.contactName}`, margin, y);
+            pushY(5);
+          }
+          if (item.contactInfo && item.contactInfo.trim().length > 0) {
+            pdf.text(`Contato: ${item.contactInfo}`, margin, y);
+            pushY(5);
+          }
+          if (item.message && item.message.trim().length > 0) {
+            const msgLines = pdf.splitTextToSize(
+              item.message,
+              maxWidth
+            );
+            msgLines.forEach((line: string) => {
+              pdf.text(line, margin, y);
+              pushY(5);
+            });
+          }
+          pushY(4);
+        });
+      }
+
       addNpsPdfFooter(pdf);
 
       const date = new Date().toLocaleDateString("pt-BR").replace(/\//g, "-");
@@ -1449,15 +1536,15 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       {/* Modal de resultados NPS - carregado sob demanda, apenas para planos com análise */}
       {showNpsModal && canShowAnalysis && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-3 sm:p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-3 sm:p-6"
           onClick={() => setShowNpsModal(false)}
         >
           <div
-            className="bg-zinc-900 text-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col p-4 sm:p-6 relative"
+            className="bg-zinc-900 text-white rounded-2xl shadow-2xl w-full max-w-3xl md:max-w-4xl max-h-[90vh] flex flex-col p-4 sm:p-6 md:p-8 relative"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <h3 className="text-base sm:text-lg font-bold">Resultados de NPS</h3>
+              <h3 className="text-base sm:text-lg md:text-xl font-bold">Resultados de NPS</h3>
               <div className="flex items-center gap-2">
                 {npsSummary && (
                   <button
@@ -1582,84 +1669,87 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                   );
                 })()}
 
-                {/* Distribuição por grupos de nota */}
-                {npsDistribution.length === 11 && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold text-zinc-200">
-                      Distribuição das notas
-                    </p>
-                    {(() => {
-                      const detratores = npsDistribution.slice(0, 7).reduce((acc, v) => acc + v, 0);
-                      const neutros = npsDistribution.slice(7, 9).reduce((acc, v) => acc + v, 0);
-                      const promotores = npsDistribution.slice(9, 11).reduce((acc, v) => acc + v, 0);
-                      const maxCount = Math.max(detratores, neutros, promotores, 1);
-                      const makeBar = (label: string, count: number, color: string) => {
-                        const widthPct = (count / maxCount) * 100;
-                        return (
-                          <div
-                            key={label}
-                            className="flex items-center gap-2 text-xs text-zinc-300"
-                          >
-                            <span className="w-28 sm:w-32">{label}</span>
-                            <div className="flex-1 h-3 bg-zinc-800 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full ${color}`}
-                                style={{ width: `${widthPct}%` }}
-                              />
+                {/* Blocos em 2 colunas no desktop, 1 coluna no mobile */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* Distribuição por grupos de nota */}
+                  {npsDistribution.length === 11 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-zinc-200">
+                        Distribuição das notas
+                      </p>
+                      {(() => {
+                        const detratores = npsDistribution.slice(0, 7).reduce((acc, v) => acc + v, 0);
+                        const neutros = npsDistribution.slice(7, 9).reduce((acc, v) => acc + v, 0);
+                        const promotores = npsDistribution.slice(9, 11).reduce((acc, v) => acc + v, 0);
+                        const maxCount = Math.max(detratores, neutros, promotores, 1);
+                        const makeBar = (label: string, count: number, color: string) => {
+                          const widthPct = (count / maxCount) * 100;
+                          return (
+                            <div
+                              key={label}
+                              className="flex items-center gap-2 text-xs text-zinc-300"
+                            >
+                              <span className="w-28 sm:w-32">{label}</span>
+                              <div className="flex-1 h-3 bg-zinc-800 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${color}`}
+                                  style={{ width: `${widthPct}%` }}
+                                />
+                              </div>
+                              <span className="w-6 text-right">{count}</span>
                             </div>
-                            <span className="w-6 text-right">{count}</span>
+                          );
+                        };
+                        return (
+                          <div className="space-y-1">
+                            {makeBar("0–6 (Detratores)", detratores, "bg-red-500")}
+                            {makeBar("7–8 (Neutros)", neutros, "bg-amber-400")}
+                            {makeBar("9–10 (Promotores)", promotores, "bg-emerald-400")}
                           </div>
                         );
-                      };
-                      return (
-                        <div className="space-y-1">
-                          {makeBar("0–6 (Detratores)", detratores, "bg-red-500")}
-                          {makeBar("7–8 (Neutros)", neutros, "bg-amber-400")}
-                          {makeBar("9–10 (Promotores)", promotores, "bg-emerald-400")}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                {/* Evolução mensal do NPS */}
-                {npsHistory.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold text-zinc-200">
-                      Evolução do NPS por mês
-                    </p>
-                    <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
-                      {npsHistory.map((entry) => {
-                        const normalized = (entry.npsScore + 100) / 2; // -100..100 -> 0..100
-                        return (
-                          <div
-                            key={entry.monthLabel}
-                            className="flex items-center gap-2 text-xs text-zinc-300"
-                          >
-                            <span className="w-12">{entry.monthLabel}</span>
-                            <div className="flex-1 h-3 bg-zinc-800 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full ${
-                                  entry.npsScore < 0
-                                    ? "bg-red-500"
-                                    : entry.npsScore < 30
-                                    ? "bg-amber-400"
-                                    : entry.npsScore < 70
-                                    ? "bg-emerald-400"
-                                    : "bg-emerald-500"
-                                }`}
-                                style={{ width: `${normalized}%` }}
-                              />
-                            </div>
-                            <span className="w-10 text-right">
-                              {entry.npsScore}
-                            </span>
-                          </div>
-                        );
-                      })}
+                      })()}
                     </div>
-                  </div>
-                )}
+                  )}
+
+                  {/* Evolução mensal do NPS */}
+                  {npsHistory.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-zinc-200">
+                        Evolução do NPS por mês
+                      </p>
+                      <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                        {npsHistory.map((entry) => {
+                          const normalized = (entry.npsScore + 100) / 2; // -100..100 -> 0..100
+                          return (
+                            <div
+                              key={entry.monthLabel}
+                              className="flex items-center gap-2 text-xs text-zinc-300"
+                            >
+                              <span className="w-12">{entry.monthLabel}</span>
+                              <div className="flex-1 h-3 bg-zinc-800 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${
+                                    entry.npsScore < 0
+                                      ? "bg-red-500"
+                                      : entry.npsScore < 30
+                                      ? "bg-amber-400"
+                                      : entry.npsScore < 70
+                                      ? "bg-emerald-400"
+                                      : "bg-emerald-500"
+                                  }`}
+                                  style={{ width: `${normalized}%` }}
+                                />
+                              </div>
+                              <span className="w-10 text-right">
+                                {entry.npsScore}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Comentários recentes */}
                 {npsComments.length > 0 && (
@@ -1686,6 +1776,58 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
                           </p>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Contatos de clientes insatisfeitos */}
+                {npsContacts.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-zinc-200">
+                      Contatos de clientes para recuperação
+                    </p>
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {npsContacts.map((item) => {
+                        const hasInfo =
+                          (item.contactName && item.contactName.trim().length > 0) ||
+                          (item.contactInfo && item.contactInfo.trim().length > 0) ||
+                          (item.message && item.message.trim().length > 0);
+                        if (!hasInfo) return null;
+                        return (
+                          <div
+                            key={item.id}
+                            className="bg-zinc-800 rounded-lg p-3 text-xs"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-semibold text-zinc-100">
+                                Nota: {Number.isFinite(item.score) ? item.score : "-"}
+                              </span>
+                              <span className="text-[10px] text-zinc-500">
+                                {item.createdAt
+                                  ? item.createdAt.toLocaleDateString()
+                                  : ""}
+                              </span>
+                            </div>
+                            {item.contactName && item.contactName.trim().length > 0 && (
+                              <p className="text-zinc-300">
+                                <span className="font-semibold">Nome: </span>
+                                {item.contactName}
+                              </p>
+                            )}
+                            {item.contactInfo && item.contactInfo.trim().length > 0 && (
+                              <p className="text-zinc-300">
+                                <span className="font-semibold">Contato: </span>
+                                {item.contactInfo}
+                              </p>
+                            )}
+                            {item.message && item.message.trim().length > 0 && (
+                              <p className="text-zinc-300 whitespace-pre-wrap mt-1">
+                                {item.message}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
