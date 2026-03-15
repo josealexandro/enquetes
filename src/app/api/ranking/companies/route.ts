@@ -67,35 +67,60 @@ export async function GET(request: NextRequest) {
             ? userData.photoURL
             : null;
 
-      const ratingsSnap = await adminDb
-        .collection("users")
-        .doc(companyId)
-        .collection("ratings")
-        .get();
+      let totalRatings: number;
+      let averageScore: number;
 
-      const scores: number[] = [];
-      ratingsSnap.docs.forEach((ratingDoc) => {
-        const d = ratingDoc.data();
-        const s =
-          typeof d.score === "number"
-            ? d.score
-            : typeof d.npsScore === "number"
-              ? d.npsScore
-              : typeof d.rating === "number"
-                ? Math.round(Number(d.rating) * 2)
-                : null;
-        if (s !== null && !Number.isNaN(s) && s >= 0 && s <= 10) {
-          scores.push(s);
+      const docTotal = userData.totalRatings;
+      const docSum = userData.sumOfScores;
+      const hasAggregates =
+        typeof docTotal === "number" &&
+        docTotal >= 0 &&
+        typeof docSum === "number" &&
+        !Number.isNaN(docSum);
+
+      if (hasAggregates && docTotal > 0) {
+        totalRatings = docTotal;
+        averageScore = docSum / docTotal;
+      } else {
+        const ratingsSnap = await adminDb
+          .collection("users")
+          .doc(companyId)
+          .collection("ratings")
+          .get();
+
+        const scores: number[] = [];
+        ratingsSnap.docs.forEach((ratingDoc) => {
+          const d = ratingDoc.data();
+          const s =
+            typeof d.score === "number"
+              ? d.score
+              : typeof d.npsScore === "number"
+                ? d.npsScore
+                : typeof d.rating === "number"
+                  ? Math.round(Number(d.rating) * 2)
+                  : null;
+          if (s !== null && !Number.isNaN(s) && s >= 0 && s <= 10) {
+            scores.push(s);
+          }
+        });
+
+        totalRatings = scores.length;
+        if (totalRatings > 0) {
+          averageScore = scores.reduce((a, b) => a + b, 0) / totalRatings;
+          const companyRef = adminDb.collection("users").doc(companyId);
+          const sumOfScores = scores.reduce((a, b) => a + b, 0);
+          companyRef.set({ totalRatings, sumOfScores }, { merge: true }).catch((err) => {
+            console.warn("[RANKING] backfill aggregates failed for", companyId, err);
+          });
+        } else {
+          continue;
         }
-      });
-
-      if (scores.length < MIN_RATINGS) {
-        continue; // só entram no ranking empresas com pelo menos MIN_RATINGS avaliações
       }
 
-      const totalRatings = scores.length;
-      const averageScore =
-        scores.reduce((a, b) => a + b, 0) / totalRatings;
+      if (totalRatings < MIN_RATINGS) {
+        continue;
+      }
+
       const slug = slugify(commercialName);
       const scoreFinal = averageScore * Math.log(totalRatings + 1);
 

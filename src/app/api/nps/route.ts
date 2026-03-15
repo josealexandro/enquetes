@@ -117,14 +117,45 @@ export async function POST(request: NextRequest) {
 
   try {
     const rating = Math.max(1, Math.min(5, Math.round(numScore / 2)));
-    const ref = adminDb
+    const ratingRef = adminDb
       .collection(NPS_STORAGE_PATH)
       .doc(companyId)
       .collection("ratings")
       .doc(clientId);
+    const companyRef = adminDb.collection(NPS_STORAGE_PATH).doc(companyId);
 
-    await ref.set(
-      {
+    await adminDb.runTransaction(async (tx) => {
+      const [ratingSnap, companySnap] = await Promise.all([
+        tx.get(ratingRef),
+        tx.get(companyRef),
+      ]);
+
+      let oldScore0to10: number | null = null;
+      if (ratingSnap.exists) {
+        const d = ratingSnap.data();
+        const s =
+          typeof d?.score === "number"
+            ? d.score
+            : typeof d?.npsScore === "number"
+              ? d.npsScore
+              : typeof d?.rating === "number"
+                ? Math.round(Number(d.rating) * 2)
+                : null;
+        if (s !== null && !Number.isNaN(s) && s >= 0 && s <= 10) oldScore0to10 = s;
+      }
+
+      const data = companySnap.data();
+      let totalRatings = typeof data?.totalRatings === "number" && data.totalRatings >= 0 ? data.totalRatings : 0;
+      let sumOfScores = typeof data?.sumOfScores === "number" && !Number.isNaN(data.sumOfScores) ? data.sumOfScores : 0;
+
+      if (oldScore0to10 !== null) {
+        sumOfScores = sumOfScores - oldScore0to10 + numScore;
+      } else {
+        totalRatings += 1;
+        sumOfScores += numScore;
+      }
+
+      tx.set(ratingRef, {
         clientId,
         empresaId: companyId,
         score: numScore,
@@ -132,9 +163,10 @@ export async function POST(request: NextRequest) {
         rating,
         comment: trimmedComment,
         createdAt: new Date(),
-      },
-      { merge: true }
-    );
+      }, { merge: true });
+
+      tx.set(companyRef, { totalRatings, sumOfScores }, { merge: true });
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
