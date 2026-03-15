@@ -649,7 +649,36 @@ export default function Home() {
       {/* Empresas mais bem avaliadas */}
       <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-4xl px-4 mt-10 mb-6">
         {loadingTopCompanies ? (
-          <p className="text-zinc-500 dark:text-zinc-400 text-center py-8">Carregando...</p>
+          <div className="bg-zinc-800 dark:bg-zinc-800 rounded-xl shadow-lg border border-zinc-700 overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3 border-b border-zinc-700">
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faTrophy} className="text-amber-400 text-lg" />
+                <h2 className="text-lg sm:text-xl font-bold text-white">Empresas mais bem avaliadas</h2>
+              </div>
+              <div className="h-8 w-28 rounded-full bg-zinc-700 animate-pulse" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-zinc-700">
+              {[0, 1].map((colIndex) => (
+                <div key={colIndex} className="flex flex-col">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2">
+                      <div className="flex-shrink-0 w-5 h-3 rounded bg-zinc-700 animate-pulse" />
+                      <div className="w-8 h-8 rounded-full bg-zinc-700 animate-pulse flex-shrink-0" />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="h-3.5 w-3/4 max-w-[120px] rounded bg-zinc-700 animate-pulse" />
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <div key={s} className="w-3 h-3 rounded-sm bg-zinc-700 animate-pulse" />
+                          ))}
+                          <div className="h-3 w-8 ml-1 rounded bg-zinc-700 animate-pulse" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
         ) : topCompanies.length > 0 ? (
           <div className="bg-zinc-800 dark:bg-zinc-800 rounded-xl shadow-lg border border-zinc-700 overflow-hidden">
             {/* Cabeçalho: troféu + título à esquerda, botão à direita */}
