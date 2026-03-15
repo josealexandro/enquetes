@@ -418,7 +418,7 @@ function PollCard({ poll, onVote, onDelete, onCardClick, rankColor, textColorCla
 
   return (
     <div
-      className={`rounded-lg transition-all duration-300 p-4 md:p-6 mb-6 transform hover:-translate-y-1 cursor-pointer w-full max-w-full min-w-0 mx-auto relative overflow-hidden
+      className={`rounded-lg transition-all duration-300 p-4 md:p-6 mb-6 transform hover:-translate-y-1 cursor-pointer w-full max-w-full min-w-0 mx-auto relative
         ${variant === "podium" ? "md:w-[90%] md:max-w-[90%]" : ""}
         ${showShareMenu ? "z-20" : ""}
         ${isExpanded
