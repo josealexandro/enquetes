@@ -2455,7 +2455,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
       {/* DOCUMENTAÇÃO: Modal de QR Code responsivo - QR Code menor no mobile */}
       {showQrCodeModal && companyPublicPageUrl && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-          <div className="bg-white p-4 sm:p-8 rounded-lg shadow-xl w-full max-w-sm relative flex flex-col items-center max-h-[90vh] overflow-y-auto">
+          <div className="bg-white px-4 pt-3 pb-4 sm:px-6 sm:pt-4 sm:pb-6 rounded-lg shadow-xl w-full max-w-sm relative flex flex-col items-center max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setShowQrCodeModal(false)}
               className="absolute top-2 sm:top-4 right-2 sm:right-4 text-gray-800 hover:text-gray-600 text-xl sm:text-2xl z-10"
@@ -2463,12 +2463,17 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
               &times;
             </button>
             <Image
-              src="/logoPrincipal.png"
-              alt="PollApp Logo"
-              width={80}
-              height={80}
-              className="mb-2 sm:w-[100px] sm:h-[100px]"
+              src="/logoQrCodee.png"
+              alt="Engaaja Logo"
+              width={420}
+              height={180}
+              quality={100}
+              priority
+              className="mb-1 w-56 sm:w-64 h-auto object-contain"
             />
+            <p className="text-zinc-700 text-sm sm:text-base font-medium mb-3 text-center">
+              Sua opinião é importante.
+            </p>
             <div className="p-2 sm:p-4 bg-white rounded-lg shadow-inner">
               {/* DOCUMENTAÇÃO: QR Code responsivo - tamanho ajustado automaticamente */}
               <QRCode 
@@ -2481,7 +2486,7 @@ const Dashboard = ({ polls, user }: DashboardProps) => {
               href={companyPublicPageUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-3 sm:mt-4 text-indigo-600 hover:text-indigo-800 font-semibold text-sm sm:text-base text-center"
+              className="mt-3 sm:mt-4 text-zinc-900 hover:text-zinc-700 font-semibold text-sm sm:text-base text-center"
             >
               Ir para a Página da Empresa
             </a>
